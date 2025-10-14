@@ -1,0 +1,84 @@
+{
+  "name": "yno-libero-vino",
+  "description": "A wine club and loyalty platform for Commerce7 and Shopify",
+  "repository": "https://github.com/your-username/yno-libero-vino",
+  "logo": "https://via.placeholder.com/150x150/4F46E5/FFFFFF?text=YNO",
+  "keywords": [
+    "wine-club",
+    "loyalty-platform",
+    "winery",
+    "wine",
+    "commerce7",
+    "shopify",
+    "react-router",
+    "supabase",
+    "heroku"
+  ],
+  "env": {
+    "SUPABASE_URL": {
+      "description": "Your Supabase project URL",
+      "required": true
+    },
+    "SUPABASE_ANON_KEY": {
+      "description": "Your Supabase anonymous key",
+      "required": true
+    },
+    "SUPABASE_SERVICE_ROLE_KEY": {
+      "description": "Your Supabase service role key",
+      "required": true
+    },
+    "SHOPIFY_API_KEY": {
+      "description": "Your Shopify app API key",
+      "required": false
+    },
+    "SHOPIFY_API_SECRET": {
+      "description": "Your Shopify app API secret",
+      "required": false
+    },
+    "SHOPIFY_APP_URL": {
+      "description": "Your Shopify app URL (will be set automatically)",
+      "required": false
+    },
+    "SCOPES": {
+      "description": "Shopify app scopes",
+      "value": "read_customers,read_orders,read_products,write_discounts",
+      "required": false
+    },
+    "COMMERCE7_KEY": {
+      "description": "Your Commerce7 API key",
+      "required": false
+    },
+    "COMMERCE7_USER": {
+      "description": "Your Commerce7 username",
+      "required": false
+    },
+    "COMMERCE7_PASSWORD": {
+      "description": "Your Commerce7 password",
+      "required": false
+    },
+    "COMMERCE7_TENANT": {
+      "description": "Your Commerce7 tenant ID",
+      "required": false
+    },
+    "NODE_ENV": {
+      "description": "Node environment",
+      "value": "production"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini"
+    }
+  ]
+}

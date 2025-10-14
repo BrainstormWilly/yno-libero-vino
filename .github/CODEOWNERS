@@ -1,0 +1,44 @@
+# Code Owners for Yno Libero Vino
+# These owners will be the default owners for everything in the repo
+# Unless a later match takes precedence, they will be requested for
+# review when someone opens a pull request.
+
+# Default owner for everything
+* @willysair
+
+# CRM Provider implementations
+/app/lib/crm/ @willysair
+
+# Webhook implementations
+/app/routes/webhooks.*.tsx @willysair
+
+# Authentication routes
+/app/routes/shp.auth.tsx @willysair
+/app/routes/c7.auth.tsx @willysair
+
+# TypeScript types and interfaces
+/app/types/ @willysair
+
+# Utility functions
+/app/util/ @willysair
+
+# GitHub workflows and CI/CD
+/.github/ @willysair
+
+# Documentation
+*.md @willysair
+/docs/ @willysair
+
+# Configuration files
+*.config.js @willysair
+*.config.ts @willysair
+.env.example @willysair
+env.example @willysair
+
+# Database migrations
+/supabase/migrations/ @willysair
+
+# Security-sensitive files
+SECURITY.md @willysair
+/.github/workflows/security-scan.yml @willysair
+

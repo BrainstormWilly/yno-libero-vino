@@ -1,0 +1,162 @@
+# GitHub Labels Configuration
+# Use https://github.com/crazy-max/ghaction-github-labeler to sync
+
+# Type labels
+- name: "type: bug"
+  color: "d73a4a"
+  description: "Something isn't working"
+
+- name: "type: feature"
+  color: "a2eeef"
+  description: "New feature or request"
+
+- name: "type: enhancement"
+  color: "a2eeef"
+  description: "Enhancement to existing feature"
+
+- name: "type: documentation"
+  color: "0075ca"
+  description: "Improvements or additions to documentation"
+
+- name: "type: refactor"
+  color: "fbca04"
+  description: "Code refactoring"
+
+- name: "type: security"
+  color: "b60205"
+  description: "Security-related issue or improvement"
+
+# Priority labels
+- name: "priority: critical"
+  color: "b60205"
+  description: "Critical priority"
+
+- name: "priority: high"
+  color: "d93f0b"
+  description: "High priority"
+
+- name: "priority: medium"
+  color: "fbca04"
+  description: "Medium priority"
+
+- name: "priority: low"
+  color: "0e8a16"
+  description: "Low priority"
+
+# Status labels
+- name: "status: in progress"
+  color: "f9d0c4"
+  description: "Work in progress"
+
+- name: "status: blocked"
+  color: "d73a4a"
+  description: "Blocked by another issue"
+
+- name: "status: needs review"
+  color: "fbca04"
+  description: "Needs code review"
+
+- name: "status: needs testing"
+  color: "fbca04"
+  description: "Needs testing"
+
+- name: "status: ready"
+  color: "0e8a16"
+  description: "Ready for implementation"
+
+# Component labels
+- name: "component: webhook"
+  color: "1d76db"
+  description: "Webhook functionality"
+
+- name: "component: crm"
+  color: "1d76db"
+  description: "CRM integration"
+
+- name: "component: auth"
+  color: "1d76db"
+  description: "Authentication"
+
+- name: "component: ui"
+  color: "1d76db"
+  description: "User interface"
+
+- name: "component: api"
+  color: "1d76db"
+  description: "API related"
+
+- name: "component: database"
+  color: "1d76db"
+  description: "Database related"
+
+# CRM-specific labels
+- name: "crm: shopify"
+  color: "5dbd00"
+  description: "Shopify integration"
+
+- name: "crm: commerce7"
+  color: "7e57c2"
+  description: "Commerce7 integration"
+
+# Size labels
+- name: "size/xs"
+  color: "c5def5"
+  description: "Extra small PR (1-10 lines)"
+
+- name: "size/s"
+  color: "c5def5"
+  description: "Small PR (11-100 lines)"
+
+- name: "size/m"
+  color: "c5def5"
+  description: "Medium PR (101-500 lines)"
+
+- name: "size/l"
+  color: "c5def5"
+  description: "Large PR (501-1000 lines)"
+
+- name: "size/xl"
+  color: "c5def5"
+  description: "Extra large PR (1000+ lines)"
+
+# Special labels
+- name: "dependencies"
+  color: "0366d6"
+  description: "Dependency updates"
+
+- name: "automated"
+  color: "ededed"
+  description: "Automated changes"
+
+- name: "good first issue"
+  color: "7057ff"
+  description: "Good for newcomers"
+
+- name: "help wanted"
+  color: "008672"
+  description: "Extra attention is needed"
+
+- name: "breaking change"
+  color: "b60205"
+  description: "Breaking change"
+
+- name: "wip"
+  color: "fbca04"
+  description: "Work in progress"
+
+- name: "duplicate"
+  color: "cfd3d7"
+  description: "This issue or pull request already exists"
+
+- name: "invalid"
+  color: "e4e669"
+  description: "This doesn't seem right"
+
+- name: "wontfix"
+  color: "ffffff"
+  description: "This will not be worked on"
+
+- name: "question"
+  color: "d876e3"
+  description: "Further information is requested"
+

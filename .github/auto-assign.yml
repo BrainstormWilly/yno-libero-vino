@@ -1,0 +1,23 @@
+# Auto-assign reviewers to pull requests
+addReviewers: true
+addAssignees: true
+
+# A list of reviewers to be added to pull requests (GitHub user name)
+reviewers:
+  - willysair
+
+# A number of reviewers added to the pull request
+numberOfReviewers: 1
+
+# A list of assignees, overrides reviewers if set
+assignees:
+  - willysair
+
+# A number of assignees to add to the pull request
+numberOfAssignees: 1
+
+# A list of keywords to be skipped for reviewers
+skipKeywords:
+  - wip
+  - draft
+

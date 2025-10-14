@@ -6,6 +6,8 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { AppProvider } from "@shopify/polaris";
+import "@shopify/polaris/build/esm/styles.css";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -32,8 +34,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
       </head>
-      <body>
-        {children}
+      <body className="font-sans antialiased">
+        <AppProvider
+          i18n={{
+            Polaris: {
+              Common: {
+                checkbox: 'checkbox',
+                undo: 'undo',
+                cancel: 'Cancel',
+                clear: 'Clear',
+                submit: 'Submit',
+                more: 'More',
+                search: 'Search',
+                filter: 'Filter',
+                refresh: 'Refresh',
+                close: 'Close',
+                loading: 'Loading',
+                optional: 'Optional',
+              },
+            },
+          }}
+        >
+          {children}
+        </AppProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

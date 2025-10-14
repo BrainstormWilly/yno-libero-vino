@@ -1,0 +1,49 @@
+# GitHub Release Configuration
+# Automatically generate release notes
+
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+      - automated
+    authors:
+      - dependabot
+      - github-actions
+  categories:
+    - title: 🚀 Features
+      labels:
+        - "type: feature"
+        - "type: enhancement"
+    - title: 🐛 Bug Fixes
+      labels:
+        - "type: bug"
+    - title: 🔒 Security
+      labels:
+        - "type: security"
+    - title: 📝 Documentation
+      labels:
+        - "type: documentation"
+    - title: 🔄 Refactoring
+      labels:
+        - "type: refactor"
+    - title: 🔗 Webhook Improvements
+      labels:
+        - "component: webhook"
+    - title: 🛍️ Shopify Integration
+      labels:
+        - "crm: shopify"
+    - title: 🍷 Commerce7 Integration
+      labels:
+        - "crm: commerce7"
+    - title: 📦 Dependencies
+      labels:
+        - dependencies
+    - title: ⚠️ Breaking Changes
+      labels:
+        - "breaking change"
+    - title: 🔧 Other Changes
+      labels:
+        - "*"
+
