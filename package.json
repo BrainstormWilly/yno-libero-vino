@@ -37,7 +37,7 @@
     "@uppy/react": "^4.2.3",
     "@uppy/transloadit": "^4.2.2",
     "dotenv": "^16.5.0",
-    "framer-motion": "^12.7.4",
+    "framer-motion": "^12.23.24",
     "isbot": "^5.1.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
