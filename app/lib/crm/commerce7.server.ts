@@ -4,14 +4,16 @@ import { redirect } from 'react-router';
 import crypto from 'crypto';
 
 const API_URL = "https://api.commerce7.com/v1";
-const API_KEY = process.env.COMMERCE7_KEY;
 const APP_NAME = "yno-libero-vino";
 
-if (!API_KEY) {
-  throw new Error("Commerce7 Error. Missing API key");
+// Helper to get API auth (lazy evaluation)
+function getApiAuth(): string {
+  const API_KEY = process.env.COMMERCE7_KEY;
+  if (!API_KEY) {
+    throw new Error("Commerce7 Error. Missing API key");
+  }
+  return "Basic " + Buffer.from(`${APP_NAME}:${API_KEY}`).toString("base64");
 }
-
-const apiAuth = "Basic " + Buffer.from(`${APP_NAME}:${API_KEY}`).toString("base64");
 
 export class Commerce7Provider implements CrmProvider {
   name = CrmNames.COMMERCE7;
@@ -65,7 +67,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -94,7 +96,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -124,7 +126,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
       body: JSON.stringify(customer)
@@ -155,7 +157,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
       body: JSON.stringify(customer)
@@ -185,7 +187,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -215,7 +217,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -245,7 +247,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -273,7 +275,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -301,7 +303,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -332,7 +334,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -364,7 +366,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
       body: JSON.stringify(discount)
@@ -397,7 +399,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
       body: JSON.stringify(discount)
@@ -430,7 +432,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
     });
@@ -442,14 +444,11 @@ export class Commerce7Provider implements CrmProvider {
     return true;
   }
 
-  private async getCurrentTenant() {
-    // This would typically come from the session or request context
-    // For now, we'll use an environment variable or throw an error
-    const tenant = process.env.COMMERCE7_TENANT;
-    if (!tenant) {
-      throw new Error('Commerce7 tenant not configured');
-    }
-    return { tenant };
+  private async getCurrentTenant(request?: Request) {
+    // TODO: Get tenant from session/request context
+    // The tenant comes dynamically from the auth flow (like shop for Shopify)
+    // For now, this will need to be passed in or retrieved from the session
+    throw new Error('getCurrentTenant must be implemented to retrieve tenant from session');
   }
 
   // Webhook operations
@@ -538,7 +537,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       },
       body: JSON.stringify({
@@ -569,7 +568,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       }
     });
@@ -596,7 +595,7 @@ export class Commerce7Provider implements CrmProvider {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: apiAuth,
+        Authorization: getApiAuth(),
         tenant: tenant
       }
     });

@@ -72,11 +72,11 @@ npm run dev
 ```
 
 7. (Optional) Set up local subdomains for testing:
-   - See [SUBDOMAIN_SETUP.md](SUBDOMAIN_SETUP.md) for detailed instructions
+   - See [SUBDOMAIN_SETUP.md](docs/SUBDOMAIN_SETUP.md) for detailed instructions
    - Edit `/etc/hosts` to add local subdomain entries
 
 8. (Optional) Set up Ngrok for webhook testing:
-   - See [NGROK_WEBHOOK_SETUP.md](NGROK_WEBHOOK_SETUP.md) for detailed instructions
+   - See [NGROK_WEBHOOK_SETUP.md](docs/NGROK_WEBHOOK_SETUP.md) for detailed instructions
    - Required for testing CRM webhooks during development
 
 ## Environment Variables
@@ -96,7 +96,7 @@ npm run dev
 - `COMMERCE7_KEY`: Your Commerce7 API key
 - `COMMERCE7_USER`: Your Commerce7 username
 - `COMMERCE7_PASSWORD`: Your Commerce7 password
-- `COMMERCE7_TENANT`: Your Commerce7 tenant ID
+- **Note**: Tenant ID comes dynamically from the auth flow (like shop for Shopify)
 
 ### Domain Configuration (Optional)
 - `BASE_DOMAIN`: Your production domain (e.g., yourdomain.com)
@@ -158,7 +158,7 @@ The subdomain routing is handled transparently by the `getSubdomainInfo()` utili
 - Maps subdomains to specific platforms
 - Works seamlessly in both development and production environments
 
-For detailed setup instructions, see [SUBDOMAIN_SETUP.md](SUBDOMAIN_SETUP.md).
+For detailed setup instructions, see [SUBDOMAIN_SETUP.md](docs/SUBDOMAIN_SETUP.md).
 
 ### Platform Abstraction Layer
 
@@ -203,7 +203,7 @@ For local development and webhook testing:
    ./scripts/webhook-test.sh c7
    ```
 
-For detailed instructions, see [NGROK_WEBHOOK_SETUP.md](NGROK_WEBHOOK_SETUP.md).
+For detailed instructions, see [NGROK_WEBHOOK_SETUP.md](docs/NGROK_WEBHOOK_SETUP.md).
 
 ## API Endpoints
 
@@ -226,17 +226,18 @@ For detailed instructions, see [NGROK_WEBHOOK_SETUP.md](NGROK_WEBHOOK_SETUP.md).
 
 The application uses Supabase with the following main tables:
 
-- `platform_sessions` - Stores authentication sessions for each platform
-- `club_members` - Wine club member data
-- `customers` - Customer and guest data
-- `wines` - Wine inventory and product data
-- `orders` - Orders and club shipments
-- `club_tiers` - Wine club tier definitions
-- `loyalty_points` - Customer loyalty tracking
+- `clients` - Paid customers (wineries) with tenant_shop, org info
+- `platform_sessions` - Authentication sessions linked to clients
+- `customers` - Wine club members and customers (linked to clients)
+- `products` - Wine inventory and products (linked to clients)
+- `orders` - Orders and club shipments (linked to clients)
+- `discounts` - Promotional discount codes (linked to clients)
+
+All data is properly isolated per client using foreign keys.
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](. /github/CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [Contributing Guide](.github/CONTRIBUTING.md) for details.
 
 ### Quick Start
 
@@ -248,7 +249,7 @@ We welcome contributions! Please see our [Contributing Guide](. /github/CONTRIBU
 
 ### GitHub Integration
 
-For setting up GitHub workflows, CI/CD, and automation, see [GITHUB_SETUP.md](GITHUB_SETUP.md).
+For setting up GitHub workflows, CI/CD, and automation, see [GITHUB_SETUP.md](docs/GITHUB_SETUP.md).
 
 ## Adding New Platform Providers
 

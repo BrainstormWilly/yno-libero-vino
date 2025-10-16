@@ -111,6 +111,8 @@ export interface CrmProvider {
   getCustomer(id: string): Promise<CrmCustomer>;
   createCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer>;
   updateCustomer(id: string, customer: Partial<CrmCustomer>): Promise<CrmCustomer>;
+  upsertCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer>;
+  findCustomerByEmail(email: string): Promise<CrmCustomer | null>;
   
   // Product operations
   getProducts(params?: any): Promise<CrmProduct[]>;
@@ -133,4 +135,9 @@ export interface CrmProvider {
   registerWebhook(topic: WebhookTopic, address: string): Promise<WebhookRegistration>;
   listWebhooks(): Promise<WebhookRegistration[]>;
   deleteWebhook(id: string): Promise<boolean>;
+  
+  // Customer-specific discount management (for club stages)
+  addCustomerToDiscount(discountId: string, customerId: string): Promise<void>;
+  removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void>;
+  getDiscountCustomers(discountId: string): Promise<string[]>;
 }

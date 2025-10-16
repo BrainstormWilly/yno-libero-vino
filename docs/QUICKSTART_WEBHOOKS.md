@@ -145,7 +145,7 @@ chmod +x ./scripts/start-ngrok.sh ./scripts/webhook-test.sh
 ## What's Next?
 
 - ✅ Webhooks are now configured for local testing
-- 📖 Read [NGROK_WEBHOOK_SETUP.md](NGROK_WEBHOOK_SETUP.md) for detailed documentation
+- 📖 Read [NGROK_WEBHOOK_SETUP.md](./NGROK_WEBHOOK_SETUP.md) for detailed documentation
 - 🎯 Implement webhook processing logic in `app/lib/crm/*.server.ts`
 - 💾 Set up Supabase tables to store webhook data
 - 🚀 Deploy to production when ready (no Ngrok needed!)
@@ -181,7 +181,7 @@ Open http://127.0.0.1:4040 to see:
 
 ## Support
 
-- 📝 Full documentation: [NGROK_WEBHOOK_SETUP.md](NGROK_WEBHOOK_SETUP.md)
+- 📝 Full documentation: [NGROK_WEBHOOK_SETUP.md](./NGROK_WEBHOOK_SETUP.md)
 - 🐛 Issues: Create an issue on GitHub
 - 💬 Questions: Email support@ynosoftware.com
 
