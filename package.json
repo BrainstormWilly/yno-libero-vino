@@ -34,7 +34,7 @@
     "@uppy/google-drive": "^4.3.3",
     "@uppy/onedrive": "^4.2.4",
     "@uppy/progress-bar": "^4.2.1",
-    "@uppy/react": "^4.2.3",
+    "@uppy/react": "^5.1.0",
     "@uppy/transloadit": "^4.2.2",
     "dotenv": "^16.5.0",
     "framer-motion": "^12.7.4",
