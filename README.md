@@ -10,14 +10,14 @@ A wine club and loyalty platform for Commerce7 and Shopify. Built with React Rou
 
 ## Features
 
-- **Wine Club Management**: Manage wine club memberships, shipments, and member benefits
-- **Loyalty Programs**: Track customer loyalty points, rewards, and engagement
-- **Multi-Platform Support**: Seamlessly integrate with Commerce7 and Shopify
-- **Subdomain-Based Routing**: Separate platform access via dedicated subdomains (c7.* for Commerce7, shp.* for Shopify)
-- **Real-time Webhook Integration**: Keep your data in sync across all platforms with instant updates
-- **Member Data Management**: Centralized customer, order, and club membership management
-- **Modern Tech Stack**: Built with React Router v7, TypeScript, and Tailwind CSS
-- **Scalable Architecture**: Designed for wineries of all sizes
+- **Wine Club Management**: Manage wine club memberships, shipments, and member benefits.
+- **Loyalty Programs**: Track customer loyalty points, rewards, and engagement.
+- **Multi-Platform Support**: Seamlessly integrate with Commerce7 and Shopify.
+- **Subdomain-Based Routing**: Separate platform access via dedicated subdomains (c7.* for Commerce7, shp.* for Shopify).
+- **Real-time Webhook Integration**: Keep your data in sync across all platforms with instant updates.
+- **Member Data Management**: Centralized customer, order, and club membership management.
+- **Modern Tech Stack**: Built with React Router v7, TypeScript, and Tailwind CSS.
+- **Scalable Architecture**: Designed for wineries of all sizes.
 
 ## Tech Stack
 
