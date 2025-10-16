@@ -31,6 +31,8 @@ A wine club and loyalty platform for Commerce7 and Shopify. Built with React Rou
 
 ### Prerequisites
 
+test
+
 - Node.js 18+ 
 - npm or yarn
 - Supabase account
