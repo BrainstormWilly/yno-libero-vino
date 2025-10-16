@@ -1,9 +1,11 @@
 name: Deploy to Heroku
 
+# Disabled - using Heroku's native GitHub integration instead
+# Re-enable if you want GitHub Actions to handle deployment
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  # push:
+  #   branches: [ main ]
+  workflow_dispatch:  # Keep manual trigger option
 
 jobs:
   deploy:
