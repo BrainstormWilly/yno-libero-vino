@@ -13,6 +13,8 @@ export type Crm = {
   slug: CrmSlugs;
 };
 
+export type CrmTypes = 'commerce7' | 'shopify';
+
 export type SerializedCrm = {
   name: string,
   slug: string

@@ -1,5 +1,4 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
-import { json, redirect } from 'react-router';
 import { useLoaderData, useActionData, Form } from 'react-router';
 import { 
   Page, 
@@ -33,21 +32,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const webhookEndpoint = getWebhookEndpoint(crmType as 'shopify' | 'commerce7');
     const availableTopics = getAvailableWebhookTopics();
 
-    return json({
+    return {
       crmType,
       webhooks,
       webhookEndpoint,
       availableTopics
-    });
+    };
   } catch (error) {
     console.error('Error loading webhooks:', error);
-    return json({
+    return {
       crmType,
       webhooks: [],
       webhookEndpoint: getWebhookEndpoint(crmType as 'shopify' | 'commerce7'),
       availableTopics: getAvailableWebhookTopics(),
       error: error instanceof Error ? error.message : 'Failed to load webhooks'
-    });
+    };
   }
 }
 
@@ -57,7 +56,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const crmType = formData.get('crmType') as 'shopify' | 'commerce7';
 
   if (!crmType || (crmType !== 'shopify' && crmType !== 'commerce7')) {
-    return json({ error: 'Invalid CRM type' }, { status: 400 });
+    return Response.json({ error: 'Invalid CRM type' }, { status: 400 });
   }
 
   const provider = crmManager.getProvider(crmType);
@@ -68,28 +67,28 @@ export async function action({ request }: ActionFunctionArgs) {
       const address = formData.get('address') as string;
 
       if (!topic || !address) {
-        return json({ error: 'Missing required fields' }, { status: 400 });
+        return Response.json({ error: 'Missing required fields' }, { status: 400 });
       }
 
       await provider.registerWebhook(topic, address);
-      return json({ success: true, message: 'Webhook registered successfully' });
+      return { success: true, message: 'Webhook registered successfully' };
 
     } else if (action === 'delete') {
       const webhookId = formData.get('webhookId') as string;
 
       if (!webhookId) {
-        return json({ error: 'Missing webhook ID' }, { status: 400 });
+        return Response.json({ error: 'Missing webhook ID' }, { status: 400 });
       }
 
       await provider.deleteWebhook(webhookId);
-      return json({ success: true, message: 'Webhook deleted successfully' });
+      return { success: true, message: 'Webhook deleted successfully' };
     }
 
-    return json({ error: 'Invalid action' }, { status: 400 });
+    return Response.json({ error: 'Invalid action' }, { status: 400 });
 
   } catch (error) {
     console.error('Webhook action error:', error);
-    return json({ 
+    return Response.json({ 
       error: error instanceof Error ? error.message : 'Action failed' 
     }, { status: 500 });
   }

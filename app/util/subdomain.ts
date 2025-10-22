@@ -2,11 +2,13 @@
  * Utility functions for handling subdomain-based routing
  */
 
+import type { CrmTypes } from '~/types/crm';
+
 export type SubdomainType = 'c7' | 'shp' | 'www' | null;
 
 export interface SubdomainInfo {
   subdomain: SubdomainType;
-  crmType: 'commerce7' | 'shopify' | null;
+  crmType: CrmTypes | null;
   isValid: boolean;
 }
 

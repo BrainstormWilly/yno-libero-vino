@@ -2,6 +2,41 @@
 
 ## 🎉 Recently Completed Features
 
+### ✅ Uninstall Webhook (Complete)
+
+**Date Completed**: October 16, 2025
+
+#### What Was Built
+
+1. **Uninstall Route** (`/uninstall`)
+   - Handles app uninstallation for both Commerce7 and Shopify
+   - Subdomain-aware routing (c7.domain.com/uninstall and shp.domain.com/uninstall)
+   - Properly authenticates using respective CRM validation methods
+
+2. **Complete Data Cleanup**
+   - Deletes client record and all associated data
+   - Leverages PostgreSQL CASCADE constraints for automatic cleanup
+   - Removes: sessions, customers, orders, products, discounts, club programs, loyalty data, communications
+   - Idempotent operation (safe to call multiple times)
+
+3. **Authentication**
+   - Commerce7: Basic Auth validation using COMMERCE7_USER/COMMERCE7_PASSWORD
+   - Shopify: HMAC-SHA256 signature validation using SHOPIFY_API_SECRET
+
+4. **Documentation**
+   - `UNINSTALL_WEBHOOK.md` - Complete setup and configuration guide
+   - Includes testing instructions for both platforms
+   - Production checklist and security considerations
+
+#### Why This Matters
+
+This completes the Commerce7 app requirements by handling the full app lifecycle:
+- ✅ Install webhook (`/install`) - Creates client records
+- ✅ Uninstall webhook (`/uninstall`) - Removes all client data
+- ✅ Data webhooks (`/webhooks/c7`, `/webhooks/shp`) - Syncs data changes
+
+The app now properly cleans up all data when uninstalled, meeting app store compliance requirements and respecting data privacy.
+
 ### ✅ Ngrok Webhook Integration (Complete)
 
 **Date Completed**: October 14, 2025

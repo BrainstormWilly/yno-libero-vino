@@ -1,5 +1,4 @@
 import type { ActionFunctionArgs } from 'react-router';
-import { json } from 'react-router';
 import { crmManager } from '~/lib/crm';
 import type { WebhookPayload } from '~/types/crm';
 
@@ -9,7 +8,7 @@ import type { WebhookPayload } from '~/types/crm';
  */
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return Response.json({ error: 'Method not allowed' }, { status: 405 });
   }
 
   try {
@@ -20,7 +19,7 @@ export async function action({ request }: ActionFunctionArgs) {
     
     if (!isValid) {
       console.error('Invalid Shopify webhook signature');
-      return json({ error: 'Unauthorized' }, { status: 401 });
+      return Response.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Parse webhook payload
@@ -29,7 +28,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const shop = request.headers.get('x-shopify-shop-domain');
 
     if (!topic) {
-      return json({ error: 'Missing webhook topic' }, { status: 400 });
+      return Response.json({ error: 'Missing webhook topic' }, { status: 400 });
     }
 
     const payload: WebhookPayload = {
@@ -43,11 +42,11 @@ export async function action({ request }: ActionFunctionArgs) {
     await shopifyProvider.processWebhook(payload);
 
     // Return success response
-    return json({ success: true, message: 'Webhook processed successfully' }, { status: 200 });
+    return Response.json({ success: true, message: 'Webhook processed successfully' }, { status: 200 });
 
   } catch (error) {
     console.error('Error processing Shopify webhook:', error);
-    return json(
+    return Response.json(
       { 
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error'
@@ -59,6 +58,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // Loader to handle GET requests (Shopify may send verification requests)
 export async function loader() {
-  return json({ message: 'Shopify webhook endpoint at /webhooks/shp' }, { status: 200 });
+  return Response.json({ message: 'Shopify webhook endpoint at /webhooks/shp' }, { status: 200 });
 }
 

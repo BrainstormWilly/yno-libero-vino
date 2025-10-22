@@ -60,6 +60,47 @@ export class Commerce7Provider implements CrmProvider {
            password === process.env.COMMERCE7_PASSWORD;
   }
 
+  /**
+   * Authorizes user access for embedded app usage
+   * Verifies the account token with Commerce7 API
+   */
+  async authorizeUse(request: Request): Promise<{ tenantId: string; user: any; adminUITheme?: string } | null> {
+    const searchParams = new URL(request.url).searchParams;
+    const tenantId = searchParams.get("tenantId");
+    const account = searchParams.get("account");
+    const adminUITheme = searchParams.get("adminUITheme");
+
+    if (!tenantId || !account) {
+      return null;
+    }
+
+    try {
+      // Verify the account token with Commerce7 API
+      const userResponse = await fetch(`${API_URL}/account/user`, {
+        headers: {
+          Authorization: account,
+          tenant: tenantId
+        },
+      });
+
+      const userData = await userResponse.json();
+
+      if (userData?.statusCode === 401) {
+        console.error("Commerce7 authorization failed: Invalid account token");
+        return null;
+      }
+
+      return {
+        tenantId,
+        user: userData,
+        adminUITheme
+      };
+    } catch (error) {
+      console.error("Error authorizing Commerce7 user:", error);
+      return null;
+    }
+  }
+
   async getCustomers(params?: any): Promise<CrmCustomer[]> {
     const { tenant, q = '', limit = 50 } = params || {};
     
