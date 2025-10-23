@@ -10,7 +10,7 @@ import {
 } from '@shopify/polaris';
 import { getSubdomainInfo } from '~/util/subdomain';
 import { Commerce7Provider } from '~/lib/crm/commerce7.server';
-import { getAppSession, createAppSession, redirectWithSession, getFakeAppSession } from '~/lib/sessions.server';
+import { getAppSession, createAppSession, redirectWithSession } from '~/lib/sessions.server';
 import { getClient, getClientbyCrmIdentifier, upsertFakeClient } from '~/lib/supabase.server';
 import type { Tables } from '~/types/supabase';
 import type { CrmTypes } from '~/types/crm';
@@ -28,7 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   // DEV MODE: Unembedded local testing (Commerce7 only - Shopify doesn't need this)
   if (process.env.NODE_ENV === 'development' && process.env.EMBEDDED_APP === 'no' && crmType === 'commerce7') {
-    console.log('🔓 DEV MODE: Upsert fake C7 client and create fake session');
+    console.log('🔓 DEV MODE: Upsert fake C7 client and session');
     
     // Upsert fake C7 client (Yno Fanbase equivalent)
     const fakeClient = await upsertFakeClient('commerce7');
@@ -36,18 +36,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
       throw new Error('Failed to create fake C7 client in dev mode');
     }
     
-    // Create fake session
-    const fakeSession = getFakeAppSession('commerce7');
+    // Check if we already have a session in the URL
+    let session = await getAppSession(request, 'commerce7');
     
-    // Override with actual client ID
-    fakeSession.clientId = fakeClient.id;
-    fakeSession.tenantShop = fakeClient.tenant_shop;
+    if (!session) {
+      // No session yet - create a real one and redirect with session ID
+      console.log('🔐 DEV MODE: Creating real session in database');
+      const sessionId = await createAppSession({
+        clientId: fakeClient.id,
+        tenantShop: fakeClient.tenant_shop,
+        crmType: 'commerce7',
+        userName: 'William Langley (Dev)',
+        userEmail: 'will@ynosoftware.com',
+        theme: 'light',
+      });
+      
+      console.log('✅ DEV MODE: Real session created:', sessionId);
+      
+      // Redirect with session ID in URL
+      return redirectWithSession(url.pathname, sessionId);
+    }
     
-    console.log('✅ DEV MODE: Using fake client:', fakeClient.org_name);
-    
+    console.log('✅ DEV MODE: Using existing session:', session.id);
+    console.log('   Client:', fakeClient.org_name);
+
+    // Check if setup is incomplete and we're NOT already on the setup route
+    if (!fakeClient.setup_complete && !url.pathname.includes('/app/setup')) {
+      return redirectWithSession('/app/setup', session.id);
+    }
+
     return { 
       client: fakeClient,
-      session: fakeSession,
+      session: session,
       isDev: true 
     };
   }
@@ -109,6 +129,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
       console.log('⛔ Client not found - redirecting to homepage');
       throw redirect('/');
     }
+  }
+
+  // Check if setup is incomplete and redirect (but not if already on setup route)
+  if (!client.setup_complete && !url.pathname.includes('/app/setup')) {
+    return redirect('/app/setup');
   }
 
   // Parent route only checks auth - child routes handle their own logic

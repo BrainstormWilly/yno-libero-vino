@@ -16,6 +16,7 @@ import {
   Divider,
 } from '@shopify/polaris';
 import { createClient } from '@supabase/supabase-js';
+
 import { getAppSession } from '~/lib/sessions.server';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -39,7 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
   // DEV MODE: Get fake dev client (already created by parent /app route)
-  if (process.env.NODE_ENV === 'development' && process.env.EMBEDDED_APP === 'no') {
+  if (process.env.NODE_ENV === 'development' && process.env.EMBEDDED_APP === 'no' && session.crmType === 'commerce7') {
     let { data: client } = await supabase
       .from('clients')
       .select('*')

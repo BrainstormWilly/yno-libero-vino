@@ -26,3 +26,7 @@ export type Commerce7AuthParams = {
   adminUITheme?: string;
 };
 
+// Re-export unified discount types
+export * from "./discount";
+export * from "./discount-commerce7";
+export * from "./discount-shopify";

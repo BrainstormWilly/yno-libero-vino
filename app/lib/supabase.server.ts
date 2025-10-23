@@ -65,17 +65,17 @@ export const getClient = async (id: string) => {
   return data;
 };
 
-export const getC7CustomerbyIdentifier = async (identifier: string) => {
-  const customerQ = supabase.from('customers')
-    .select('*')
-    .eq('crm_type', crmType)
-    .eq('identifier', identifier)
-    .single();
+// export const getC7CustomerbyIdentifier = async (crmType: CrmTypes, identifier: string) => {
+//   const customerQ = supabase.from('customers')
+//     .select('*')
+//     .eq('crm_type', crmType)
+//     .eq('identifier', identifier)
+//     .single();
 
-  const { data, error } = await customerQ;
-  if (error) throw error;
-  return data;
-};
+//   const { data, error } = await customerQ;
+//   if (error) throw error;
+//   return data;
+// };
 
 export const getClientbyCrmIdentifier = async (crmType: CrmTypes, identifier: string) => {
   if (crmType === 'commerce7') {
@@ -139,7 +139,7 @@ export const upsertFakeShopifyClient = async () => {
     const { data: newClient, error } = await supabase
       .from('clients')
       .upsert({
-        id: 'yno-fake-shopify-client-id',
+        id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
         tenant_shop: 'fake-client-shopify',
         crm_type: 'shopify',
         org_name: 'Fake Shopify Client',
@@ -167,7 +167,7 @@ export const upsertFakeC7Client = async () => {
     const { data: newClient, error } = await supabase
       .from('clients')
       .upsert({
-        id: 'yno-fanbase-client-id',
+        id: 'a7f5c3e2-8d91-4b1e-9a2f-1c5b8e3d4f6a',
         tenant_shop: 'yno-fanbase',
         crm_type: 'commerce7',
         org_name: 'Yno Fanbase',

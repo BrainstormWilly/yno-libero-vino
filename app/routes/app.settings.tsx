@@ -29,7 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
   
   // DEV MODE: Get fake dev client (already created by parent /app route)
-  if (process.env.NODE_ENV === 'development' && process.env.EMBEDDED_APP === 'no') {
+  if (process.env.NODE_ENV === 'development' && process.env.EMBEDDED_APP === 'no' && session.crmType === 'commerce7') {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     const { data: client } = await supabase
