@@ -4,7 +4,6 @@ export default [
   index("routes/_index.tsx"),
   route("install", "routes/install.tsx"),
   route("uninstall", "routes/uninstall.tsx"),
-  route("logout", "routes/logout.tsx"),
   route("app", "routes/app.tsx", [
     index("routes/app._index.tsx"),
     route("settings", "routes/app.settings.tsx"),

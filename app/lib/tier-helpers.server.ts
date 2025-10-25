@@ -4,7 +4,7 @@
  */
 
 import { Commerce7Provider } from "./crm/commerce7.server";
-import { toC7Coupon } from "./discount-converters";
+import { toC7Coupon } from "~/types/discount-commerce7";
 import { formatTagName, formatCouponTitle, formatCouponCode } from "./naming";
 import type { Discount } from "~/types/discount";
 import type { C7Tag } from "~/types/tag";

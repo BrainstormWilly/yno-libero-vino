@@ -10,18 +10,17 @@ import {
   Banner,
   InlineStack
 } from '@shopify/polaris';
-import { createClient } from '@supabase/supabase-js';
 
-import { getSubdomainInfo } from '~/util/subdomain';
 import { WelcomeBanner } from '~/components/WelcomeBanner';
 import { getAppSession } from '~/lib/sessions.server';
 import { addSessionToUrl } from '~/util/session';
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Consider a client "new" if created within the last 5 minutes
-const NEW_CLIENT_THRESHOLD_MS = 5 * 60 * 1000;
+import {
+  isFirstVisit,
+  getClientAndCheckSetup,
+  getDevModeClient,
+  updateOrganization,
+  isDevMode
+} from '~/lib/settings-helpers.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Trust that parent /app route already checked authorization
@@ -31,62 +30,28 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
   
   // DEV MODE: Get fake dev client (already created by parent /app route)
-  if (process.env.NODE_ENV === 'development' && process.env.EMBEDDED_APP === 'no' && session.crmType === 'commerce7') {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const { data: client } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('id', session.clientId)
-      .single();
-    
-    if (!client) {
-      throw new Error('Dev client not found');
-    }
-    
-    const createdAt = new Date(client.created_at);
-    const now = new Date();
-    const isFirstVisit = (now.getTime() - createdAt.getTime()) < NEW_CLIENT_THRESHOLD_MS;
+  if (isDevMode(session.crmType)) {
+    const client = await getDevModeClient(session.clientId);
     
     return {
       client,
       identifier: session.tenantShop,
       crmType: session.crmType,
       subdomainInfo: { crmType: session.crmType },
-      isFirstVisit,
+      isFirstVisit: isFirstVisit(client.created_at),
       session,
     };
   }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
-  // Get client from session
-  const { data: client } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('id', session.clientId)
-    .single();
-  
-  if (!client) {
-    throw new Error('Client not found');
-  }
-  
-  // Check if setup is complete - redirect to setup if not
-  if (!client.setup_complete) {
-    console.log('⚙️  Setup incomplete - redirecting to /app/setup');
-    throw redirect('/app/setup');
-  }
-  
-  const createdAt = new Date(client.created_at);
-  const now = new Date();
-  const isFirstVisit = (now.getTime() - createdAt.getTime()) < NEW_CLIENT_THRESHOLD_MS;
+  // Get client and check if setup is complete
+  const client = await getClientAndCheckSetup(session.clientId);
   
   return { 
     client,
     identifier: session.tenantShop,
     crmType: session.crmType,
     subdomainInfo: { crmType: session.crmType },
-    isFirstVisit,
+    isFirstVisit: isFirstVisit(client.created_at),
     session,
   };
 }
@@ -113,24 +78,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     try {
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
-      
-      const { error } = await supabase
-        .from('clients')
-        .update({ 
-          org_name: orgName,
-          org_contact: orgContact,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', session.clientId);
-      
-      if (error) {
-        return { 
-          success: false, 
-          message: 'Failed to update organization details',
-          error: error.message 
-        };
-      }
+      await updateOrganization(session.clientId, orgName, orgContact);
       
       return { 
         success: true, 
@@ -173,13 +121,7 @@ export default function Settings() {
               <Banner 
                 tone={actionData.success ? 'success' : 'critical'} 
                 title={actionData.message}
-              >
-                {actionData.error && (
-                  <Text variant="bodyMd" as="p">
-                    {actionData.error}
-                  </Text>
-                )}
-              </Banner>
+              />
             </Layout.Section>
           )}
 
