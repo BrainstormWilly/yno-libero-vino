@@ -3,7 +3,7 @@ import { redirect } from 'react-router';
 import { createClient } from '@supabase/supabase-js';
 import { getSubdomainInfo } from '~/util/subdomain';
 import type { Commerce7InstallPayload } from '~/types/commerce7';
-import { createAppSession, createSessionCookie } from '~/lib/sessions.server';
+import { createAppSession, withSession } from '~/lib/sessions.server';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -136,17 +136,18 @@ async function handleC7Install(request: Request) {
       userName: `${payload.user.firstName} ${payload.user.lastName}`.trim(),
       userEmail: payload.user.email,
       theme: 'light',
-    }, request);
+    });
 
-    const sessionCookie = await createSessionCookie(sessionId);
+    // Generate app URL with session parameter
+    // The /app loader will check setup_complete and redirect to /app/setup if needed
+    const appUrl = withSession('/app', sessionId);
 
     return { 
       success: true, 
       message: 'Client created successfully',
       clientId: newClient.id,
-      headers: {
-        'Set-Cookie': sessionCookie,
-      }
+      sessionId,
+      redirectUrl: appUrl
     };
 
   } catch (error) {

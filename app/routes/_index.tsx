@@ -12,26 +12,32 @@ import {
   Icon
 } from '@shopify/polaris';
 import { StoreIcon, ChartDonutIcon } from '@shopify/polaris-icons';
-import { crmManager } from '~/lib/crm';
 import { getSubdomainInfo, getCrmUrl } from '~/util/subdomain';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const subdomainInfo = getSubdomainInfo(request);
   
+  // Create metadata for display purposes (not full provider instances)
+  const providerMetadata = [
+    { slug: 'shopify', name: 'Shopify' },
+    { slug: 'commerce7', name: 'Commerce7' }
+  ];
+  
   // If we're on a CRM-specific subdomain, show only that CRM's content
   if (subdomainInfo.isValid && subdomainInfo.crmType) {
-    const provider = crmManager.getProvider(subdomainInfo.crmType);
+    const provider = providerMetadata.find(p => 
+      subdomainInfo.crmType === 'shopify' ? p.slug === 'shopify' : p.slug === 'commerce7'
+    );
     return { 
-      providers: [provider],
+      providers: provider ? [provider] : providerMetadata,
       subdomainInfo,
       isSingleCrm: true
     };
   }
   
   // Otherwise show all providers (for www or no subdomain)
-  const providers = crmManager.getAvailableProviders();
   return { 
-    providers,
+    providers: providerMetadata,
     subdomainInfo,
     isSingleCrm: false
   };
@@ -105,7 +111,7 @@ export default function Index() {
                       Connect and manage your {provider.name} wine club and loyalty programs.
                     </Text>
                   </BlockStack>
-                  <Link to={`/${provider.slug === 'shopify' ? 'shp' : 'c7'}/auth`}>
+                  <Link to={provider.slug === 'shopify' ? '/shp/auth' : '/app'}>
                     <Button variant="primary" size="large">
                       Connect {provider.name}
                     </Button>

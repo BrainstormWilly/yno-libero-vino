@@ -59,6 +59,8 @@ export async function storeSession(data: AppSessionData): Promise<boolean> {
     },
   };
 
+  console.log('💾 Storing session:', data.id);
+
   const { error } = await supabase
     .from('app_sessions')
     .upsert(sessionData, { 
@@ -67,10 +69,11 @@ export async function storeSession(data: AppSessionData): Promise<boolean> {
     });
 
   if (error) {
-    console.error('Failed to store session:', error);
+    console.error('❌ Failed to store session:', error);
     return false;
   }
 
+  console.log('✅ Session stored successfully:', data.id);
   return true;
 }
 
@@ -79,6 +82,8 @@ export async function storeSession(data: AppSessionData): Promise<boolean> {
  */
 export async function loadSession(id: string): Promise<AppSessionData | null> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  console.log('📥 Loading session:', id);
   
   const { data, error } = await supabase
     .from('app_sessions')
@@ -99,8 +104,11 @@ export async function loadSession(id: string): Promise<AppSessionData | null> {
     .single();
 
   if (error || !data) {
+    console.log('❌ Failed to load session:', error?.message || 'No data');
     return null;
   }
+  
+  console.log('✅ Session loaded successfully:', data.id);
 
   // Check if expired
   if (new Date(data.expires_at) < new Date()) {
@@ -283,12 +291,17 @@ export function isReady(): boolean {
 export async function cleanupExpiredSessions(): Promise<number> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
-  const { count } = await supabase
+  const { data, error } = await supabase
     .from('app_sessions')
     .delete()
     .lt('expires_at', new Date().toISOString())
-    .select('*', { count: 'exact', head: true });
+    .select();
   
-  return count || 0;
+  if (error) {
+    console.error('Error cleaning up expired sessions:', error);
+    return 0;
+  }
+  
+  return data?.length || 0;
 }
 

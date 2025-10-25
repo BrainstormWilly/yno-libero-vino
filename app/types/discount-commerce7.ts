@@ -101,13 +101,13 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
   let appliesTo: C7AppliesTo;
   let appliesToObjectIds: string | string[];
   
-  if (discount.appliesTo.all) {
+  if (discount.appliesTo?.all) {
     appliesTo = C7AppliesTo.NONE;
     appliesToObjectIds = "";
-  } else if (discount.appliesTo.collections.length > 0) {
+  } else if (discount.appliesTo?.collections && discount.appliesTo.collections.length > 0) {
     appliesTo = C7AppliesTo.COLLECTION;
     appliesToObjectIds = discount.appliesTo.collections.map(c => c.id);
-  } else if (discount.appliesTo.products.length > 0) {
+  } else if (discount.appliesTo?.products && discount.appliesTo.products.length > 0) {
     appliesTo = C7AppliesTo.PRODUCT;
     appliesToObjectIds = discount.appliesTo.products.map(p => p.id);
   } else {
@@ -119,13 +119,13 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
   let availableTo: C7AvailableTo;
   let availableToObjectIds: string | string[];
   
-  if (discount.customerSelection.all) {
+  if (discount.customerSelection?.all) {
     availableTo = C7AvailableTo.EVERYONE;
     availableToObjectIds = "";
-  } else if (discount.customerSelection.segments.length > 0) {
+  } else if (discount.customerSelection?.segments && discount.customerSelection.segments.length > 0) {
     availableTo = C7AvailableTo.TAG;
     availableToObjectIds = discount.customerSelection.segments.map(s => s.id);
-  } else if (discount.customerSelection.customers.length > 0) {
+  } else if (discount.customerSelection?.customers && discount.customerSelection.customers.length > 0) {
     // C7 doesn't support individual customer selection well, use tags
     availableTo = C7AvailableTo.TAG;
     availableToObjectIds = discount.customerSelection.customers.map(c => c.id);
@@ -138,7 +138,7 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
   let cartRequirementType: C7CartRequirementType;
   let cartRequirement: number | null;
   
-  switch (discount.minimumRequirement.type) {
+  switch (discount.minimumRequirement?.type) {
     case "quantity":
       cartRequirementType = C7CartRequirementType.MINIMUM_QUANTITY;
       cartRequirement = discount.minimumRequirement.quantity || null;
@@ -159,10 +159,10 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
   let usageLimitType: C7UsageLimitType;
   let usageLimit: number | null;
   
-  if (discount.usageLimits.appliesOncePerCustomer || discount.usageLimits.perCustomer) {
+  if (discount.usageLimits?.appliesOncePerCustomer || discount.usageLimits?.perCustomer) {
     usageLimitType = C7UsageLimitType.CUSTOMER;
     usageLimit = discount.usageLimits.perCustomer || 1;
-  } else if (discount.usageLimits.total) {
+  } else if (discount.usageLimits?.total) {
     usageLimitType = C7UsageLimitType.STORE;
     usageLimit = discount.usageLimits.total;
   } else {
@@ -171,13 +171,15 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
   }
 
   // Convert discount value
-  const discountType = discount.value.type === "percentage" 
+  // C7 stores ALL numbers as integers * 100 (like cents)
+  // 10% -> 1000, $10.50 -> 1050
+  const discountType = discount.value?.type === "percentage" 
     ? C7DiscountType.PERCENTAGE_OFF 
     : C7DiscountType.DOLLAR_OFF;
   
-  const discountValue = discount.value.type === "percentage"
-    ? (discount.value.percentage || 0)
-    : ((discount.value.amount || 0) / 100); // Convert cents to dollars
+  const discountValue = discount.value?.type === "percentage"
+    ? (discount.value.percentage || 0) * 100 // Percentage: 10 -> 1000
+    : (discount.value?.amount || 0); // Already in cents
 
   const payload: C7CouponPayload = {
     actionMessage: "", // C7 specific, could be added to platformData
@@ -191,15 +193,15 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
     cartRequirementCountType: C7CartRequirementCountType.ALL_ITEMS,
     cartRequirementMaximum: null,
     cartRequirementType,
-    code: discount.code,
+    code: discount.code || '',
     discount: discountValue,
     discountType,
     dollarOffDiscountApplies: "Items",
     endDate: null, // Discounts never expire
     excludes: null,
-    startDate: discount.startsAt.toISOString(),
-    status: toC7Status(discount.status),
-    title: discount.title,
+    startDate: discount.startsAt instanceof Date ? discount.startsAt.toISOString() : new Date().toISOString(),
+    status: toC7Status(discount.status || 'active'),
+    title: discount.title || '',
     type: "Product",
     usageLimit,
     usageLimitType,
@@ -216,46 +218,54 @@ export const toC7Coupon = (discount: Discount): C7CouponPayload => {
 /**
  * Convert Commerce7 Coupon to unified Discount
  */
-export const fromC7Coupon = (coupon: C7CouponPayload): Discount => {
+export const fromC7Coupon = (coupon: any): Discount => {
+  if (!coupon) {
+    throw new Error('Coupon data is null or undefined');
+  }
+  
   // Parse applies to
   const appliesTo = {
-    all: coupon.appliesTo === C7AppliesTo.NONE,
-    products: coupon.appliesTo === C7AppliesTo.PRODUCT
+    all: coupon.appliesTo === C7AppliesTo.NONE || coupon.appliesTo === "None",
+    products: (coupon.appliesTo === C7AppliesTo.PRODUCT || coupon.appliesTo === "Product")
       ? (Array.isArray(coupon.appliesToObjectIds) 
-          ? coupon.appliesToObjectIds.map(id => ({ id }))
+          ? coupon.appliesToObjectIds.map((id: string) => ({ id }))
           : coupon.appliesToObjectIds ? [{ id: coupon.appliesToObjectIds }] : [])
       : [],
-    collections: coupon.appliesTo === C7AppliesTo.COLLECTION
+    collections: (coupon.appliesTo === C7AppliesTo.COLLECTION || coupon.appliesTo === "Collection")
       ? (Array.isArray(coupon.appliesToObjectIds)
-          ? coupon.appliesToObjectIds.map(id => ({ id }))
+          ? coupon.appliesToObjectIds.map((id: string) => ({ id }))
           : coupon.appliesToObjectIds ? [{ id: coupon.appliesToObjectIds }] : [])
       : [],
   };
 
   // Parse customer selection
   const customerSelection = {
-    all: coupon.availableTo === C7AvailableTo.EVERYONE,
+    all: coupon.availableTo === C7AvailableTo.EVERYONE || coupon.availableTo === "Everyone",
     customers: [],
-    segments: coupon.availableTo === C7AvailableTo.TAG
+    segments: (coupon.availableTo === C7AvailableTo.TAG || coupon.availableTo === "Tag")
       ? (Array.isArray(coupon.availableToObjectIds)
-          ? coupon.availableToObjectIds.map(id => ({ id, name: "" }))
+          ? coupon.availableToObjectIds.map((id: string) => ({ id, name: "" }))
           : coupon.availableToObjectIds ? [{ id: coupon.availableToObjectIds, name: "" }] : [])
       : [],
   };
 
   // Parse minimum requirement
-  let minimumRequirement = {
-    type: "none" as const,
+  let minimumRequirement: {
+    type: "none" | "quantity" | "amount";
+    quantity?: number;
+    amount?: number;
+  } = {
+    type: "none",
     quantity: undefined,
     amount: undefined,
   };
   
-  if (coupon.cartRequirementType === C7CartRequirementType.MINIMUM_QUANTITY) {
+  if (coupon.cartRequirementType === C7CartRequirementType.MINIMUM_QUANTITY || coupon.cartRequirementType === "Minimum Quantity") {
     minimumRequirement = {
       type: "quantity",
       quantity: coupon.cartRequirement || undefined,
     };
-  } else if (coupon.cartRequirementType === C7CartRequirementType.MINIMUM_PURCHASE) {
+  } else if (coupon.cartRequirementType === C7CartRequirementType.MINIMUM_PURCHASE || coupon.cartRequirementType === "Minimum Purchase Amount") {
     minimumRequirement = {
       type: "amount",
       // Convert dollars to cents
@@ -265,26 +275,43 @@ export const fromC7Coupon = (coupon: C7CouponPayload): Discount => {
 
   // Parse usage limits
   const usageLimits = {
-    total: coupon.usageLimitType === C7UsageLimitType.STORE ? coupon.usageLimit : null,
-    perCustomer: coupon.usageLimitType === C7UsageLimitType.CUSTOMER ? coupon.usageLimit : null,
-    appliesOncePerCustomer: coupon.usageLimitType === C7UsageLimitType.CUSTOMER && coupon.usageLimit === 1,
+    total: (coupon.usageLimitType === C7UsageLimitType.STORE || coupon.usageLimitType === "Per Store") ? coupon.usageLimit : null,
+    perCustomer: (coupon.usageLimitType === C7UsageLimitType.CUSTOMER || coupon.usageLimitType === "Per Customer") ? coupon.usageLimit : null,
+    appliesOncePerCustomer: (coupon.usageLimitType === C7UsageLimitType.CUSTOMER || coupon.usageLimitType === "Per Customer") && coupon.usageLimit === 1,
   };
 
   // Parse discount value
+  // C7 stores ALL numbers as integers * 100
+  // 1000 -> 10%, 1050 -> $10.50
   const value = {
-    type: coupon.discountType === C7DiscountType.PERCENTAGE_OFF ? "percentage" as const : "fixed-amount" as const,
-    percentage: coupon.discountType === C7DiscountType.PERCENTAGE_OFF ? coupon.discount : undefined,
-    // Convert dollars to cents for fixed amount
-    amount: coupon.discountType === C7DiscountType.DOLLAR_OFF ? coupon.discount * 100 : undefined,
+    type: (coupon.discountType === C7DiscountType.PERCENTAGE_OFF || coupon.discountType === "Percentage Off") 
+      ? "percentage" as const 
+      : "fixed-amount" as const,
+    // Percentage: divide by 100 (1000 -> 10)
+    percentage: (coupon.discountType === C7DiscountType.PERCENTAGE_OFF || coupon.discountType === "Percentage Off") 
+      ? (coupon.discount || 0) / 100
+      : undefined,
+    // Dollar amount: C7 stores 1050 for $10.50, we store as cents (1050)
+    amount: (coupon.discountType === C7DiscountType.DOLLAR_OFF || coupon.discountType === "Dollar Off") 
+      ? (coupon.discount || 0)
+      : undefined,
   };
 
-  return {
-    id: coupon.id,
-    code: coupon.code,
-    title: coupon.title,
-    platform: "commerce7",
-    status: fromC7Status(coupon.status),
-    startsAt: new Date(coupon.startDate),
+  // Parse status
+  let status: "active" | "inactive" | "scheduled" = "active";
+  if (coupon.status === C7CouponStatus.ENABLED || coupon.status === "Enabled") {
+    status = "active";
+  } else if (coupon.status === C7CouponStatus.DISABLED || coupon.status === "Disabled") {
+    status = "inactive";
+  }
+  
+  const result = {
+    id: coupon.id || '',
+    code: coupon.code || '',
+    title: coupon.title || '',
+    platform: "commerce7" as const,
+    status,
+    startsAt: coupon.startDate ? new Date(coupon.startDate) : new Date(),
     // No endsAt - discounts never expire
     value,
     appliesTo,
@@ -297,5 +324,7 @@ export const fromC7Coupon = (coupon: C7CouponPayload): Discount => {
       shippingDiscounts: false,
     },
   };
+  
+  return result;
 };
 

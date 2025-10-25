@@ -30,3 +30,4 @@ export type Commerce7AuthParams = {
 export * from "./discount";
 export * from "./discount-commerce7";
 export * from "./discount-shopify";
+export * from "./tag";

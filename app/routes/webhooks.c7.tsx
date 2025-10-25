@@ -12,7 +12,16 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const commerce7Provider = crmManager.getProvider('commerce7');
+    // Extract tenant from webhook headers/body for provider instantiation
+    const tenant = request.headers.get('x-commerce7-tenant');
+    
+    if (!tenant) {
+      console.error('Missing tenant ID in Commerce7 webhook');
+      return Response.json({ error: 'Missing tenant information' }, { status: 400 });
+    }
+    
+    // Create provider instance for this specific tenant
+    const commerce7Provider = crmManager.getProvider('commerce7', tenant);
     
     // Validate webhook signature
     const isValid = await commerce7Provider.validateWebhook(request);
@@ -25,7 +34,6 @@ export async function action({ request }: ActionFunctionArgs) {
     // Parse webhook payload
     const body = await request.json();
     const topic = request.headers.get('x-commerce7-event') || body.event;
-    const tenant = request.headers.get('x-commerce7-tenant') || body.tenantId;
 
     if (!topic) {
       return Response.json({ error: 'Missing webhook topic' }, { status: 400 });

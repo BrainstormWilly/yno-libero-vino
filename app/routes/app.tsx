@@ -1,16 +1,20 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router';
-import { Outlet, useLoaderData } from 'react-router';
+import { Outlet, useLoaderData, useSearchParams } from 'react-router';
+import { useState, useCallback, useEffect } from 'react';
 import { 
   Page, 
   Layout,
   Banner,
   Text,
   InlineStack,
-  Button
+  Button,
+  Frame,
+  Toast
 } from '@shopify/polaris';
 import { getSubdomainInfo } from '~/util/subdomain';
 import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { getAppSession, createAppSession, redirectWithSession } from '~/lib/sessions.server';
+import { addSessionToUrl } from '~/util/session';
 import { getClient, getClientbyCrmIdentifier, upsertFakeClient } from '~/lib/supabase.server';
 import type { Tables } from '~/types/supabase';
 import type { CrmTypes } from '~/types/crm';
@@ -80,7 +84,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     console.log(`🔐 New authorization request for ${crmType}: ${identifier}`);
     
     if (crmType === 'commerce7') {
-      const c7Provider = new Commerce7Provider();
+      const c7Provider = new Commerce7Provider(identifier);
       const authResult = await c7Provider.authorizeUse(request);
       
       if (!authResult) {
@@ -119,8 +123,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!session) {
       // No session and no auth parameters - redirect to homepage
       console.log('⛔ No session found - redirecting to homepage');
+      console.log('   URL:', url.href);
+      console.log('   Session param:', url.searchParams.get('session'));
       throw redirect('/');
     }
+    
+    console.log('✅ Session found:', session.id);
     
     // Get client from session
     client = await getClient(session.clientId);
@@ -133,7 +141,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Check if setup is incomplete and redirect (but not if already on setup route)
   if (!client.setup_complete && !url.pathname.includes('/app/setup')) {
-    return redirect('/app/setup');
+    console.log('🔧 Setup incomplete - redirecting to /app/setup with session');
+    return redirectWithSession('/app/setup', session.id);
   }
 
   // Parent route only checks auth - child routes handle their own logic
@@ -146,9 +155,45 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function AppLayout() {
   const { client, session } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Toast state
+  const [toastActive, setToastActive] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastError, setToastError] = useState(false);
+  
+  // Check for toast in URL params on mount and when params change
+  useEffect(() => {
+    const toast = searchParams.get('toast');
+    const toastType = searchParams.get('toastType');
+    
+    if (toast) {
+      setToastMessage(toast);
+      setToastError(toastType === 'error');
+      setToastActive(true);
+      
+      // Remove toast params from URL without triggering navigation
+      searchParams.delete('toast');
+      searchParams.delete('toastType');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+  
+  const toggleToast = useCallback(() => setToastActive((active) => !active), []);
+  
+  const toastMarkup = toastActive ? (
+    <Toast 
+      content={toastMessage} 
+      onDismiss={toggleToast}
+      error={toastError}
+      duration={4500}
+    />
+  ) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-violet-100">
+    <Frame>
+      {toastMarkup}
+      <div className="embedded-app-wrapper min-h-screen bg-gradient-to-br from-purple-50 to-violet-100">
       {/* Simple header */}
       <div className="bg-white shadow-sm border-b border-gray-200 mb-6">
         <div className="container mx-auto px-4 py-4">
@@ -164,16 +209,19 @@ export default function AppLayout() {
               )}
             </div>
             <InlineStack gap="200">
-              <Button url="/app">Dashboard</Button>
-              <Button url="/app/settings">Settings</Button>
-              <Button url="/logout">Logout</Button>
+              <Button url={addSessionToUrl('/app', session.id)}>Dashboard</Button>
+              <Button url={addSessionToUrl('/app/settings', session.id)}>Settings</Button>
+              <Button url={addSessionToUrl('/logout', session.id)}>Logout</Button>
             </InlineStack>
           </InlineStack>
         </div>
       </div>
 
       {/* Nested routes render here */}
-      <Outlet />
+      <div className="container mx-auto px-4 pb-8">
+        <Outlet />
+      </div>
     </div>
+    </Frame>
   );
 }

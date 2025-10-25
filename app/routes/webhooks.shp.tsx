@@ -12,7 +12,20 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    const shopifyProvider = crmManager.getProvider('shopify');
+    // Extract shop from webhook headers for provider instantiation
+    const shop = request.headers.get('x-shopify-shop-domain');
+    
+    if (!shop) {
+      console.error('Missing shop domain in Shopify webhook');
+      return Response.json({ error: 'Missing shop information' }, { status: 400 });
+    }
+    
+    // For webhooks, we need to get the access token from the database
+    // TODO: Retrieve access token from database based on shop
+    const accessToken = 'webhook-access-token'; // Placeholder
+    
+    // Create provider instance for this specific shop
+    const shopifyProvider = crmManager.getProvider('shopify', shop, accessToken);
     
     // Validate webhook signature
     const isValid = await shopifyProvider.validateWebhook(request);
@@ -25,7 +38,6 @@ export async function action({ request }: ActionFunctionArgs) {
     // Parse webhook payload
     const body = await request.json();
     const topic = request.headers.get('x-shopify-topic');
-    const shop = request.headers.get('x-shopify-shop-domain');
 
     if (!topic) {
       return Response.json({ error: 'Missing webhook topic' }, { status: 400 });

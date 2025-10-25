@@ -225,9 +225,15 @@ export const parseDiscount = (serialized: SerializedDiscount): Discount => ({
  */
 export const serializeDiscount = (discount: Discount): SerializedDiscount => ({
   ...discount,
-  startsAt: discount.startsAt.toISOString(),
-  createdAt: discount.createdAt?.toISOString(),
-  updatedAt: discount.updatedAt?.toISOString(),
+  startsAt: discount.startsAt instanceof Date 
+    ? discount.startsAt.toISOString() 
+    : (typeof discount.startsAt === 'string' ? discount.startsAt : new Date().toISOString()),
+  createdAt: discount.createdAt instanceof Date 
+    ? discount.createdAt.toISOString() 
+    : (typeof discount.createdAt === 'string' ? discount.createdAt : undefined),
+  updatedAt: discount.updatedAt instanceof Date 
+    ? discount.updatedAt.toISOString() 
+    : (typeof discount.updatedAt === 'string' ? discount.updatedAt : undefined),
 });
 
 /**

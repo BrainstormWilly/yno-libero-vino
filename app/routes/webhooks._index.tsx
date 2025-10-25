@@ -21,30 +21,54 @@ import type { WebhookTopic } from '~/types/crm';
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const crmType = url.searchParams.get('crm') || 'shopify';
+  const identifier = url.searchParams.get('identifier'); // tenant or shop
+  const accessToken = url.searchParams.get('accessToken'); // for Shopify
 
   if (crmType !== 'shopify' && crmType !== 'commerce7') {
     throw new Response('Invalid CRM type', { status: 400 });
   }
 
-  try {
-    const provider = crmManager.getProvider(crmType);
-    const webhooks = await provider.listWebhooks().catch(() => []);
-    const webhookEndpoint = getWebhookEndpoint(crmType as 'shopify' | 'commerce7');
-    const availableTopics = getAvailableWebhookTopics();
+  // Note: For actual webhook management, you need to provide tenant/shop identifier
+  // This is typically done from the authenticated app context
+  const webhookEndpoint = getWebhookEndpoint(crmType as 'shopify' | 'commerce7');
+  const availableTopics = getAvailableWebhookTopics();
 
+  try {
+    if (identifier) {
+      // Only fetch webhooks if we have the necessary credentials
+      const provider = crmManager.getProvider(
+        crmType, 
+        identifier, 
+        accessToken || undefined
+      );
+      const webhooks = await provider.listWebhooks().catch(() => []);
+
+      return {
+        crmType,
+        webhooks,
+        webhookEndpoint,
+        availableTopics,
+        hasCredentials: true
+      };
+    }
+
+    // No credentials - show UI but can't fetch webhooks
     return {
       crmType,
-      webhooks,
+      webhooks: [],
       webhookEndpoint,
-      availableTopics
+      availableTopics,
+      hasCredentials: false,
+      error: 'Tenant/shop identifier required to manage webhooks. Access this page from within your authenticated app.'
     };
   } catch (error) {
     console.error('Error loading webhooks:', error);
     return {
       crmType,
       webhooks: [],
-      webhookEndpoint: getWebhookEndpoint(crmType as 'shopify' | 'commerce7'),
-      availableTopics: getAvailableWebhookTopics(),
+      webhookEndpoint,
+      availableTopics,
+      hasCredentials: !!identifier,
       error: error instanceof Error ? error.message : 'Failed to load webhooks'
     };
   }
@@ -54,12 +78,18 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const action = formData.get('_action');
   const crmType = formData.get('crmType') as 'shopify' | 'commerce7';
+  const identifier = formData.get('identifier') as string;
+  const accessToken = formData.get('accessToken') as string | undefined;
 
   if (!crmType || (crmType !== 'shopify' && crmType !== 'commerce7')) {
     return Response.json({ error: 'Invalid CRM type' }, { status: 400 });
   }
 
-  const provider = crmManager.getProvider(crmType);
+  if (!identifier) {
+    return Response.json({ error: 'Tenant/shop identifier required' }, { status: 400 });
+  }
+
+  const provider = crmManager.getProvider(crmType, identifier, accessToken);
 
   try {
     if (action === 'register') {

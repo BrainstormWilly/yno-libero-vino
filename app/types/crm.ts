@@ -51,6 +51,13 @@ export interface CrmProduct {
   updatedAt: string;
 }
 
+export interface CrmCollection {
+  id: string;
+  title: string;
+  image?: string;
+  description?: string;
+}
+
 export interface CrmOrder {
   id: string;
   customerId: string;
@@ -119,6 +126,10 @@ export interface CrmProvider {
   // Product operations
   getProducts(params?: any): Promise<CrmProduct[]>;
   getProduct(id: string): Promise<CrmProduct>;
+  
+  // Collection operations
+  getCollections(params?: any): Promise<CrmCollection[]>;
+  getCollection(id: string): Promise<CrmCollection>;
   
   // Order operations
   getOrders(params?: any): Promise<CrmOrder[]>;

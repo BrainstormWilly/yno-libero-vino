@@ -6,6 +6,13 @@ import crypto from 'crypto';
 export class ShopifyProvider implements CrmProvider {
   name = CrmNames.SHOPIFY;
   slug = CrmSlugs.SHOPIFY;
+  private shop: string;
+  private accessToken: string;
+
+  constructor(shop: string, accessToken: string) {
+    this.shop = shop;
+    this.accessToken = accessToken;
+  }
 
   async authenticate(request: Request) {
     // TODO: Implement Shopify authentication
@@ -169,5 +176,39 @@ export class ShopifyProvider implements CrmProvider {
   async deleteWebhook(id: string): Promise<boolean> {
     // TODO: Implement Shopify webhook deletion using Admin API
     throw new Error('Shopify webhook deletion not implemented yet');
+  }
+
+  async upsertCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer> {
+    // Try to find by email first
+    if (customer.email) {
+      const existing = await this.findCustomerByEmail(customer.email);
+      if (existing) {
+        return this.updateCustomer(existing.id, customer);
+      }
+    }
+    
+    // Otherwise create new
+    return this.createCustomer(customer);
+  }
+
+  async findCustomerByEmail(email: string): Promise<CrmCustomer | null> {
+    // TODO: Implement Shopify customer search by email using GraphQL API
+    throw new Error('findCustomerByEmail not implemented yet for Shopify');
+  }
+
+  // Customer-specific discount management
+  async addCustomerToDiscount(discountId: string, customerId: string): Promise<void> {
+    // TODO: Implement Shopify customer-specific discount assignment
+    throw new Error('addCustomerToDiscount not implemented yet for Shopify');
+  }
+
+  async removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void> {
+    // TODO: Implement Shopify customer-specific discount removal
+    throw new Error('removeCustomerFromDiscount not implemented yet for Shopify');
+  }
+
+  async getDiscountCustomers(discountId: string): Promise<string[]> {
+    // TODO: Implement Shopify discount customer list
+    throw new Error('getDiscountCustomers not implemented yet for Shopify');
   }
 }

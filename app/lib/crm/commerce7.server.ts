@@ -1,10 +1,23 @@
-import type { CrmProvider, CrmCustomer, CrmProduct, CrmOrder, CrmDiscount, WebhookPayload, WebhookTopic, WebhookRegistration } from '~/types/crm';
-import { CrmNames, CrmSlugs } from '~/types/crm';
-import { redirect } from 'react-router';
-import crypto from 'crypto';
+import type {
+  CrmProvider,
+  CrmCustomer,
+  CrmProduct,
+  CrmCollection,
+  CrmOrder,
+  CrmDiscount,
+  WebhookPayload,
+  WebhookTopic,
+  WebhookRegistration,
+} from "~/types/crm";
+import { CrmNames, CrmSlugs } from "~/types/crm";
+import { redirect } from "react-router";
+import crypto from "crypto";
+import type { C7CouponPayload } from "~/lib/discount-converters";
+import type { C7Tag } from "~/types/tag";
+import { C7TagObjectType } from "~/types/tag";
 
 const API_URL = "https://api.commerce7.com/v1";
-const APP_NAME = "yno-libero-vino";
+const APP_NAME = "yno-liberovino-wine-club-and-loyalty";
 
 // Helper to get API auth (lazy evaluation)
 function getApiAuth(): string {
@@ -15,9 +28,37 @@ function getApiAuth(): string {
   return "Basic " + Buffer.from(`${APP_NAME}:${API_KEY}`).toString("base64");
 }
 
+/**
+ * Helper to check and handle Commerce7 API errors
+ * C7 has two error patterns:
+ * 1. HTTP error status (non-200) - error in { statusCode, type, message }
+ * 2. Success status (200) but operation failed - errors in { errors: [] }
+ */
+function handleC7ApiError(data: any, operation: string): void {
+  // Check for status code errors
+  if (data.statusCode && data.statusCode !== 200) {
+    throw new Error(
+      `Commerce7 ${operation} error (${data.statusCode}): ${data.message || data.type || 'Unknown error'}`
+    );
+  }
+  
+  // Check for errors array (success status but operation failed)
+  if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+    const errorMessages = data.errors.map((e: any) => 
+      typeof e === 'string' ? e : (e.message || JSON.stringify(e))
+    ).join(', ');
+    throw new Error(`Commerce7 ${operation} error: ${errorMessages}`);
+  }
+}
+
 export class Commerce7Provider implements CrmProvider {
   name = CrmNames.COMMERCE7;
   slug = CrmSlugs.COMMERCE7;
+  private tenantId: string;
+
+  constructor(tenantId: string) {
+    this.tenantId = tenantId;
+  }
 
   async authenticate(request: Request) {
     const searchParams = new URL(request.url).searchParams;
@@ -32,7 +73,7 @@ export class Commerce7Provider implements CrmProvider {
     const userResponse = await fetch(`${API_URL}/account/user`, {
       headers: {
         Authorization: account,
-        tenant: tenantId
+        tenant: tenantId,
       },
     }).then((res) => res.json());
 
@@ -43,7 +84,7 @@ export class Commerce7Provider implements CrmProvider {
     return {
       tenantId,
       account,
-      user: userResponse
+      user: userResponse,
     };
   }
 
@@ -54,17 +95,23 @@ export class Commerce7Provider implements CrmProvider {
     }
 
     const base64 = auth.replace("Basic ", "");
-    const [username, password] = Buffer.from(base64, "base64").toString().split(":");
-    
-    return username === process.env.COMMERCE7_USER && 
-           password === process.env.COMMERCE7_PASSWORD;
+    const [username, password] = Buffer.from(base64, "base64")
+      .toString()
+      .split(":");
+
+    return (
+      username === process.env.COMMERCE7_USER &&
+      password === process.env.COMMERCE7_PASSWORD
+    );
   }
 
   /**
    * Authorizes user access for embedded app usage
    * Verifies the account token with Commerce7 API
    */
-  async authorizeUse(request: Request): Promise<{ tenantId: string; user: any; adminUITheme?: string } | null> {
+  async authorizeUse(
+    request: Request
+  ): Promise<{ tenantId: string; user: any; adminUITheme?: string } | null> {
     const searchParams = new URL(request.url).searchParams;
     const tenantId = searchParams.get("tenantId");
     const account = searchParams.get("account");
@@ -79,7 +126,7 @@ export class Commerce7Provider implements CrmProvider {
       const userResponse = await fetch(`${API_URL}/account/user`, {
         headers: {
           Authorization: account,
-          tenant: tenantId
+          tenant: tenantId,
         },
       });
 
@@ -93,7 +140,7 @@ export class Commerce7Provider implements CrmProvider {
       return {
         tenantId,
         user: userData,
-        adminUITheme
+        ...(adminUITheme && { adminUITheme }),
       };
     } catch (error) {
       console.error("Error authorizing Commerce7 user:", error);
@@ -102,21 +149,23 @@ export class Commerce7Provider implements CrmProvider {
   }
 
   async getCustomers(params?: any): Promise<CrmCustomer[]> {
-    const { tenant, q = '', limit = 50 } = params || {};
-    
+    const { q = "", limit = 50 } = params || {};
+
     const response = await fetch(`${API_URL}/customer?q=${q}&limit=${limit}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 customers: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 customers: ${data.errors[0]?.message}`
+      );
     }
 
     return data.customers.map((customer: any) => ({
@@ -126,26 +175,26 @@ export class Commerce7Provider implements CrmProvider {
       lastName: customer.lastName,
       phone: customer.phone,
       createdAt: customer.createdAt,
-      updatedAt: customer.updatedAt
+      updatedAt: customer.updatedAt,
     }));
   }
 
   async getCustomer(id: string): Promise<CrmCustomer> {
-    const { tenant } = await this.getCurrentTenant();
-    
     const response = await fetch(`${API_URL}/customer/${id}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 customer: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 customer: ${data.errors[0]?.message}`
+      );
     }
 
     return {
@@ -155,28 +204,28 @@ export class Commerce7Provider implements CrmProvider {
       lastName: data.lastName,
       phone: data.phone,
       createdAt: data.createdAt,
-      updatedAt: data.updatedAt
+      updatedAt: data.updatedAt,
     };
   }
 
   async createCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer> {
-    const { tenant } = await this.getCurrentTenant();
-    
     const response = await fetch(`${API_URL}/customer/`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
-      body: JSON.stringify(customer)
+      body: JSON.stringify(customer),
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error creating Commerce7 customer: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error creating Commerce7 customer: ${data.errors[0]?.message}`
+      );
     }
 
     return {
@@ -186,28 +235,31 @@ export class Commerce7Provider implements CrmProvider {
       lastName: data.lastName,
       phone: data.phone,
       createdAt: data.createdAt,
-      updatedAt: data.updatedAt
+      updatedAt: data.updatedAt,
     };
   }
 
-  async updateCustomer(id: string, customer: Partial<CrmCustomer>): Promise<CrmCustomer> {
-    const { tenant } = await this.getCurrentTenant();
-    
+  async updateCustomer(
+    id: string,
+    customer: Partial<CrmCustomer>
+  ): Promise<CrmCustomer> {
     const response = await fetch(`${API_URL}/customer/${id}`, {
-      method: 'PUT',
+      method: "PUT",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
-      body: JSON.stringify(customer)
+      body: JSON.stringify(customer),
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error updating Commerce7 customer: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error updating Commerce7 customer: ${data.errors[0]?.message}`
+      );
     }
 
     return {
@@ -217,26 +269,69 @@ export class Commerce7Provider implements CrmProvider {
       lastName: data.lastName,
       phone: data.phone,
       createdAt: data.createdAt,
-      updatedAt: data.updatedAt
+      updatedAt: data.updatedAt,
+    };
+  }
+
+  async upsertCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer> {
+    // Try to find by email first
+    if (customer.email) {
+      const existing = await this.findCustomerByEmail(customer.email);
+      if (existing) {
+        return this.updateCustomer(existing.id, customer);
+      }
+    }
+    
+    // Otherwise create new
+    return this.createCustomer(customer);
+  }
+
+  async findCustomerByEmail(email: string): Promise<CrmCustomer | null> {
+    const response = await fetch(`${API_URL}/customer?q=${encodeURIComponent(email)}&limit=1`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.errors || !data.customers || data.customers.length === 0) {
+      return null;
+    }
+
+    const customer = data.customers[0];
+    return {
+      id: customer.id,
+      email: customer.email,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      phone: customer.phone,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
     };
   }
 
   async getProducts(params?: any): Promise<CrmProduct[]> {
-    const { tenant, q = '', limit = 50 } = params || {};
-    
+    const { q = "", limit = 50 } = params || {};
+
     const response = await fetch(`${API_URL}/product?q=${q}&limit=${limit}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 products: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 products: ${data.errors[0]?.message}`
+      );
     }
 
     return data.products.map((product: any) => ({
@@ -247,26 +342,83 @@ export class Commerce7Provider implements CrmProvider {
       image: product.image,
       description: product.description,
       createdAt: product.createdAt,
-      updatedAt: product.updatedAt
+      updatedAt: product.updatedAt,
     }));
   }
 
-  async getProduct(id: string): Promise<CrmProduct> {
-    const { tenant } = await this.getCurrentTenant();
-    
-    const response = await fetch(`${API_URL}/product/${id}`, {
+  async getCollections(params?: any): Promise<CrmCollection[]> {
+    const { q = "", limit = 50 } = params || {};
+
+    const response = await fetch(`${API_URL}/collection?q=${q}&limit=${limit}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+  
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 product: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 collections: ${data.errors[0]?.message}`
+      );
+    }
+
+    return data.collections.map((collection: any) => ({
+      id: collection.id,
+      title: collection.title,
+      image: collection.featuredImage,
+      description: collection.content,
+    }));
+  }
+
+  async getCollection(id: string): Promise<CrmCollection> {
+    const response = await fetch(`${API_URL}/collection/${id}`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.errors) {
+      throw new Error(
+        `Error fetching Commerce7 collection: ${data.errors[0]?.message}`
+      );
+    }
+
+    // C7 can return collection wrapped or directly
+    const collection = data.collection || data;
+
+    return {
+      id: collection.id,
+      title: collection.title,
+      image: collection.featuredImage,
+      description: collection.content,
+    };
+  }
+
+  async getProduct(id: string): Promise<CrmProduct> {
+    const response = await fetch(`${API_URL}/product/${id}`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+
+    if (data.errors) {
+      throw new Error(
+        `Error fetching Commerce7 product: ${data.errors[0]?.message}`
+      );
     }
 
     return {
@@ -277,26 +429,28 @@ export class Commerce7Provider implements CrmProvider {
       image: data.image,
       description: data.description,
       createdAt: data.createdAt,
-      updatedAt: data.updatedAt
+      updatedAt: data.updatedAt,
     };
   }
 
   async getOrders(params?: any): Promise<CrmOrder[]> {
-    const { tenant, q = '', limit = 50 } = params || {};
-    
+    const { q = "", limit = 50 } = params || {};
+
     const response = await fetch(`${API_URL}/order?q=${q}&limit=${limit}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 orders: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 orders: ${data.errors[0]?.message}`
+      );
     }
 
     return data.orders.map((order: any) => ({
@@ -305,26 +459,26 @@ export class Commerce7Provider implements CrmProvider {
       total: order.total,
       status: order.status,
       createdAt: order.createdAt,
-      updatedAt: order.updatedAt
+      updatedAt: order.updatedAt,
     }));
   }
 
   async getOrder(id: string): Promise<CrmOrder> {
-    const { tenant } = await this.getCurrentTenant();
-    
     const response = await fetch(`${API_URL}/order/${id}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 order: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 order: ${data.errors[0]?.message}`
+      );
     }
 
     return {
@@ -333,192 +487,255 @@ export class Commerce7Provider implements CrmProvider {
       total: data.total,
       status: data.status,
       createdAt: data.createdAt,
-      updatedAt: data.updatedAt
+      updatedAt: data.updatedAt,
     };
   }
 
   async getDiscounts(params?: any): Promise<CrmDiscount[]> {
-    const { tenant, q = '', limit = 50 } = params || {};
-    
+    const { q = "", limit = 50 } = params || {};
+
     const response = await fetch(`${API_URL}/coupon?q=${q}&limit=${limit}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 discounts: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 discounts: ${data.errors[0]?.message}`
+      );
     }
 
     return data.coupons.map((coupon: any) => ({
       id: coupon.id,
       code: coupon.code,
-      type: coupon.type === 'percentage' ? 'percentage' : 'fixed_amount',
+      type: coupon.type === "percentage" ? "percentage" : "fixed_amount",
       value: coupon.value,
       startsAt: coupon.startsAt,
       endsAt: coupon.endsAt,
       usageLimit: coupon.usageLimit,
       usageCount: coupon.usageCount,
-      isActive: coupon.isActive
+      isActive: coupon.isActive,
     }));
   }
 
   async getDiscount(id: string): Promise<CrmDiscount> {
-    const { tenant } = await this.getCurrentTenant();
-    
     const response = await fetch(`${API_URL}/coupon/${id}`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error fetching Commerce7 discount: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error fetching Commerce7 discount: ${data.errors[0]?.message}`
+      );
     }
 
     return {
       id: data.id,
       code: data.code,
-      type: data.type === 'percentage' ? 'percentage' : 'fixed_amount',
+      type: data.type === "percentage" ? "percentage" : "fixed_amount",
       value: data.value,
       startsAt: data.startsAt,
       endsAt: data.endsAt,
       usageLimit: data.usageLimit,
       usageCount: data.usageCount,
-      isActive: data.isActive
+      isActive: data.isActive,
     };
+  }
+
+  /**
+   * Get full C7 coupon data (for editing/loading into forms)
+   * Returns the complete coupon payload with all fields
+   */
+  async getC7CouponFull(id: string): Promise<any> {
+    const response = await fetch(`${API_URL}/coupon/${id}`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'fetching coupon');
+
+    // C7 wraps the coupon in a 'coupon' property or returns it directly
+    return data.coupon || data;
   }
 
   async createDiscount(discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
-    const { tenant } = await this.getCurrentTenant();
-    
+    throw new Error("Use createC7Coupon() method for creating Commerce7 coupons");
+  }
+
+  /**
+   * Create a Commerce7 coupon with full control over all fields
+   * Use this instead of createDiscount() for C7-specific coupon creation
+   */
+  async createC7Coupon(couponPayload: C7CouponPayload): Promise<{ id: string; code: string; title: string }> {
     const response = await fetch(`${API_URL}/coupon/`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
-      body: JSON.stringify(discount)
+      body: JSON.stringify(couponPayload),
     });
 
     const data = await response.json();
-    
-    if (data.errors) {
-      throw new Error(`Error creating Commerce7 discount: ${data.errors[0]?.message}`);
-    }
+    handleC7ApiError(data, 'creating coupon');
 
+    // Return minimal response with the created coupon info
     return {
-      id: data.id,
-      code: data.code,
-      type: data.type === 'percentage' ? 'percentage' : 'fixed_amount',
-      value: data.value,
-      startsAt: data.startsAt,
-      endsAt: data.endsAt,
-      usageLimit: data.usageLimit,
-      usageCount: data.usageCount,
-      isActive: data.isActive
+      id: data.coupon?.id || data.id,
+      code: data.coupon?.code || data.code,
+      title: data.coupon?.title || data.title,
     };
   }
 
-  async updateDiscount(id: string, discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
-    const { tenant } = await this.getCurrentTenant();
-    
-    const response = await fetch(`${API_URL}/coupon/${id}`, {
-      method: 'PUT',
+  /**
+   * Update an existing Commerce7 coupon
+   * Note: You cannot change the code of an existing coupon
+   */
+  async updateC7Coupon(couponId: string, couponPayload: Partial<C7CouponPayload>): Promise<{ id: string; code: string; title: string }> {
+    const response = await fetch(`${API_URL}/coupon/${couponId}`, {
+      method: "PUT",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
-      body: JSON.stringify(discount)
+      body: JSON.stringify(couponPayload),
     });
 
     const data = await response.json();
-    
-    if (data.errors) {
-      throw new Error(`Error updating Commerce7 discount: ${data.errors[0]?.message}`);
-    }
+    handleC7ApiError(data, 'updating coupon');
 
     return {
-      id: data.id,
-      code: data.code,
-      type: data.type === 'percentage' ? 'percentage' : 'fixed_amount',
-      value: data.value,
-      startsAt: data.startsAt,
-      endsAt: data.endsAt,
-      usageLimit: data.usageLimit,
-      usageCount: data.usageCount,
-      isActive: data.isActive
+      id: data.coupon?.id || data.id,
+      code: data.coupon?.code || data.code,
+      title: data.coupon?.title || data.title,
     };
   }
 
-  async deleteDiscount(id: string): Promise<boolean> {
-    const { tenant } = await this.getCurrentTenant();
-    
-    const response = await fetch(`${API_URL}/coupon/${id}`, {
-      method: 'DELETE',
+  /**
+   * Delete a Commerce7 coupon
+   */
+  async deleteC7Coupon(couponId: string): Promise<boolean> {
+    const response = await fetch(`${API_URL}/coupon/${couponId}`, {
+      method: "DELETE",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`Error deleting Commerce7 discount: ${response.statusText}`);
-    }
+    const data = await response.json();
+    handleC7ApiError(data, 'deleting coupon');
 
     return true;
   }
 
-  private async getCurrentTenant(request?: Request) {
-    // TODO: Get tenant from session/request context
-    // The tenant comes dynamically from the auth flow (like shop for Shopify)
-    // For now, this will need to be passed in or retrieved from the session
-    throw new Error('getCurrentTenant must be implemented to retrieve tenant from session');
+  async updateDiscount(
+    id: string,
+    discount: Partial<CrmDiscount>
+  ): Promise<CrmDiscount> {
+    const response = await fetch(`${API_URL}/coupon/${id}`, {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(discount),
+    });
+
+    const data = await response.json();
+
+    if (data.errors) {
+      throw new Error(
+        `Error updating Commerce7 discount: ${data.errors[0]?.message}`
+      );
+    }
+
+    return {
+      id: data.id,
+      code: data.code,
+      type: data.type === "percentage" ? "percentage" : "fixed_amount",
+      value: data.value,
+      startsAt: data.startsAt,
+      endsAt: data.endsAt,
+      usageLimit: data.usageLimit,
+      usageCount: data.usageCount,
+      isActive: data.isActive,
+    };
+  }
+
+  async deleteDiscount(id: string): Promise<boolean> {
+    const response = await fetch(`${API_URL}/coupon/${id}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Error deleting Commerce7 discount: ${response.statusText}`
+      );
+    }
+
+    return true;
   }
 
   // Webhook operations
   async validateWebhook(request: Request): Promise<boolean> {
     // Commerce7 webhook validation
     // Check if request is from Commerce7 using signature or IP whitelist
-    const signature = request.headers.get('x-commerce7-signature');
-    const tenantId = request.headers.get('x-commerce7-tenant');
-    
+    const signature = request.headers.get("x-commerce7-signature");
+    const tenantId = request.headers.get("x-commerce7-tenant");
+
     if (!signature || !tenantId) {
-      console.warn('Commerce7 webhook missing required headers');
+      console.warn("Commerce7 webhook missing required headers");
       return false;
     }
 
     // TODO: Implement signature validation if Commerce7 provides one
     // For now, we'll validate the basic headers are present
-    
+
     const secret = process.env.COMMERCE7_WEBHOOK_SECRET;
     if (secret) {
       try {
         const body = await request.text();
         const expectedSignature = crypto
-          .createHmac('sha256', secret)
-          .update(body, 'utf8')
-          .digest('hex');
+          .createHmac("sha256", secret)
+          .update(body, "utf8")
+          .digest("hex");
 
         return signature === expectedSignature;
       } catch (error) {
-        console.error('Commerce7 webhook validation error:', error);
+        console.error("Commerce7 webhook validation error:", error);
         return false;
       }
     }
@@ -529,122 +746,313 @@ export class Commerce7Provider implements CrmProvider {
 
   async processWebhook(payload: WebhookPayload): Promise<void> {
     console.log(`Processing Commerce7 webhook: ${payload.topic}`, payload.data);
-    
+
     // TODO: Implement webhook processing logic based on topic
     // This is where you would sync data to your database
-    
+
     switch (payload.topic) {
-      case 'customers/create':
-        console.log('New customer created:', payload.data.id);
+      case "customers/create":
+        console.log("New customer created:", payload.data.id);
         // TODO: Store customer in Supabase
         break;
-      
-      case 'customers/update':
-        console.log('Customer updated:', payload.data.id);
+
+      case "customers/update":
+        console.log("Customer updated:", payload.data.id);
         // TODO: Update customer in Supabase
         break;
-      
-      case 'orders/create':
-        console.log('New order created:', payload.data.id);
+
+      case "orders/create":
+        console.log("New order created:", payload.data.id);
         // TODO: Store order in Supabase
         break;
-      
-      case 'orders/update':
-        console.log('Order updated:', payload.data.id);
+
+      case "orders/update":
+        console.log("Order updated:", payload.data.id);
         // TODO: Update order in Supabase
         break;
-      
-      case 'products/create':
-        console.log('New product created:', payload.data.id);
+
+      case "products/create":
+        console.log("New product created:", payload.data.id);
         // TODO: Store product in Supabase
         break;
-      
-      case 'products/update':
-        console.log('Product updated:', payload.data.id);
+
+      case "products/update":
+        console.log("Product updated:", payload.data.id);
         // TODO: Update product in Supabase
         break;
-      
+
       default:
-        console.log('Unhandled webhook topic:', payload.topic);
+        console.log("Unhandled webhook topic:", payload.topic);
     }
   }
 
-  async registerWebhook(topic: WebhookTopic, address: string): Promise<WebhookRegistration> {
-    const { tenant } = await this.getCurrentTenant();
-    
+  async registerWebhook(
+    topic: WebhookTopic,
+    address: string
+  ): Promise<WebhookRegistration> {
     // Commerce7 webhook registration
     const response = await fetch(`${API_URL}/webhook`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
+        tenant: this.tenantId,
       },
       body: JSON.stringify({
         topic,
         url: address,
-        isActive: true
-      })
+        isActive: true,
+      }),
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error registering Commerce7 webhook: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error registering Commerce7 webhook: ${data.errors[0]?.message}`
+      );
     }
 
     return {
       id: data.id,
       topic,
       address,
-      createdAt: data.createdAt
+      createdAt: data.createdAt,
     };
   }
 
   async listWebhooks(): Promise<WebhookRegistration[]> {
-    const { tenant } = await this.getCurrentTenant();
-    
     const response = await fetch(`${API_URL}/webhook`, {
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
-      }
+        tenant: this.tenantId,
+      },
     });
 
     const data = await response.json();
-    
+
     if (data.errors) {
-      throw new Error(`Error listing Commerce7 webhooks: ${data.errors[0]?.message}`);
+      throw new Error(
+        `Error listing Commerce7 webhooks: ${data.errors[0]?.message}`
+      );
     }
 
     return (data.webhooks || []).map((webhook: any) => ({
       id: webhook.id,
       topic: webhook.topic as WebhookTopic,
       address: webhook.url,
-      createdAt: webhook.createdAt
+      createdAt: webhook.createdAt,
     }));
   }
 
   async deleteWebhook(id: string): Promise<boolean> {
-    const { tenant } = await this.getCurrentTenant();
-    
     const response = await fetch(`${API_URL}/webhook/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
         Authorization: getApiAuth(),
-        tenant: tenant
-      }
+        tenant: this.tenantId,
+      },
     });
 
     if (!response.ok) {
-      throw new Error(`Error deleting Commerce7 webhook: ${response.statusText}`);
+      throw new Error(
+        `Error deleting Commerce7 webhook: ${response.statusText}`
+      );
     }
 
     return true;
+  }
+
+  // Customer-specific discount management
+  async addCustomerToDiscount(discountId: string, customerId: string): Promise<void> {
+    // TODO: Implement Commerce7 customer-specific discount assignment
+    // This might be done through coupon customer restrictions
+    throw new Error("addCustomerToDiscount not implemented yet for Commerce7");
+  }
+
+  async removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void> {
+    // TODO: Implement Commerce7 customer-specific discount removal
+    throw new Error("removeCustomerFromDiscount not implemented yet for Commerce7");
+  }
+
+  async getDiscountCustomers(discountId: string): Promise<string[]> {
+    // TODO: Implement Commerce7 discount customer list
+    throw new Error("getDiscountCustomers not implemented yet for Commerce7");
+  }
+
+  // Tag operations
+  /**
+   * Search for customer tags in Commerce7
+   * Used for segmenting customers in coupons
+   */
+  async searchCustomerTags(params?: { q?: string; limit?: number }): Promise<C7Tag[]> {
+    const { q = "", limit = 50 } = params || {};
+
+    const queryParams = new URLSearchParams();
+    if (q) queryParams.append("q", q);
+    queryParams.append("limit", limit.toString());
+
+    const response = await fetch(`${API_URL}/tag/customer?${queryParams.toString()}`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'searching customer tags');
+
+    return (data.tags || []).map((tag: any) => ({
+      id: tag.id,
+      title: tag.title,
+      type: tag.type,
+      objectType: tag.objectType,
+    }));
+  }
+
+  /**
+   * Get a specific tag by ID
+   */
+  async getTag(id: string): Promise<C7Tag> {
+    const response = await fetch(`${API_URL}/tag/${id}`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'fetching tag');
+
+    return {
+      id: data.id,
+      title: data.title,
+      type: data.type,
+      objectType: data.objectType,
+    };
+  }
+
+  /**
+   * Create a new customer tag
+   * @param title - The name of the tag
+   * @param type - "Manual" or "Dynamic"
+   */
+  async createCustomerTag(title: string, type: "Manual" | "Dynamic" = "Manual"): Promise<C7Tag> {
+    const response = await fetch(`${API_URL}/tag/customer`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify({
+        title,
+        type,
+      }),
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'creating customer tag');
+
+    return {
+      id: data.id,
+      title: data.title,
+      type: data.type,
+      objectType: C7TagObjectType.CUSTOMER,
+    };
+  }
+
+  /**
+   * Delete a tag
+   * @param tagId - The tag's ID
+   */
+  async deleteTag(tagId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/tag/${tagId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'deleting tag');
+  }
+
+  /**
+   * Add a tag to a customer
+   * @param customerId - The customer's ID
+   * @param tagId - The tag's ID
+   */
+  async tagCustomer(customerId: string, tagId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/tag/${tagId}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'tagging customer');
+  }
+
+  /**
+   * Remove a tag from a customer
+   * @param customerId - The customer's ID
+   * @param tagId - The tag's ID
+   */
+  async untagCustomer(customerId: string, tagId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/tag/${tagId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'removing tag from customer');
+  }
+
+  /**
+   * Get all tags for a customer
+   * @param customerId - The customer's ID
+   */
+  async getCustomerTags(customerId: string): Promise<C7Tag[]> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/tag`, {
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'fetching customer tags');
+
+    return (data.tags || []).map((tag: any) => ({
+      id: tag.id,
+      title: tag.title,
+      type: tag.type,
+      objectType: tag.objectType,
+    }));
   }
 }

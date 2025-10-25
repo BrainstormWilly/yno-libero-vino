@@ -13,3 +13,41 @@ body {
     color-scheme: dark;
   }
 }
+
+/* Embedded app scrolling fixes for Commerce7 old iframe-resizer */
+html,
+body {
+  height: auto !important;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+body {
+  /* Ensure body can scroll in embedded iframes */
+  position: relative;
+}
+
+/* Fix for Polaris Page component in embedded apps */
+.Polaris-Page {
+  min-height: auto !important;
+}
+
+/* Ensure proper scrolling in embedded context */
+.embedded-app-wrapper {
+  width: 100%;
+  min-height: 100vh;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Ensure cards and sections can expand naturally in embedded context */
+.embedded-app-wrapper .Polaris-Card {
+  height: auto;
+}
+
+/* Prevent Polaris Layout from restricting height */
+.embedded-app-wrapper .Polaris-Layout {
+  max-height: none !important;
+}

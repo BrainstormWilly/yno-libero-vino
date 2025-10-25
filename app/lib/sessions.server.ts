@@ -20,7 +20,6 @@ import {
   getSessionIdFromRequest,
   addSessionToUrl,
 } from './session-storage.server';
-import { crmManager } from '~/lib/crm';
 
 /**
  * Get current session from request (via URL parameter)

@@ -33,6 +33,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {/* Load iframe-resizer content window script for Commerce7 embedded app */}
+        <script 
+          type="text/javascript" 
+          src="https://cdnjs.cloudflare.com/ajax/libs/iframe-resizer/4.3.2/iframeResizer.contentWindow.min.js"
+        />
       </head>
       <body className="font-sans antialiased">
         <AppProvider

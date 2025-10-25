@@ -16,4 +16,7 @@ export default [
     route("c7", "routes/webhooks.c7.tsx"),
     route("shp", "routes/webhooks.shp.tsx"),
   ]),
+  // API resource routes
+  route("api/products", "routes/api.products.tsx"),
+  route("api/collections", "routes/api.collections.tsx"),
 ] satisfies RouteConfig;

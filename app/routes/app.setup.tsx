@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { useLoaderData, Form, useActionData, redirect, useNavigate } from 'react-router';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Page, 
   Layout, 
@@ -18,6 +18,14 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 import { getAppSession } from '~/lib/sessions.server';
+import { createDefaultDiscount, type Discount, type SerializedDiscount, serializeDiscount, parseDiscount } from '~/types/discount';
+import ProductCollectionSelector from '~/components/ProductCollectionSelector';
+import { notifyParentOfHeightChange, setupAutoResize, scrollToTop } from '~/util/iframe-helper';
+import { useCrmProvider } from '~/hooks/useCrmProvider';
+import { Commerce7Provider } from '~/lib/crm/commerce7.server';
+import { addSessionToUrl } from '~/util/session';
+import { createTierTagAndCoupon, syncTierTagAndCoupon } from '~/lib/tier-helpers.server';
+import { fromC7Coupon } from '~/types/discount-commerce7';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -29,6 +37,13 @@ interface TierFormData {
   durationMonths: string;
   minPurchaseAmount: string;
   description?: string;
+  discount?: Discount; // Unified discount for C7/Shopify (in React state)
+  showDiscountForm?: boolean; // Toggle to show/hide discount configuration
+}
+
+// When parsed from JSON, discount dates become strings
+interface TierFormDataSerialized extends Omit<TierFormData, 'discount'> {
+  discount?: SerializedDiscount;
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -91,10 +106,102 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .eq('id', session.clientId)
     .single();
   
-  return { 
+  // Fetch actual discount data from C7 for existing tiers
+  let tiersWithDiscounts = existingProgram?.club_stages || [];
+  if (existingProgram?.club_stages && session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    
+    tiersWithDiscounts = await Promise.all(
+      existingProgram.club_stages.map(async (stage: any) => {
+        if (stage.platform_discount_id) {
+          try {
+            // Fetch the full C7 coupon data
+            const c7CouponData = await provider.getC7CouponFull(stage.platform_discount_id);
+            
+            // Convert to unified Discount type
+            let discount: Discount;
+            try {
+              discount = fromC7Coupon(c7CouponData) as Discount;
+              
+              // Enrich collections with titles (fromC7Coupon only gives us IDs)
+              if (discount.appliesTo?.collections && discount.appliesTo.collections.length > 0) {
+                const enrichedCollections = await Promise.all(
+                  discount.appliesTo.collections.map(async (collectionRef) => {
+                    // Handle case where collectionRef might be a string instead of an object
+                    const collectionId = typeof collectionRef === 'string' ? collectionRef : collectionRef.id;
+                    
+                    if (!collectionId) {
+                      console.warn('Collection reference missing ID:', collectionRef);
+                      return { id: '' }; // Return empty ID to avoid crashes
+                    }
+                    
+                    try {
+                      // Fetch the full collection data from C7 to get the title
+                      const collection = await provider.getCollection(collectionId);
+                      return { id: collectionId, title: collection.title };
+                    } catch (error) {
+                      console.warn(`Failed to fetch collection ${collectionId}:`, error);
+                      return { id: collectionId }; // Keep just the ID if fetch fails
+                    }
+                  })
+                );
+                discount.appliesTo.collections = enrichedCollections;
+              }
+              
+              // Enrich products with titles (fromC7Coupon only gives us IDs)
+              if (discount.appliesTo?.products && discount.appliesTo.products.length > 0) {
+                const enrichedProducts = await Promise.all(
+                  discount.appliesTo.products.map(async (productRef) => {
+                    // Handle case where productRef might be a string instead of an object
+                    const productId = typeof productRef === 'string' ? productRef : productRef.id;
+                    
+                    if (!productId) {
+                      console.warn('Product reference missing ID:', productRef);
+                      return { id: '' }; // Return empty ID to avoid crashes
+                    }
+                    
+                    try {
+                      // Fetch the full product data from C7 to get the title
+                      const product = await provider.getProduct(productId);
+                      return { id: productId, title: product.title };
+                    } catch (error) {
+                      console.warn(`Failed to fetch product ${productId}:`, error);
+                      return { id: productId }; // Keep just the ID if fetch fails
+                    }
+                  })
+                );
+                discount.appliesTo.products = enrichedProducts;
+              }
+            } catch (conversionError) {
+              console.error(`Conversion error for ${stage.name}:`, conversionError);
+              throw conversionError;
+            }
+            
+            // Serialize for transmission (dates to strings)
+            const serializedDiscount = serializeDiscount(discount);
+            
+            return {
+              ...stage,
+              discountData: serializedDiscount,
+            };
+          } catch (error) {
+            console.error(`Failed to fetch discount for tier ${stage.name}:`, error);
+            console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+            return stage;
+          }
+        }
+        return stage;
+      })
+    );
+  }
+  
+  return {
     session,
     client,
-    existingProgram,
+    existingProgram: existingProgram ? {
+      ...existingProgram,
+      club_stages: tiersWithDiscounts,
+    } : null,
     loyaltyRules,
     hasSetup: !!existingProgram && !!loyaltyRules,
   };
@@ -129,7 +236,7 @@ export async function action({ request }: ActionFunctionArgs) {
         };
       }
       
-      const tiers: TierFormData[] = JSON.parse(tiersJson);
+      const tiers: TierFormDataSerialized[] = JSON.parse(tiersJson);
       
       if (tiers.length === 0) {
         return {
@@ -167,20 +274,73 @@ export async function action({ request }: ActionFunctionArgs) {
         min_purchase_amount: parseFloat(tier.minPurchaseAmount),
         stage_order: index + 1,
         is_active: true,
+        // Store discount code and title for reference
+        discount_code: tier.discount?.code,
+        discount_title: tier.discount?.title,
       }));
       
-      const { error: tiersError } = await supabase
+      const { data: createdTiers, error: tiersError } = await supabase
         .from('club_stages')
-        .insert(tierInserts);
+        .insert(tierInserts)
+        .select();
       
-      if (tiersError) {
+      if (tiersError || !createdTiers) {
         // Rollback club program
         await supabase.from('club_programs').delete().eq('id', clubProgram.id);
         return {
           success: false,
           message: 'Failed to create tiers',
-          error: tiersError.message
+          error: tiersError?.message
         };
+      }
+      
+      // Create tags and discounts in Commerce7/Shopify for each tier
+      const discountCreationErrors: string[] = [];
+      
+      for (let i = 0; i < tiers.length; i++) {
+        const tier = tiers[i];
+        const createdTier = createdTiers[i];
+        
+        if (tier.discount) {
+          try {
+            const discount = parseDiscount(tier.discount);
+            
+            if (session.crmType === 'commerce7') {
+              // Create customer tag and coupon together
+              const provider = new Commerce7Provider(session.tenantShop);
+              const result = await createTierTagAndCoupon(
+                provider,
+                tier.name,
+                discount
+              );
+              
+              // Store the tag ID, coupon ID, and codes back to the tier
+              await supabase
+                .from('club_stages')
+                .update({ 
+                  platform_tag_id: result.tagId,
+                  platform_discount_id: result.couponId,
+                  discount_code: result.couponCode,
+                  discount_title: result.couponTitle,
+                })
+                .eq('id', createdTier.id);
+            } else if (session.crmType === 'shopify') {
+              // TODO: Implement Shopify discount creation
+              throw new Error('Shopify discount creation not yet implemented');
+            }
+          } catch (error) {
+            const errorMsg = `Failed to create discount for tier "${tier.name}": ${error instanceof Error ? error.message : 'Unknown error'}`;
+            console.error(errorMsg);
+            discountCreationErrors.push(errorMsg);
+          }
+        }
+      }
+      
+      // If any discounts failed to create, warn but don't fail the whole setup
+      if (discountCreationErrors.length > 0) {
+        console.warn('Some discounts failed to create:', discountCreationErrors);
+        // You could optionally return a warning message here
+        // but we'll let the setup continue since the tiers were created
       }
       
       // Create loyalty point rules
@@ -215,7 +375,266 @@ export async function action({ request }: ActionFunctionArgs) {
         })
         .eq('id', session.clientId);
       
-      return redirect('/app');
+      // Redirect to settings with success toast
+      let successMessage = 'Club setup completed successfully!';
+      if (discountCreationErrors.length > 0) {
+        successMessage += ` (${discountCreationErrors.length} coupon creation(s) failed - see console)`;
+      }
+      
+      const settingsUrl = addSessionToUrl('/app/settings', session.id) + 
+        `&toast=${encodeURIComponent(successMessage)}&toastType=success`;
+      
+      throw redirect(settingsUrl);
+    }
+    
+    if (action === 'update_setup') {
+      // Parse all the setup data
+      const clubName = formData.get('club_name') as string;
+      const clubDescription = formData.get('club_description') as string;
+      const tiersJson = formData.get('tiers') as string;
+      const pointsPerDollar = formData.get('points_per_dollar') as string;
+      const minMembershipDays = formData.get('min_membership_days') as string;
+      const pointDollarValue = formData.get('point_dollar_value') as string;
+      const minPointsRedemption = formData.get('min_points_redemption') as string;
+      
+      if (!clubName || !tiersJson) {
+        return { 
+          success: false, 
+          message: 'Club name and at least one tier are required' 
+        };
+      }
+      
+      const tiers: TierFormDataSerialized[] = JSON.parse(tiersJson);
+      
+      if (tiers.length === 0) {
+        return {
+          success: false,
+          message: 'You must create at least one tier'
+        };
+      }
+      
+      // Get existing program
+      const { data: existingProgram } = await supabase
+        .from('club_programs')
+        .select('*, club_stages(*)')
+        .eq('client_id', session.clientId)
+        .single();
+      
+      if (!existingProgram) {
+        return {
+          success: false,
+          message: 'No existing club program found. Please use initial setup instead.'
+        };
+      }
+      
+      // Update club program
+      const { error: updateProgramError } = await supabase
+        .from('club_programs')
+        .update({
+          name: clubName,
+          description: clubDescription,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingProgram.id);
+      
+      if (updateProgramError) {
+        return {
+          success: false,
+          message: 'Failed to update club program',
+          error: updateProgramError.message
+        };
+      }
+      
+      // Handle tier updates (add/update/delete)
+      const existingTierIds = new Set<string>(existingProgram.club_stages.map((s: any) => s.id));
+      const updatedTierIds = new Set<string>();
+      const discountUpdateErrors: string[] = [];
+      
+      // Process each tier from the form
+      for (let i = 0; i < tiers.length; i++) {
+        const tier = tiers[i];
+        
+        // Check if this is an existing tier (UUID format) or new one (tier-xxx format)
+        const isExistingTier = tier.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+        
+        if (isExistingTier && existingTierIds.has(tier.id)) {
+          // UPDATE existing tier
+          updatedTierIds.add(tier.id);
+          
+          const { error: updateTierError } = await supabase
+            .from('club_stages')
+            .update({
+              name: tier.name,
+              discount_percentage: parseFloat(tier.discountPercentage),
+              duration_months: parseInt(tier.durationMonths),
+              min_purchase_amount: parseFloat(tier.minPurchaseAmount),
+              stage_order: i + 1,
+              discount_code: tier.discount?.code,
+              discount_title: tier.discount?.title,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', tier.id);
+          
+          if (updateTierError) {
+            console.error(`Failed to update tier ${tier.name}:`, updateTierError);
+            continue;
+          }
+          
+          // Sync Commerce7 tag and coupon (handles all edge cases)
+          if (tier.discount && session.crmType === 'commerce7') {
+            try {
+              const existingTier = existingProgram.club_stages.find((s: any) => s.id === tier.id);
+              const discount = parseDiscount(tier.discount);
+              const provider = new Commerce7Provider(session.tenantShop);
+              
+              // Sync will verify what exists in C7 and create/update as needed
+              const result = await syncTierTagAndCoupon(
+                provider,
+                tier.name,
+                discount,
+                existingTier?.platform_tag_id,
+                existingTier?.platform_discount_id
+              );
+              
+              // Update database with current IDs
+              await supabase
+                .from('club_stages')
+                .update({ 
+                  platform_tag_id: result.tagId,
+                  platform_discount_id: result.couponId,
+                  discount_code: result.couponCode,
+                  discount_title: result.couponTitle,
+                })
+                .eq('id', tier.id);
+            } catch (error) {
+              const errorMsg = `Failed to sync coupon for tier "${tier.name}": ${error instanceof Error ? error.message : 'Unknown error'}`;
+              console.error(errorMsg);
+              discountUpdateErrors.push(errorMsg);
+            }
+          }
+        } else {
+          // CREATE new tier
+          const { data: newTier, error: createTierError } = await supabase
+            .from('club_stages')
+            .insert({
+              club_program_id: existingProgram.id,
+              name: tier.name,
+              discount_percentage: parseFloat(tier.discountPercentage),
+              duration_months: parseInt(tier.durationMonths),
+              min_purchase_amount: parseFloat(tier.minPurchaseAmount),
+              stage_order: i + 1,
+              is_active: true,
+              discount_code: tier.discount?.code,
+              discount_title: tier.discount?.title,
+            })
+            .select()
+            .single();
+          
+          if (createTierError || !newTier) {
+            console.error(`Failed to create new tier ${tier.name}:`, createTierError);
+            continue;
+          }
+          
+          updatedTierIds.add(newTier.id);
+          
+          // Create Commerce7 tag and coupon for new tier
+          if (tier.discount && session.crmType === 'commerce7') {
+            try {
+              const discount = parseDiscount(tier.discount);
+              const provider = new Commerce7Provider(session.tenantShop);
+              const result = await createTierTagAndCoupon(
+                provider,
+                tier.name,
+                discount
+              );
+              
+              await supabase
+                .from('club_stages')
+                .update({ 
+                  platform_tag_id: result.tagId,
+                  platform_discount_id: result.couponId,
+                  discount_code: result.couponCode,
+                  discount_title: result.couponTitle,
+                })
+                .eq('id', newTier.id);
+            } catch (error) {
+              const errorMsg = `Failed to create coupon for new tier "${tier.name}": ${error instanceof Error ? error.message : 'Unknown error'}`;
+              console.error(errorMsg);
+              discountUpdateErrors.push(errorMsg);
+            }
+          }
+        }
+      }
+      
+      // DELETE tiers that were removed
+      const tiersToDelete = Array.from(existingTierIds).filter(id => !updatedTierIds.has(id));
+      for (const tierIdToDelete of tiersToDelete) {
+        const tierToDelete = existingProgram.club_stages.find((s: any) => s.id === tierIdToDelete);
+        
+        // Delete Commerce7 coupon and tag if they exist
+        if (session.crmType === 'commerce7') {
+          const provider = new Commerce7Provider(session.tenantShop);
+          
+          // Delete coupon
+          if (tierToDelete?.platform_discount_id) {
+            try {
+              await provider.deleteC7Coupon(tierToDelete.platform_discount_id);
+            } catch (error) {
+              console.error(`Failed to delete coupon for tier "${tierToDelete?.name}":`, error);
+            }
+          }
+          
+          // Delete tag
+          if (tierToDelete?.platform_tag_id) {
+            try {
+              await provider.deleteTag(tierToDelete.platform_tag_id);
+            } catch (error) {
+              console.error(`Failed to delete tag for tier "${tierToDelete?.name}":`, error);
+            }
+          }
+        }
+        
+        // Delete the tier from database
+        await supabase
+          .from('club_stages')
+          .delete()
+          .eq('id', tierIdToDelete);
+      }
+      
+      // Update loyalty point rules
+      const { error: updateLoyaltyError } = await supabase
+        .from('loyalty_point_rules')
+        .update({
+          points_per_dollar: parseFloat(pointsPerDollar || '1'),
+          min_membership_days: parseInt(minMembershipDays || '365'),
+          point_dollar_value: parseFloat(pointDollarValue || '0.01'),
+          min_points_for_redemption: parseInt(minPointsRedemption || '100'),
+          updated_at: new Date().toISOString()
+        })
+        .eq('client_id', session.clientId);
+      
+      if (updateLoyaltyError) {
+        return {
+          success: false,
+          message: 'Failed to update loyalty rules',
+          error: updateLoyaltyError.message
+        };
+      }
+      
+      // Build success message
+      let successMessage = 'Club setup updated successfully!';
+      if (discountUpdateErrors.length > 0) {
+        successMessage += ` (${discountUpdateErrors.length} coupon update(s) failed - see console)`;
+      }
+      
+      // Redirect to settings with success toast
+      const url = new URL(request.url);
+      const sessionId = url.searchParams.get('session');
+      const settingsUrl = sessionId 
+        ? `/app/settings?session=${sessionId}&toast=${encodeURIComponent(successMessage)}&toastType=success`
+        : `/app/settings?toast=${encodeURIComponent(successMessage)}&toastType=success`;
+      
+      throw redirect(settingsUrl);
     }
     
     return { success: false, message: 'Invalid action' };
@@ -229,9 +648,13 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Setup() {
-  const { client, existingProgram, hasSetup } = useLoaderData<typeof loader>();
+  const { client, existingProgram, loyaltyRules, hasSetup, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
+  const crm = useCrmProvider(session);
+  
+  // Determine if we're in edit mode
+  const isEditMode = !!existingProgram;
   
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 5;
@@ -243,14 +666,35 @@ export default function Setup() {
     'Liberate your wine buying experience. Enjoy member pricing on your schedule - no forced shipments, no surprises.'
   );
   
+  // Helper to create initial discount for a tier
+  const createTierDiscount = (tierName: string, discountPercent: string): Discount => {
+    const discount = createDefaultDiscount(session.crmType === 'commerce7' ? 'commerce7' : 'shopify');
+    const cleanName = tierName.toUpperCase().replace(/\s+/g, '');
+    return {
+      ...discount,
+      code: `${cleanName}${discountPercent}`,
+      title: `${tierName} Tier - ${discountPercent}% Off`,
+      value: {
+        type: 'percentage',
+        percentage: parseFloat(discountPercent) || 0,
+      },
+      status: 'scheduled', // Set initial status
+    };
+  };
+  
   const [tiers, setTiers] = useState<TierFormData[]>(
-    existingProgram?.club_stages?.map((stage: any, index: number) => ({
-      id: `tier-${index}`,
+    existingProgram?.club_stages?.map((stage: any) => ({
+      id: stage.id, // Use actual UUID for existing tiers
       name: stage.name,
       discountPercentage: stage.discount_percentage.toString(),
       durationMonths: stage.duration_months.toString(),
       minPurchaseAmount: stage.min_purchase_amount.toString(),
       description: '',
+      // Use fetched discount data if available, otherwise create default
+      discount: stage.discountData 
+        ? parseDiscount(stage.discountData)
+        : createTierDiscount(stage.name, stage.discount_percentage.toString()),
+      showDiscountForm: false,
     })) || [
       {
         id: 'tier-1',
@@ -259,18 +703,60 @@ export default function Setup() {
         durationMonths: '3',
         minPurchaseAmount: '150',
         description: 'Start your liberation journey',
+        discount: createTierDiscount('Bronze', '10'),
+        showDiscountForm: false,
       }
     ]
   );
   
-  const [pointsPerDollar, setPointsPerDollar] = useState('1');
-  const [minMembershipDays, setMinMembershipDays] = useState('365');
-  const [pointDollarValue, setPointDollarValue] = useState('0.01');
-  const [minPointsRedemption, setMinPointsRedemption] = useState('100');
+  const [pointsPerDollar, setPointsPerDollar] = useState(
+    loyaltyRules?.points_per_dollar?.toString() || '1'
+  );
+  const [minMembershipDays, setMinMembershipDays] = useState(
+    loyaltyRules?.min_membership_days?.toString() || '365'
+  );
+  const [pointDollarValue, setPointDollarValue] = useState(
+    loyaltyRules?.point_dollar_value?.toString() || '0.01'
+  );
+  const [minPointsRedemption, setMinPointsRedemption] = useState(
+    loyaltyRules?.min_points_for_redemption?.toString() || '100'
+  );
+  
+  // Collections are now handled by useCrmProvider (like products)
   
   const progressPercent = (currentStep / totalSteps) * 100;
   
+  // Setup auto-resize for embedded iframe on mount
+  useEffect(() => {
+    setupAutoResize();
+  }, []);
+  
+  // Notify parent of height changes when step changes
+  useEffect(() => {
+    scrollToTop();
+    // Small delay to ensure DOM has updated
+    setTimeout(() => {
+      notifyParentOfHeightChange();
+    }, 100);
+  }, [currentStep]);
+  
+  // Notify when tier forms expand/collapse or tiers are added/removed
+  useEffect(() => {
+    notifyParentOfHeightChange();
+  }, [tiers.length, tiers.map(t => t.showDiscountForm).join(',')]);
+  
+  // Notify when products/collections are loaded
+  useEffect(() => {
+    if ((crm.products && crm.products.length > 0) || (crm.collections && crm.collections.length > 0)) {
+      notifyParentOfHeightChange();
+    }
+  }, [crm.products?.length, crm.collections?.length]);
+  
   const addTier = () => {
+    const newDiscount: Discount = {
+      ...createDefaultDiscount(session.crmType === 'commerce7' ? 'commerce7' : 'shopify'),
+      status: 'scheduled',
+    };
     setTiers([...tiers, {
       id: `tier-${Date.now()}`,
       name: '',
@@ -278,16 +764,99 @@ export default function Setup() {
       durationMonths: '',
       minPurchaseAmount: '',
       description: '',
+      discount: newDiscount,
+      showDiscountForm: false,
     }]);
+    // Notify parent of height change after tier is added
+    setTimeout(() => {
+      notifyParentOfHeightChange();
+    }, 150);
   };
   
   const removeTier = (id: string) => {
     setTiers(tiers.filter(t => t.id !== id));
+    // Notify parent of height change after tier is removed
+    setTimeout(() => {
+      notifyParentOfHeightChange();
+    }, 150);
   };
   
   const updateTier = (id: string, field: keyof TierFormData, value: string) => {
-    setTiers(tiers.map(t => t.id === id ? { ...t, [field]: value } : t));
+    setTiers(tiers.map(t => {
+      if (t.id !== id) return t;
+      
+      const updated = { ...t, [field]: value };
+      
+      // Sync tier fields with discount
+      if (updated.discount) {
+        if (field === 'name' && value) {
+          const cleanName = value.toUpperCase().replace(/\s+/g, '');
+          updated.discount.code = `${cleanName}${updated.discountPercentage || ''}`;
+          updated.discount.title = `${value} Tier - ${updated.discountPercentage || 0}% Off`;
+        } else if (field === 'discountPercentage' && value) {
+          updated.discount.value = {
+            type: 'percentage',
+            percentage: parseFloat(value) || 0,
+          };
+          if (updated.name) {
+            const cleanName = updated.name.toUpperCase().replace(/\s+/g, '');
+            updated.discount.code = `${cleanName}${value}`;
+            updated.discount.title = `${updated.name} Tier - ${value}% Off`;
+          }
+        } else if (field === 'minPurchaseAmount' && value) {
+          // Update discount minimum requirement
+          updated.discount.minimumRequirement = {
+            type: 'amount',
+            amount: Math.round(parseFloat(value) * 100), // Convert to cents
+          };
+        }
+      }
+      
+      return updated;
+    }));
   };
+  
+  const updateTierDiscount = (id: string, discount: Discount) => {
+    setTiers(tiers.map(t => t.id === id ? { ...t, discount } : t));
+  };
+  
+  const toggleDiscountForm = (id: string) => {
+    setTiers(tiers.map(t => 
+      t.id === id ? { ...t, showDiscountForm: !t.showDiscountForm } : t
+    ));
+    // Notify parent of height change after a short delay to let DOM update
+    setTimeout(() => {
+      notifyParentOfHeightChange();
+    }, 150);
+  };
+  
+  // Load products from platform
+  const loadProducts = async (q?: string) => {
+    crm.getProducts({ q, limit: 25 });
+  };
+  
+  // Load collections from platform
+  const loadCollections = async (q?: string) => {
+    crm.getCollections({ q, limit: 25 });
+  };
+  
+  // Notify parent when products finish loading
+  useEffect(() => {
+    if (!crm.productsLoading && crm.products) {
+      setTimeout(() => {
+        notifyParentOfHeightChange();
+      }, 150);
+    }
+  }, [crm.productsLoading, crm.products]);
+  
+  // Notify parent when collections finish loading
+  useEffect(() => {
+    if (!crm.collectionsLoading && crm.collections) {
+      setTimeout(() => {
+        notifyParentOfHeightChange();
+      }, 150);
+    }
+  }, [crm.collectionsLoading, crm.collections]);
   
   const moveTier = (index: number, direction: 'up' | 'down') => {
     const newTiers = [...tiers];
@@ -313,9 +882,10 @@ export default function Setup() {
 
   return (
     <Page
-      title="LiberoVino Club Setup"
-      backAction={{ content: 'Cancel', onAction: () => navigate('/app') }}
+      title={isEditMode ? "Edit Club Setup" : "LiberoVino Club Setup"}
+      backAction={{ content: 'Cancel', onAction: () => navigate(addSessionToUrl('/app', session.id)) }}
     >
+      <div style={{ paddingBottom: '80px' }}>
       <Layout>
         {/* Progress Bar */}
         <Layout.Section>
@@ -537,6 +1107,90 @@ export default function Setup() {
                         placeholder="e.g., Free shipping, exclusive access to library wines"
                         autoComplete="off"
                       />
+                      
+                      <Divider />
+                      
+                      {/* Discount Configuration */}
+                      <BlockStack gap="200">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <BlockStack gap="100">
+                            <Text variant="headingMd" as="h4">
+                              Discount Settings
+                            </Text>
+                            {tier.discount && !tier.showDiscountForm && (
+                              <Text variant="bodyMd" as="p" tone="subdued">
+                                Code: <strong>{tier.discount.code || '(auto-generated)'}</strong> • 
+                                {' '}{tier.discount.value?.percentage || 0}% off
+                                {tier.discount.minimumRequirement?.type === 'amount' && 
+                                  ` • $${((tier.discount.minimumRequirement.amount || 0) / 100).toFixed(2)} minimum`}
+                              </Text>
+                            )}
+                          </BlockStack>
+                          <Button 
+                            size="slim"
+                            onClick={() => toggleDiscountForm(tier.id)}
+                          >
+                            {tier.showDiscountForm ? 'Hide Details' : 'Configure Discount'}
+                          </Button>
+                        </InlineStack>
+                        
+                        {tier.showDiscountForm && tier.discount && (
+                          <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                            <BlockStack gap="400">
+                              <BlockStack gap="300">
+                                <TextField
+                                  label="Discount Code"
+                                  value={tier.discount.code}
+                                  onChange={(value) => {
+                                    const updated = { ...tier.discount!, code: value.toUpperCase().replace(/\s/g, '') };
+                                    updateTierDiscount(tier.id, updated);
+                                  }}
+                                  helpText="Code customers will use (automatically uppercase, no spaces)"
+                                  autoComplete="off"
+                                />
+                                
+                                <TextField
+                                  label="Internal Title"
+                                  value={tier.discount.title}
+                                  onChange={(value) => {
+                                    const updated = { ...tier.discount!, title: value };
+                                    updateTierDiscount(tier.id, updated);
+                                  }}
+                                  helpText="Internal name for tracking"
+                                  autoComplete="off"
+                                />
+                                
+                                <Text variant="bodyMd" as="p" tone="subdued">
+                                  <strong>Note:</strong> Discount percentage is synced with the tier discount above. 
+                                  Minimum purchase requirement is also synced with tier minimum.
+                                </Text>
+                              </BlockStack>
+                              
+                              <Divider />
+                              
+                              {/* Product & Collection Selector */}
+                              <ProductCollectionSelector
+                                discount={tier.discount}
+                                onUpdateDiscount={(updatedDiscount) => updateTierDiscount(tier.id, updatedDiscount)}
+                                availableProducts={crm.products || []}
+                                availableCollections={crm.collections || []}
+                                onLoadProducts={loadProducts}
+                                onLoadCollections={loadCollections}
+                                isLoading={crm.productsLoading || crm.collectionsLoading}
+                              />
+                              
+                              <Divider />
+                              
+                              <Banner tone="info">
+                                <Text as="p">
+                                  This discount will be created in your {session.crmType === 'commerce7' ? 'Commerce7' : 'Shopify'} account when you complete setup. 
+                                  Customers will be added to the discount as they join this tier.
+                                </Text>
+                              </Banner>
+                            </BlockStack>
+                          </Box>
+                        )}
+                      </BlockStack>
                     </BlockStack>
                   </Card>
                 ))}
@@ -661,6 +1315,32 @@ export default function Setup() {
                         <Text variant="bodyMd" as="p" tone="subdued">
                           {tier.discountPercentage}% discount • {tier.durationMonths} months duration • ${tier.minPurchaseAmount} min purchase
                         </Text>
+                        {tier.discount && (
+                          <>
+                            <Text variant="bodySm" as="p" tone="subdued">
+                              💳 Discount Code: <strong>{tier.discount.code}</strong>
+                            </Text>
+                            {tier.discount.appliesTo.all && (
+                              <Text variant="bodySm" as="p" tone="subdued">
+                                ✅ Applies to all products
+                              </Text>
+                            )}
+                            {!tier.discount.appliesTo.all && (
+                              <>
+                                {tier.discount.appliesTo.products.length > 0 && (
+                                  <Text variant="bodySm" as="p" tone="subdued">
+                                    📦 {tier.discount.appliesTo.products.length} product(s) selected
+                                  </Text>
+                                )}
+                                {tier.discount.appliesTo.collections.length > 0 && (
+                                  <Text variant="bodySm" as="p" tone="subdued">
+                                    📚 {tier.discount.appliesTo.collections.length} collection(s) selected
+                                  </Text>
+                                )}
+                              </>
+                            )}
+                          </>
+                        )}
                         {tier.description && (
                           <Text variant="bodySm" as="p" tone="subdued">
                             {tier.description}
@@ -722,16 +1402,19 @@ export default function Setup() {
                 </Button>
               ) : (
                 <Form method="post">
-                  <input type="hidden" name="action" value="complete_setup" />
+                  <input type="hidden" name="action" value={isEditMode ? "update_setup" : "complete_setup"} />
                   <input type="hidden" name="club_name" value={clubName} />
                   <input type="hidden" name="club_description" value={clubDescription} />
-                  <input type="hidden" name="tiers" value={JSON.stringify(tiers)} />
+                  <input type="hidden" name="tiers" value={JSON.stringify(tiers.map(t => ({
+                    ...t,
+                    discount: t.discount ? serializeDiscount(t.discount) : undefined
+                  })))} />
                   <input type="hidden" name="points_per_dollar" value={pointsPerDollar} />
                   <input type="hidden" name="min_membership_days" value={minMembershipDays} />
                   <input type="hidden" name="point_dollar_value" value={pointDollarValue} />
                   <input type="hidden" name="min_points_redemption" value={minPointsRedemption} />
                   <Button variant="primary" submit>
-                    Complete Setup ✨
+                    {isEditMode ? 'Update Setup 💾' : 'Complete Setup ✨'}
                   </Button>
                 </Form>
               )}
@@ -739,6 +1422,7 @@ export default function Setup() {
           </Card>
         </Layout.Section>
       </Layout>
+      </div>
     </Page>
   );
 }

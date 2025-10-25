@@ -11,9 +11,11 @@ import {
   InlineStack
 } from '@shopify/polaris';
 import { createClient } from '@supabase/supabase-js';
+
 import { getSubdomainInfo } from '~/util/subdomain';
 import { WelcomeBanner } from '~/components/WelcomeBanner';
 import { getAppSession } from '~/lib/sessions.server';
+import { addSessionToUrl } from '~/util/session';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -147,7 +149,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Settings() {
-  const { client, identifier, crmType, isFirstVisit } = useLoaderData<typeof loader>();
+  const { client, identifier, crmType, isFirstVisit, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   
   // crmType should always be set at this point (validated in loader)
@@ -192,7 +194,7 @@ export default function Settings() {
                   Review and update your LiberoVino club setup, including tiers and loyalty points.
                 </Text>
                 <InlineStack gap="200">
-                  <Button url="/app/setup">
+                  <Button url={addSessionToUrl("/app/setup", session.id)}>
                     View Club Setup
                   </Button>
                 </InlineStack>
