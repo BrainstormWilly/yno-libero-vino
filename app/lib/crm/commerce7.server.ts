@@ -491,7 +491,7 @@ export class Commerce7Provider implements CrmProvider {
     };
   }
 
-  async getDiscounts(params?: any): Promise<CrmDiscount[]> {
+  async getCoupons(params?: any): Promise<CrmDiscount[]> {
     const { q = "", limit = 50 } = params || {};
 
     const response = await fetch(`${API_URL}/coupon?q=${q}&limit=${limit}`, {
@@ -524,7 +524,7 @@ export class Commerce7Provider implements CrmProvider {
     }));
   }
 
-  async getDiscount(id: string): Promise<CrmDiscount> {
+  async getCoupon(id: string): Promise<CrmDiscount> {
     const response = await fetch(`${API_URL}/coupon/${id}`, {
       headers: {
         Accept: "application/json",
@@ -576,7 +576,7 @@ export class Commerce7Provider implements CrmProvider {
     return data.coupon || data;
   }
 
-  async createDiscount(discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
+  async createCoupon(discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
     throw new Error("Use createC7Coupon() method for creating Commerce7 coupons");
   }
 
@@ -653,7 +653,7 @@ export class Commerce7Provider implements CrmProvider {
     return true;
   }
 
-  async updateDiscount(
+  async updateCoupon(
     id: string,
     discount: Partial<CrmDiscount>
   ): Promise<CrmDiscount> {
@@ -689,7 +689,7 @@ export class Commerce7Provider implements CrmProvider {
     };
   }
 
-  async deleteDiscount(id: string): Promise<boolean> {
+  async deleteCoupon(id: string): Promise<boolean> {
     const response = await fetch(`${API_URL}/coupon/${id}`, {
       method: "DELETE",
       headers: {
@@ -880,9 +880,9 @@ export class Commerce7Provider implements CrmProvider {
     throw new Error("removeCustomerFromDiscount not implemented yet for Commerce7");
   }
 
-  async getDiscountCustomers(discountId: string): Promise<string[]> {
-    // TODO: Implement Commerce7 discount customer list
-    throw new Error("getDiscountCustomers not implemented yet for Commerce7");
+  async getCouponCustomers(couponId: string): Promise<string[]> {
+    // TODO: Implement Commerce7 coupon customer list
+    throw new Error("getCouponCustomers not implemented yet for Commerce7");
   }
 
   // Tag operations
@@ -1054,5 +1054,435 @@ export class Commerce7Provider implements CrmProvider {
       type: tag.type,
       objectType: tag.objectType,
     }));
+  }
+
+  // ============================================
+  // CLUB (TIER) METHODS
+  // ============================================
+  // C7 Clubs represent LiberoVino tiers
+  // Each tier (Bronze, Silver, Gold) gets its own C7 Club
+
+  /**
+   * Create a club (tier) on Commerce7
+   * @param data - Club creation data
+   */
+  async createClub(data: import("~/types/commerce7").C7ClubCreateRequest): Promise<import("~/types/commerce7").C7Club> {
+    const response = await fetch(`${API_URL}/club`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'creating club');
+
+    return result;
+  }
+
+  /**
+   * Get a club by ID
+   * @param clubId - The club's ID
+   */
+  async getClub(clubId: string): Promise<import("~/types/commerce7").C7Club> {
+    const response = await fetch(`${API_URL}/club/${clubId}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'fetching club');
+
+    return result;
+  }
+
+  /**
+   * Update a club
+   * @param clubId - The club's ID
+   * @param data - Club update data
+   */
+  async updateClub(
+    clubId: string, 
+    data: Partial<import("~/types/commerce7").C7ClubCreateRequest>
+  ): Promise<import("~/types/commerce7").C7Club> {
+    const response = await fetch(`${API_URL}/club/${clubId}`, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'updating club');
+
+    return result;
+  }
+
+  /**
+   * Delete a club
+   * @param clubId - The club's ID
+   */
+  async deleteClub(clubId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/club/${clubId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'deleting club');
+  }
+
+  /**
+   * List all clubs
+   */
+  async listClubs(): Promise<import("~/types/commerce7").C7Club[]> {
+    const response = await fetch(`${API_URL}/club`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'listing clubs');
+
+    return result.data || [];
+  }
+
+  // ============================================
+  // PROMOTION METHODS
+  // ============================================
+  // Promotions auto-apply discounts (unlike coupons)
+  // Linked to clubs for tier-specific discounts
+
+  /**
+   * Create a promotion
+   * @param data - Promotion creation data
+   */
+  async createPromotion(
+    data: import("~/types/commerce7").C7PromotionCreateRequest
+  ): Promise<import("~/types/commerce7").C7Promotion> {
+    const response = await fetch(`${API_URL}/promotion`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'creating promotion');
+
+    return result;
+  }
+
+  /**
+   * Get a promotion by ID
+   * @param promotionId - The promotion's ID
+   */
+  async getPromotion(promotionId: string): Promise<import("~/types/commerce7").C7Promotion> {
+    const response = await fetch(`${API_URL}/promotion/${promotionId}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'fetching promotion');
+
+    return result;
+  }
+
+  /**
+   * Update a promotion
+   * @param promotionId - The promotion's ID
+   * @param data - Promotion update data
+   */
+  async updatePromotion(
+    promotionId: string,
+    data: Partial<import("~/types/commerce7").C7PromotionCreateRequest>
+  ): Promise<import("~/types/commerce7").C7Promotion> {
+    const response = await fetch(`${API_URL}/promotion/${promotionId}`, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'updating promotion');
+
+    return result;
+  }
+
+  /**
+   * Delete a promotion
+   * @param promotionId - The promotion's ID
+   */
+  async deletePromotion(promotionId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/promotion/${promotionId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'deleting promotion');
+  }
+
+  /**
+   * List all promotions
+   */
+  async listPromotions(): Promise<import("~/types/commerce7").C7Promotion[]> {
+    const response = await fetch(`${API_URL}/promotion`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'listing promotions');
+
+    return result.data || [];
+  }
+
+  // ============================================
+  // PROMOTION SET METHODS
+  // ============================================
+  // Promotion Sets group multiple promotions to apply together
+  // Without a set, only the highest value discount applies
+
+  /**
+   * Create a promotion set
+   * Used when tier has multiple promotions (e.g., 20% off + free shipping)
+   * @param data - Promotion set creation data
+   */
+  async createPromotionSet(
+    data: import("~/types/commerce7").C7PromotionSetCreateRequest
+  ): Promise<import("~/types/commerce7").C7PromotionSet> {
+    const response = await fetch(`${API_URL}/promo-set`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'creating promotion set');
+
+    return result;
+  }
+
+  /**
+   * Get a promotion set by ID
+   * @param setId - The promotion set's ID
+   */
+  async getPromotionSet(setId: string): Promise<import("~/types/commerce7").C7PromotionSet> {
+    const response = await fetch(`${API_URL}/promo-set/${setId}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'fetching promotion set');
+
+    return result;
+  }
+
+  /**
+   * Delete a promotion set
+   * @param setId - The promotion set's ID
+   */
+  async deletePromotionSet(setId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/promo-set/${setId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'deleting promotion set');
+  }
+
+  // ============================================
+  // LOYALTY TIER METHODS
+  // ============================================
+  // Loyalty is an EXTENSION - must be activated by tenant
+  // Each club tier can optionally have loyalty earning
+  // Uses /v2 API (not v1)
+
+  /**
+   * Create a loyalty tier
+   * NOTE: Loyalty extension must be enabled by tenant first
+   * @param data - Loyalty tier creation data
+   */
+  async createLoyaltyTier(
+    data: import("~/types/commerce7").C7LoyaltyTierCreateRequest
+  ): Promise<import("~/types/commerce7").C7LoyaltyTier> {
+    const response = await fetch("https://api.commerce7.com/v2/loyalty-tier", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'creating loyalty tier');
+
+    return result;
+  }
+
+  /**
+   * Get a loyalty tier by ID
+   * @param loyaltyTierId - The loyalty tier's ID
+   */
+  async getLoyaltyTier(loyaltyTierId: string): Promise<import("~/types/commerce7").C7LoyaltyTier> {
+    const response = await fetch(`https://api.commerce7.com/v2/loyalty-tier/${loyaltyTierId}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'fetching loyalty tier');
+
+    return result;
+  }
+
+  /**
+   * Update a loyalty tier
+   * @param loyaltyTierId - The loyalty tier's ID
+   * @param data - Loyalty tier update data
+   */
+  async updateLoyaltyTier(
+    loyaltyTierId: string,
+    data: Partial<import("~/types/commerce7").C7LoyaltyTierCreateRequest>
+  ): Promise<import("~/types/commerce7").C7LoyaltyTier> {
+    const response = await fetch(`https://api.commerce7.com/v2/loyalty-tier/${loyaltyTierId}`, {
+      method: "PATCH",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'updating loyalty tier');
+
+    return result;
+  }
+
+  /**
+   * Delete a loyalty tier
+   * @param loyaltyTierId - The loyalty tier's ID
+   */
+  async deleteLoyaltyTier(loyaltyTierId: string): Promise<void> {
+    const response = await fetch(`https://api.commerce7.com/v2/loyalty-tier/${loyaltyTierId}`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'deleting loyalty tier');
+  }
+
+  /**
+   * List all loyalty tiers
+   */
+  async listLoyaltyTiers(): Promise<import("~/types/commerce7").C7LoyaltyTier[]> {
+    const response = await fetch("https://api.commerce7.com/v2/loyalty-tier", {
+      headers: {
+        Accept: "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'listing loyalty tiers');
+
+    return result.data || [];
+  }
+
+  // ============================================
+  // LOYALTY TRANSACTION METHODS
+  // ============================================
+  // For manual point adjustments (bonus points, etc.)
+
+  /**
+   * Add or remove loyalty points for a customer
+   * @param data - Transaction data (positive = add, negative = remove)
+   */
+  async addLoyaltyPoints(
+    data: import("~/types/commerce7").C7LoyaltyTransactionCreateRequest
+  ): Promise<import("~/types/commerce7").C7LoyaltyTransaction> {
+    const response = await fetch("https://api.commerce7.com/v2/loyalty-transaction", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    handleC7ApiError(result, 'adding loyalty points');
+
+    return result;
   }
 }

@@ -65,27 +65,27 @@ export class ShopifyProvider implements CrmProvider {
     throw new Error('Not implemented yet');
   }
 
-  async getDiscounts(params?: any): Promise<CrmDiscount[]> {
+  async getCoupons(params?: any): Promise<CrmDiscount[]> {
     // Implementation for fetching Shopify discount codes
     throw new Error('Not implemented yet');
   }
 
-  async getDiscount(id: string): Promise<CrmDiscount> {
+  async getCoupon(id: string): Promise<CrmDiscount> {
     // Implementation for fetching a single Shopify discount
     throw new Error('Not implemented yet');
   }
 
-  async createDiscount(discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
+  async createCoupon(discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
     // Implementation for creating a Shopify discount
     throw new Error('Not implemented yet');
   }
 
-  async updateDiscount(id: string, discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
+  async updateCoupon(id: string, discount: Partial<CrmDiscount>): Promise<CrmDiscount> {
     // Implementation for updating a Shopify discount
     throw new Error('Not implemented yet');
   }
 
-  async deleteDiscount(id: string): Promise<boolean> {
+  async deleteCoupon(id: string): Promise<boolean> {
     // Implementation for deleting a Shopify discount
     throw new Error('Not implemented yet');
   }
@@ -207,8 +207,8 @@ export class ShopifyProvider implements CrmProvider {
     throw new Error('removeCustomerFromDiscount not implemented yet for Shopify');
   }
 
-  async getDiscountCustomers(discountId: string): Promise<string[]> {
-    // TODO: Implement Shopify discount customer list
-    throw new Error('getDiscountCustomers not implemented yet for Shopify');
+  async getCouponCustomers(couponId: string): Promise<string[]> {
+    // TODO: Implement Shopify coupon customer list
+    throw new Error('getCouponCustomers not implemented yet for Shopify');
   }
 }

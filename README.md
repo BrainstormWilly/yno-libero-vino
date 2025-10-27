@@ -8,10 +8,30 @@
 
 A wine club and loyalty platform for Commerce7 and Shopify. Built with React Router v7, Supabase, and deployed on Heroku.
 
+## ⚡ Recent Architecture Update (October 2025)
+
+**LiberoVino has moved to a club-based architecture!** We've replaced the tag and coupon approach with Commerce7's native Clubs, Promotions, and Loyalty features.
+
+**What's New:**
+- ✅ **Auto-applying Promotions** - Discounts apply automatically at checkout (no more manual coupons!)
+- ✅ **Tier-Based Loyalty** - Loyalty benefits tied to membership tier (not longevity)
+- ✅ **Flexible Tier Structures** - Support for loyalty-only tiers, discount+loyalty, and premium tiers
+- ✅ **Native C7 Integration** - Uses Commerce7's club functionality for better long-term support
+
+**📚 New Documentation:**
+- **[CLUB_ARCHITECTURE_INDEX.md](docs/CLUB_ARCHITECTURE_INDEX.md)** - Start here for complete overview
+- [ARCHITECTURE_CHANGE.md](docs/ARCHITECTURE_CHANGE.md) - Why and what changed
+- [CLUB_CREATION_FLOW.md](docs/CLUB_CREATION_FLOW.md) - How clubs are created
+- [C7_CLUB_ENDPOINTS.md](docs/C7_CLUB_ENDPOINTS.md) - Commerce7 API reference
+- [TIER_BASED_LOYALTY.md](docs/TIER_BASED_LOYALTY.md) - New loyalty model
+- [DATABASE_SCHEMA_UPDATES.md](docs/DATABASE_SCHEMA_UPDATES.md) - Schema changes
+
 ## Features
 
-- **Wine Club Management**: Manage wine club memberships, shipments, and member benefits.
-- **Loyalty Programs**: Track customer loyalty points, rewards, and engagement.
+- **Wine Club Management**: Manage wine club memberships with Commerce7 clubs, automatic promotions, and tiered benefits.
+- **Auto-Applying Promotions**: Discounts automatically apply at checkout - no manual coupon codes needed.
+- **Tier-Based Loyalty**: Loyalty earning rates tied to membership tier (e.g., Bronze: 1 pt/$, Gold: 5 pts/$).
+- **Flexible Tier Structures**: Support loyalty-only tiers, discount tiers, or combined discount + loyalty tiers.
 - **Multi-Platform Support**: Seamlessly integrate with Commerce7 and Shopify.
 - **Subdomain-Based Routing**: Separate platform access via dedicated subdomains (c7.* for Commerce7, shp.* for Shopify).
 - **Real-time Webhook Integration**: Keep your data in sync across all platforms with instant updates.
@@ -226,14 +246,24 @@ For detailed instructions, see [NGROK_WEBHOOK_SETUP.md](docs/NGROK_WEBHOOK_SETUP
 
 The application uses Supabase with the following main tables:
 
+### Core Tables
 - `clients` - Paid customers (wineries) with tenant_shop, org info
 - `platform_sessions` - Authentication sessions linked to clients
 - `customers` - Wine club members and customers (linked to clients)
 - `products` - Wine inventory and products (linked to clients)
 - `orders` - Orders and club shipments (linked to clients)
-- `discounts` - Promotional discount codes (linked to clients)
+
+### Club Architecture Tables
+- `club_programs` - Wine club programs (one per client)
+- `club_stages` - Membership tiers (Bronze, Silver, Gold, etc.)
+- `club_promotions` - **NEW:** Commerce7 promotions (auto-applying discounts)
+- `tier_loyalty_config` - **NEW:** Tier-specific loyalty point earning rules
+- `club_enrollments` - Customer membership in tiers
+- `loyalty_rewards` - Redemption catalog
 
 All data is properly isolated per client using foreign keys.
+
+For complete schema documentation, see [DATABASE_SCHEMA_UPDATES.md](docs/DATABASE_SCHEMA_UPDATES.md).
 
 ## Contributing
 
@@ -267,6 +297,27 @@ To add a new winery platform provider:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Documentation
+
+### Quick Links
+- **[CLUB_ARCHITECTURE_INDEX.md](docs/CLUB_ARCHITECTURE_INDEX.md)** - 📚 Complete documentation index (START HERE)
+- [ARCHITECTURE_CHANGE.md](docs/ARCHITECTURE_CHANGE.md) - Overview of the club architecture
+- [CLUB_CREATION_FLOW.md](docs/CLUB_CREATION_FLOW.md) - Detailed club creation process
+- [TIER_BASED_LOYALTY.md](docs/TIER_BASED_LOYALTY.md) - Loyalty model and examples
+- [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) - Database schema reference
+- [CRM_PROVIDER_PATTERN.md](docs/CRM_PROVIDER_PATTERN.md) - Platform abstraction pattern
+
+### Setup Guides
+- [ENVIRONMENT_SETUP.md](docs/ENVIRONMENT_SETUP.md) - Local development setup
+- [SUBDOMAIN_SETUP.md](docs/SUBDOMAIN_SETUP.md) - Subdomain configuration
+- [NGROK_WEBHOOK_SETUP.md](docs/NGROK_WEBHOOK_SETUP.md) - Webhook testing with Ngrok
+- [GITHUB_SETUP.md](docs/GITHUB_SETUP.md) - GitHub CI/CD setup
+
+### Commerce7 Integration
+- [C7_CLUB_ENDPOINTS.md](docs/C7_CLUB_ENDPOINTS.md) - Commerce7 API reference
+- [C7_AUTHORIZATION.md](docs/C7_AUTHORIZATION.md) - Commerce7 authentication
+- [C7_INSTALL_FLOW.md](docs/C7_INSTALL_FLOW.md) - Installation process
 
 ## Support
 

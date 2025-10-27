@@ -135,12 +135,12 @@ export interface CrmProvider {
   getOrders(params?: any): Promise<CrmOrder[]>;
   getOrder(id: string): Promise<CrmOrder>;
   
-  // Discount operations
-  getDiscounts(params?: any): Promise<CrmDiscount[]>;
-  getDiscount(id: string): Promise<CrmDiscount>;
-  createDiscount(discount: Partial<CrmDiscount>): Promise<CrmDiscount>;
-  updateDiscount(id: string, discount: Partial<CrmDiscount>): Promise<CrmDiscount>;
-  deleteDiscount(id: string): Promise<boolean>;
+  // Coupon operations (manual discount codes)
+  getCoupons(params?: any): Promise<CrmDiscount[]>;
+  getCoupon(id: string): Promise<CrmDiscount>;
+  createCoupon(discount: Partial<CrmDiscount>): Promise<CrmDiscount>;
+  updateCoupon(id: string, discount: Partial<CrmDiscount>): Promise<CrmDiscount>;
+  deleteCoupon(id: string): Promise<boolean>;
   
   // Webhook operations
   validateWebhook(request: Request): Promise<boolean>;
@@ -149,8 +149,8 @@ export interface CrmProvider {
   listWebhooks(): Promise<WebhookRegistration[]>;
   deleteWebhook(id: string): Promise<boolean>;
   
-  // Customer-specific discount management (for club stages)
+  // Customer-specific coupon management (for club stages)
   addCustomerToDiscount(discountId: string, customerId: string): Promise<void>;
   removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void>;
-  getDiscountCustomers(discountId: string): Promise<string[]>;
+  getCouponCustomers(couponId: string): Promise<string[]>;
 }
