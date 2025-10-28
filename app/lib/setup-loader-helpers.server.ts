@@ -1,24 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
 import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { serializeDiscount, parseDiscount, type Discount } from '~/types/discount';
 import { fromC7Coupon } from '~/types/discount-commerce7';
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import * as db from '~/lib/db/supabase.server';
 
 /**
  * Gets client data from Supabase
  */
 export async function getClientData(clientId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { data: client } = await supabase
-    .from('clients')
-    .select('*')
-    .eq('id', clientId)
-    .single();
-  
-  return client;
+  return db.getClient(clientId);
 }
 
 /**
@@ -38,17 +27,10 @@ export async function getExistingProgram(clientId: string) {
 
 /**
  * Fetches loyalty point rules for a client
+ * @deprecated Global loyalty rules are deprecated. Use tier-specific loyalty instead.
  */
 export async function getLoyaltyRules(clientId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { data: loyaltyRules } = await supabase
-    .from('loyalty_point_rules')
-    .select('*')
-    .eq('client_id', clientId)
-    .single();
-  
-  return loyaltyRules;
+  return db.getLoyaltyRules(clientId);
 }
 
 /**
@@ -125,49 +107,89 @@ async function enrichDiscount(provider: Commerce7Provider, discount: Discount): 
 }
 
 /**
- * Fetches and enriches discount data from Commerce7 for a club stage
+ * Fetches promotions for a club stage from the database
  */
-async function fetchStageDiscount(
+async function fetchStagePromotions(stageId: string): Promise<any[]> {
+  return db.getStagePromotions(stageId);
+}
+
+/**
+ * Fetches loyalty configuration for a club stage
+ */
+async function fetchStageLoyalty(stageId: string): Promise<any | null> {
+  return db.getTierLoyaltyConfig(stageId);
+}
+
+/**
+ * Fetches and enriches club/promotion/loyalty data from C7 for a club stage (NEW ARCHITECTURE)
+ */
+async function fetchStageC7Data(
   provider: Commerce7Provider,
   stage: any
 ): Promise<any> {
-  if (!stage.platform_discount_id) {
-    return stage;
-  }
-  
   try {
-    // Fetch the full C7 coupon data
-    const c7CouponData = await provider.getC7CouponFull(stage.platform_discount_id);
+    // Fetch promotions from database
+    const promotions = await fetchStagePromotions(stage.id);
     
-    // Convert to unified Discount type
-    let discount: Discount;
-    try {
-      discount = fromC7Coupon(c7CouponData) as Discount;
-      
-      // Enrich collections and products with titles
-      discount = await enrichDiscount(provider, discount);
-      
-    } catch (conversionError) {
-      console.error(`Conversion error for ${stage.name}:`, conversionError);
-      throw conversionError;
+    // Fetch full C7 promotion details (optional, for display)
+    const enrichedPromotions = await Promise.all(
+      promotions.map(async (promo) => {
+        try {
+          const c7Promotion = await provider.getPromotion(promo.crm_id);
+          return {
+            ...promo,
+            c7Data: c7Promotion, // Full C7 promotion object
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch promotion ${promo.crm_id}:`, error);
+          return promo; // Return without C7 data
+        }
+      })
+    );
+    
+    // Fetch loyalty configuration
+    const loyalty = await fetchStageLoyalty(stage.id);
+    
+    // Fetch full C7 loyalty tier details (optional)
+    let enrichedLoyalty = null;
+    if (loyalty?.c7_loyalty_tier_id) {
+      try {
+        const c7LoyaltyTier = await provider.getLoyaltyTier(loyalty.c7_loyalty_tier_id);
+        enrichedLoyalty = {
+          ...loyalty,
+          c7Data: c7LoyaltyTier,
+        };
+      } catch (error) {
+        console.warn(`Failed to fetch loyalty tier ${loyalty.c7_loyalty_tier_id}:`, error);
+        enrichedLoyalty = loyalty;
+      }
     }
-    
-    // Serialize for transmission (dates to strings)
-    const serializedDiscount = serializeDiscount(discount);
     
     return {
       ...stage,
-      discountData: serializedDiscount,
+      promotions: enrichedPromotions,
+      loyalty: enrichedLoyalty,
     };
   } catch (error) {
-    console.error(`Failed to fetch discount for tier ${stage.name}:`, error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error(`Failed to fetch C7 data for tier ${stage.name}:`, error);
     return stage;
   }
 }
 
 /**
- * Fetches existing program with enriched discount data from Commerce7
+ * DEPRECATED: Old fetchStageDiscount (kept for backwards compatibility)
+ * Use fetchStageC7Data instead
+ */
+async function fetchStageDiscount(
+  provider: Commerce7Provider,
+  stage: any
+): Promise<any> {
+  console.warn('fetchStageDiscount is deprecated, use fetchStageC7Data instead');
+  return fetchStageC7Data(provider, stage);
+}
+
+/**
+ * Fetches existing program with enriched C7 club/promotion/loyalty data (NEW ARCHITECTURE)
  */
 export async function getExistingProgramWithDiscounts(
   clientId: string,
@@ -182,15 +204,15 @@ export async function getExistingProgramWithDiscounts(
   
   const provider = new Commerce7Provider(tenantShop);
   
-  const tiersWithDiscounts = await Promise.all(
+  const tiersWithC7Data = await Promise.all(
     existingProgram.club_stages.map((stage: any) => 
-      fetchStageDiscount(provider, stage)
+      fetchStageC7Data(provider, stage)
     )
   );
   
   return {
     ...existingProgram,
-    club_stages: tiersWithDiscounts,
+    club_stages: tiersWithC7Data,
   };
 }
 

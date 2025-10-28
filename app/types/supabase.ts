@@ -34,6 +34,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_sessions: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          last_activity_at: string | null
+          metadata: Json | null
+          theme: string | null
+          updated_at: string | null
+          user_agent: string | null
+          user_email: string | null
+          user_name: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          expires_at: string
+          id: string
+          ip_address?: unknown | null
+          last_activity_at?: string | null
+          metadata?: Json | null
+          theme?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_name?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          last_activity_at?: string | null
+          metadata?: Json | null
+          theme?: string | null
+          updated_at?: string | null
+          user_agent?: string | null
+          user_email?: string | null
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           created_at: string | null
@@ -75,45 +128,39 @@ export type Database = {
       }
       club_enrollments: {
         Row: {
+          c7_membership_id: string | null
           club_stage_id: string
           created_at: string | null
-          crm_sync_at: string | null
-          crm_sync_error: string | null
           customer_id: string
           enrolled_at: string
           expires_at: string
           id: string
           qualifying_order_id: string | null
           status: string
-          synced_to_crm: boolean | null
           updated_at: string | null
         }
         Insert: {
+          c7_membership_id?: string | null
           club_stage_id: string
           created_at?: string | null
-          crm_sync_at?: string | null
-          crm_sync_error?: string | null
           customer_id: string
           enrolled_at: string
           expires_at: string
           id?: string
           qualifying_order_id?: string | null
           status?: string
-          synced_to_crm?: boolean | null
           updated_at?: string | null
         }
         Update: {
+          c7_membership_id?: string | null
           club_stage_id?: string
           created_at?: string | null
-          crm_sync_at?: string | null
-          crm_sync_error?: string | null
           customer_id?: string
           enrolled_at?: string
           expires_at?: string
           id?: string
           qualifying_order_id?: string | null
           status?: string
-          synced_to_crm?: boolean | null
           updated_at?: string | null
         }
         Relationships: [
@@ -243,53 +290,88 @@ export type Database = {
           },
         ]
       }
-      club_stages: {
+      club_stage_promotions: {
         Row: {
-          club_program_id: string
+          club_stage_id: string
           created_at: string | null
-          crm_discount_id: string | null
-          discount_code: string | null
-          discount_percentage: number
-          duration_months: number
+          crm_id: string
+          crm_type: string
+          description: string | null
           id: string
-          is_active: boolean | null
-          last_sync_at: string | null
-          min_purchase_amount: number
-          name: string
-          stage_order: number
-          sync_status: string | null
+          title: string | null
           updated_at: string | null
         }
         Insert: {
-          club_program_id: string
+          club_stage_id: string
           created_at?: string | null
-          crm_discount_id?: string | null
-          discount_code?: string | null
-          discount_percentage: number
-          duration_months: number
+          crm_id: string
+          crm_type: string
+          description?: string | null
           id?: string
-          is_active?: boolean | null
-          last_sync_at?: string | null
-          min_purchase_amount: number
-          name: string
-          stage_order: number
-          sync_status?: string | null
+          title?: string | null
           updated_at?: string | null
         }
         Update: {
+          club_stage_id?: string
+          created_at?: string | null
+          crm_id?: string
+          crm_type?: string
+          description?: string | null
+          id?: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_stage_promotions_club_stage_id_fkey"
+            columns: ["club_stage_id"]
+            isOneToOne: false
+            referencedRelation: "club_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_stages: {
+        Row: {
+          c7_club_id: string | null
+          club_program_id: string
+          created_at: string | null
+          duration_months: number
+          id: string
+          is_active: boolean | null
+          min_purchase_amount: number
+          name: string
+          platform_discount_id: string | null
+          platform_tag_id: string | null
+          stage_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          c7_club_id?: string | null
+          club_program_id: string
+          created_at?: string | null
+          duration_months: number
+          id?: string
+          is_active?: boolean | null
+          min_purchase_amount: number
+          name: string
+          platform_discount_id?: string | null
+          platform_tag_id?: string | null
+          stage_order: number
+          updated_at?: string | null
+        }
+        Update: {
+          c7_club_id?: string | null
           club_program_id?: string
           created_at?: string | null
-          crm_discount_id?: string | null
-          discount_code?: string | null
-          discount_percentage?: number
           duration_months?: number
           id?: string
           is_active?: boolean | null
-          last_sync_at?: string | null
           min_purchase_amount?: number
           name?: string
+          platform_discount_id?: string | null
+          platform_tag_id?: string | null
           stage_order?: number
-          sync_status?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -631,6 +713,7 @@ export type Database = {
           created_at: string | null
           crm_id: string | null
           cumulative_membership_days: number
+          current_club_stage_id: string | null
           email: string
           first_name: string | null
           id: string
@@ -648,6 +731,7 @@ export type Database = {
           created_at?: string | null
           crm_id?: string | null
           cumulative_membership_days?: number
+          current_club_stage_id?: string | null
           email: string
           first_name?: string | null
           id?: string
@@ -665,6 +749,7 @@ export type Database = {
           created_at?: string | null
           crm_id?: string | null
           cumulative_membership_days?: number
+          current_club_stage_id?: string | null
           email?: string
           first_name?: string | null
           id?: string
@@ -683,6 +768,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_current_club_stage_id_fkey"
+            columns: ["current_club_stage_id"]
+            isOneToOne: false
+            referencedRelation: "club_stages"
             referencedColumns: ["id"]
           },
         ]
@@ -748,6 +840,8 @@ export type Database = {
           bonus_points_percentage: number | null
           client_id: string
           created_at: string | null
+          deprecated: boolean | null
+          deprecated_at: string | null
           id: string
           is_active: boolean | null
           max_points_per_order: number | null
@@ -755,12 +849,15 @@ export type Database = {
           min_points_for_redemption: number | null
           point_dollar_value: number
           points_per_dollar: number
+          replacement_note: string | null
           updated_at: string | null
         }
         Insert: {
           bonus_points_percentage?: number | null
           client_id: string
           created_at?: string | null
+          deprecated?: boolean | null
+          deprecated_at?: string | null
           id?: string
           is_active?: boolean | null
           max_points_per_order?: number | null
@@ -768,12 +865,15 @@ export type Database = {
           min_points_for_redemption?: number | null
           point_dollar_value?: number
           points_per_dollar?: number
+          replacement_note?: string | null
           updated_at?: string | null
         }
         Update: {
           bonus_points_percentage?: number | null
           client_id?: string
           created_at?: string | null
+          deprecated?: boolean | null
+          deprecated_at?: string | null
           id?: string
           is_active?: boolean | null
           max_points_per_order?: number | null
@@ -781,6 +881,7 @@ export type Database = {
           min_points_for_redemption?: number | null
           point_dollar_value?: number
           points_per_dollar?: number
+          replacement_note?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -800,15 +901,18 @@ export type Database = {
           client_id: string
           created_at: string | null
           description: string | null
+          exclusive_tier_order: number | null
           id: string
           image_url: string | null
           is_active: boolean | null
+          min_tier_order: number | null
           name: string
           points_required: number
           quantity_available: number | null
           quantity_redeemed: number | null
           regular_price: number | null
           reward_type: string
+          tier_restricted: boolean | null
           updated_at: string | null
           wine_crm_id: string | null
           wine_sku: string | null
@@ -820,15 +924,18 @@ export type Database = {
           client_id: string
           created_at?: string | null
           description?: string | null
+          exclusive_tier_order?: number | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          min_tier_order?: number | null
           name: string
           points_required: number
           quantity_available?: number | null
           quantity_redeemed?: number | null
           regular_price?: number | null
           reward_type: string
+          tier_restricted?: boolean | null
           updated_at?: string | null
           wine_crm_id?: string | null
           wine_sku?: string | null
@@ -840,15 +947,18 @@ export type Database = {
           client_id?: string
           created_at?: string | null
           description?: string | null
+          exclusive_tier_order?: number | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          min_tier_order?: number | null
           name?: string
           points_required?: number
           quantity_available?: number | null
           quantity_redeemed?: number | null
           regular_price?: number | null
           reward_type?: string
+          tier_restricted?: boolean | null
           updated_at?: string | null
           wine_crm_id?: string | null
           wine_sku?: string | null
@@ -1146,12 +1256,59 @@ export type Database = {
           },
         ]
       }
+      tier_loyalty_config: {
+        Row: {
+          c7_loyalty_tier_id: string
+          club_stage_id: string
+          created_at: string | null
+          earn_rate: number | null
+          id: string
+          initial_points_bonus: number | null
+          is_active: boolean | null
+          tier_title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          c7_loyalty_tier_id: string
+          club_stage_id: string
+          created_at?: string | null
+          earn_rate?: number | null
+          id?: string
+          initial_points_bonus?: number | null
+          is_active?: boolean | null
+          tier_title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          c7_loyalty_tier_id?: string
+          club_stage_id?: string
+          created_at?: string | null
+          earn_rate?: number | null
+          id?: string
+          initial_points_bonus?: number | null
+          is_active?: boolean | null
+          tier_title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_loyalty_config_club_stage_id_fkey"
+            columns: ["club_stage_id"]
+            isOneToOne: true
+            referencedRelation: "club_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      cleanup_expired_app_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never

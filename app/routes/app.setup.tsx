@@ -54,18 +54,37 @@ import {
 interface TierFormData {
   id: string; // temp ID for form tracking
   name: string;
-  discountPercentage: string;
   durationMonths: string;
   minPurchaseAmount: string;
   description?: string;
-  discount?: Discount; // Unified discount for C7/Shopify (in React state)
-  showDiscountForm?: boolean; // Toggle to show/hide discount configuration
+  
+  // NEW ARCHITECTURE: Multiple promotions per tier
+  promotions: Array<{
+    id: string; // temp ID for form tracking
+    title: string;
+    productDiscountType?: string; // "Percentage Off" | "Dollar Off" | "No Discount"
+    productDiscount?: number;
+    shippingDiscountType?: string; // "Percentage Off" | "Dollar Off" | "No Discount"
+    shippingDiscount?: number;
+    minimumCartAmount?: number;
+  }>;
+  
+  // NEW ARCHITECTURE: Optional loyalty configuration
+  loyalty?: {
+    enabled: boolean;
+    earnRate: number; // decimal, e.g., 0.02 = 2%
+    initialPointsBonus?: number; // welcome bonus points
+  };
+  
+  // OLD FIELDS (deprecated, for backwards compatibility)
+  discountPercentage?: string;
+  discount?: Discount;
+  showDiscountForm?: boolean;
 }
 
-// When parsed from JSON, discount dates become strings
-interface TierFormDataSerialized extends Omit<TierFormData, 'discount'> {
-  discount?: SerializedDiscount;
-}
+// For backwards compatibility - serialized version is same as TierFormData now
+// (promotions and loyalty don't have date fields that need special serialization)
+type TierFormDataSerialized = TierFormData;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Trust that parent /app route already checked authorization
@@ -345,45 +364,49 @@ export default function Setup() {
     'Liberate your wine buying experience. Enjoy member pricing on your schedule - no forced shipments, no surprises.'
   );
   
-  // Helper to create initial discount for a tier
-  const createTierDiscount = (tierName: string, discountPercent: string): Discount => {
-    const discount = createDefaultDiscount(session.crmType === 'commerce7' ? 'commerce7' : 'shopify');
-    const cleanName = tierName.toUpperCase().replace(/\s+/g, '');
-    return {
-      ...discount,
-      code: `${cleanName}${discountPercent}`,
-      title: `${tierName} Tier - ${discountPercent}% Off`,
-      value: {
-        type: 'percentage',
-        percentage: parseFloat(discountPercent) || 0,
-      },
-      status: 'scheduled', // Set initial status
-    };
-  };
+  // Helper to create default promotion for a tier
+  const createDefaultPromotion = (tierName: string, discountPercent: number) => ({
+    id: `promo-${Date.now()}`,
+    title: `${tierName} - ${discountPercent}% Off`,
+    productDiscountType: 'Percentage Off',
+    productDiscount: discountPercent,
+    shippingDiscountType: 'No Discount',
+  });
   
   const [tiers, setTiers] = useState<TierFormData[]>(
     existingProgram?.club_stages?.map((stage: any) => ({
       id: stage.id, // Use actual UUID for existing tiers
       name: stage.name,
-      discountPercentage: stage.discount_percentage.toString(),
       durationMonths: stage.duration_months.toString(),
       minPurchaseAmount: stage.min_purchase_amount.toString(),
-      description: '',
-      // Use fetched discount data if available, otherwise create default
-      discount: stage.discountData 
-        ? parseDiscount(stage.discountData)
-        : createTierDiscount(stage.name, stage.discount_percentage.toString()),
-      showDiscountForm: false,
+      description: stage.description || '',
+      // Map promotions from database
+      promotions: stage.promotions?.map((promo: any) => ({
+        id: promo.id,
+        title: promo.title || promo.c7Data?.title || 'Untitled Promotion',
+        productDiscountType: promo.c7Data?.productDiscountType,
+        productDiscount: promo.c7Data?.productDiscount,
+        shippingDiscountType: promo.c7Data?.shippingDiscountType,
+        shippingDiscount: promo.c7Data?.shippingDiscount,
+        minimumCartAmount: promo.c7Data?.minimumCartAmount,
+      })) || [],
+      // Map loyalty from database
+      loyalty: stage.loyalty ? {
+        enabled: true,
+        earnRate: stage.loyalty.earn_rate || 0.01,
+        initialPointsBonus: stage.loyalty.initial_points_bonus || 0,
+      } : undefined,
     })) || [
       {
         id: 'tier-1',
         name: 'Bronze',
-        discountPercentage: '10',
         durationMonths: '3',
         minPurchaseAmount: '150',
         description: 'Start your liberation journey',
-        discount: createTierDiscount('Bronze', '10'),
-        showDiscountForm: false,
+        promotions: [
+          createDefaultPromotion('Bronze', 10),
+        ],
+        loyalty: undefined, // No loyalty for default tier
       }
     ]
   );
@@ -416,19 +439,22 @@ export default function Setup() {
   }, [currentStep]);
   
   const addTier = () => {
-    const newDiscount: Discount = {
-      ...createDefaultDiscount(session.crmType === 'commerce7' ? 'commerce7' : 'shopify'),
-      status: 'scheduled',
-    };
     setTiers([...tiers, {
       id: `tier-${Date.now()}`,
       name: '',
-      discountPercentage: '',
       durationMonths: '',
       minPurchaseAmount: '',
       description: '',
-      discount: newDiscount,
-      showDiscountForm: false,
+      promotions: [
+        {
+          id: `promo-${Date.now()}`,
+          title: '',
+          productDiscountType: 'Percentage Off',
+          productDiscount: 0,
+          shippingDiscountType: 'No Discount',
+        }
+      ],
+      loyalty: undefined, // No loyalty by default
     }]);
   };
   

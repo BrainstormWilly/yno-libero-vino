@@ -15,6 +15,18 @@ import crypto from "crypto";
 import type { C7CouponPayload } from "~/types/discount-commerce7";
 import type { C7Tag } from "~/types/tag";
 import { C7TagObjectType } from "~/types/tag";
+import type {
+  C7ClubCreateRequest,
+  C7Club,
+  C7PromotionCreateRequest,
+  C7Promotion,
+  C7PromotionSetCreateRequest,
+  C7PromotionSet,
+  C7LoyaltyTierCreateRequest,
+  C7LoyaltyTier,
+  C7LoyaltyTransactionCreateRequest,
+  C7LoyaltyTransaction,
+} from "~/types/commerce7";
 
 const API_URL = "https://api.commerce7.com/v1";
 const APP_NAME = "yno-liberovino-wine-club-and-loyalty";
@@ -890,6 +902,11 @@ export class Commerce7Provider implements CrmProvider {
    * Search for customer tags in Commerce7
    * Used for segmenting customers in coupons
    */
+  /**
+   * @deprecated Tags are being replaced by C7 Clubs for tier membership.
+   * Use createClub() and ClubMembership instead.
+   * This method will be removed in a future version.
+   */
   async searchCustomerTags(params?: { q?: string; limit?: number }): Promise<C7Tag[]> {
     const { q = "", limit = 50 } = params || {};
 
@@ -920,6 +937,11 @@ export class Commerce7Provider implements CrmProvider {
   /**
    * Get a specific tag by ID
    */
+  /**
+   * @deprecated Tags are being replaced by C7 Clubs for tier membership.
+   * Use getClub() instead.
+   * This method will be removed in a future version.
+   */
   async getTag(id: string): Promise<C7Tag> {
     const response = await fetch(`${API_URL}/tag/${id}`, {
       headers: {
@@ -945,6 +967,11 @@ export class Commerce7Provider implements CrmProvider {
    * Create a new customer tag
    * @param title - The name of the tag
    * @param type - "Manual" or "Dynamic"
+   */
+  /**
+   * @deprecated Tags are being replaced by C7 Clubs for tier membership.
+   * Use createClub() to create a tier, then use ClubMembership to assign customers.
+   * This method will be removed in a future version.
    */
   async createCustomerTag(title: string, type: "Manual" | "Dynamic" = "Manual"): Promise<C7Tag> {
     const response = await fetch(`${API_URL}/tag/customer`, {
@@ -975,6 +1002,11 @@ export class Commerce7Provider implements CrmProvider {
   /**
    * Delete a tag
    * @param tagId - The tag's ID
+   */
+  /**
+   * @deprecated Tags are being replaced by C7 Clubs for tier membership.
+   * Use deleteClub() instead.
+   * This method will be removed in a future version.
    */
   async deleteTag(tagId: string): Promise<void> {
     const response = await fetch(`${API_URL}/tag/${tagId}`, {
@@ -1035,6 +1067,11 @@ export class Commerce7Provider implements CrmProvider {
    * Get all tags for a customer
    * @param customerId - The customer's ID
    */
+  /**
+   * @deprecated Tags are being replaced by C7 Clubs for tier membership.
+   * Use customer.clubs array from getCustomer() to see which clubs a customer belongs to.
+   * This method will be removed in a future version.
+   */
   async getCustomerTags(customerId: string): Promise<C7Tag[]> {
     const response = await fetch(`${API_URL}/customer/${customerId}/tag`, {
       headers: {
@@ -1066,7 +1103,7 @@ export class Commerce7Provider implements CrmProvider {
    * Create a club (tier) on Commerce7
    * @param data - Club creation data
    */
-  async createClub(data: import("~/types/commerce7").C7ClubCreateRequest): Promise<import("~/types/commerce7").C7Club> {
+  async createClub(data: C7ClubCreateRequest): Promise<C7Club> {
     const response = await fetch(`${API_URL}/club`, {
       method: "POST",
       headers: {
@@ -1088,7 +1125,7 @@ export class Commerce7Provider implements CrmProvider {
    * Get a club by ID
    * @param clubId - The club's ID
    */
-  async getClub(clubId: string): Promise<import("~/types/commerce7").C7Club> {
+  async getClub(clubId: string): Promise<C7Club> {
     const response = await fetch(`${API_URL}/club/${clubId}`, {
       headers: {
         Accept: "application/json",
@@ -1110,8 +1147,8 @@ export class Commerce7Provider implements CrmProvider {
    */
   async updateClub(
     clubId: string, 
-    data: Partial<import("~/types/commerce7").C7ClubCreateRequest>
-  ): Promise<import("~/types/commerce7").C7Club> {
+    data: Partial<C7ClubCreateRequest>
+  ): Promise<C7Club> {
     const response = await fetch(`${API_URL}/club/${clubId}`, {
       method: "PATCH",
       headers: {
@@ -1150,7 +1187,7 @@ export class Commerce7Provider implements CrmProvider {
   /**
    * List all clubs
    */
-  async listClubs(): Promise<import("~/types/commerce7").C7Club[]> {
+  async listClubs(): Promise<C7Club[]> {
     const response = await fetch(`${API_URL}/club`, {
       headers: {
         Accept: "application/json",
@@ -1176,8 +1213,8 @@ export class Commerce7Provider implements CrmProvider {
    * @param data - Promotion creation data
    */
   async createPromotion(
-    data: import("~/types/commerce7").C7PromotionCreateRequest
-  ): Promise<import("~/types/commerce7").C7Promotion> {
+    data: C7PromotionCreateRequest
+  ): Promise<C7Promotion> {
     const response = await fetch(`${API_URL}/promotion`, {
       method: "POST",
       headers: {
@@ -1199,7 +1236,7 @@ export class Commerce7Provider implements CrmProvider {
    * Get a promotion by ID
    * @param promotionId - The promotion's ID
    */
-  async getPromotion(promotionId: string): Promise<import("~/types/commerce7").C7Promotion> {
+  async getPromotion(promotionId: string): Promise<C7Promotion> {
     const response = await fetch(`${API_URL}/promotion/${promotionId}`, {
       headers: {
         Accept: "application/json",
@@ -1221,8 +1258,8 @@ export class Commerce7Provider implements CrmProvider {
    */
   async updatePromotion(
     promotionId: string,
-    data: Partial<import("~/types/commerce7").C7PromotionCreateRequest>
-  ): Promise<import("~/types/commerce7").C7Promotion> {
+    data: Partial<C7PromotionCreateRequest>
+  ): Promise<C7Promotion> {
     const response = await fetch(`${API_URL}/promotion/${promotionId}`, {
       method: "PATCH",
       headers: {
@@ -1261,7 +1298,7 @@ export class Commerce7Provider implements CrmProvider {
   /**
    * List all promotions
    */
-  async listPromotions(): Promise<import("~/types/commerce7").C7Promotion[]> {
+  async listPromotions(): Promise<C7Promotion[]> {
     const response = await fetch(`${API_URL}/promotion`, {
       headers: {
         Accept: "application/json",
@@ -1288,8 +1325,8 @@ export class Commerce7Provider implements CrmProvider {
    * @param data - Promotion set creation data
    */
   async createPromotionSet(
-    data: import("~/types/commerce7").C7PromotionSetCreateRequest
-  ): Promise<import("~/types/commerce7").C7PromotionSet> {
+    data: C7PromotionSetCreateRequest
+  ): Promise<C7PromotionSet> {
     const response = await fetch(`${API_URL}/promo-set`, {
       method: "POST",
       headers: {
@@ -1311,7 +1348,7 @@ export class Commerce7Provider implements CrmProvider {
    * Get a promotion set by ID
    * @param setId - The promotion set's ID
    */
-  async getPromotionSet(setId: string): Promise<import("~/types/commerce7").C7PromotionSet> {
+  async getPromotionSet(setId: string): Promise<C7PromotionSet> {
     const response = await fetch(`${API_URL}/promo-set/${setId}`, {
       headers: {
         Accept: "application/json",
@@ -1349,7 +1386,7 @@ export class Commerce7Provider implements CrmProvider {
   // ============================================
   // Loyalty is an EXTENSION - must be activated by tenant
   // Each club tier can optionally have loyalty earning
-  // Uses /v2 API (not v1)
+
 
   /**
    * Create a loyalty tier
@@ -1357,9 +1394,9 @@ export class Commerce7Provider implements CrmProvider {
    * @param data - Loyalty tier creation data
    */
   async createLoyaltyTier(
-    data: import("~/types/commerce7").C7LoyaltyTierCreateRequest
-  ): Promise<import("~/types/commerce7").C7LoyaltyTier> {
-    const response = await fetch("https://api.commerce7.com/v2/loyalty-tier", {
+    data: C7LoyaltyTierCreateRequest
+  ): Promise<C7LoyaltyTier> {
+    const response = await fetch("https://api.commerce7.com/v1/loyalty-tier", {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -1380,8 +1417,8 @@ export class Commerce7Provider implements CrmProvider {
    * Get a loyalty tier by ID
    * @param loyaltyTierId - The loyalty tier's ID
    */
-  async getLoyaltyTier(loyaltyTierId: string): Promise<import("~/types/commerce7").C7LoyaltyTier> {
-    const response = await fetch(`https://api.commerce7.com/v2/loyalty-tier/${loyaltyTierId}`, {
+  async getLoyaltyTier(loyaltyTierId: string): Promise<C7LoyaltyTier> {
+    const response = await fetch(`https://api.commerce7.com/v1/loyalty-tier/${loyaltyTierId}`, {
       headers: {
         Accept: "application/json",
         Authorization: getApiAuth(),
@@ -1402,9 +1439,9 @@ export class Commerce7Provider implements CrmProvider {
    */
   async updateLoyaltyTier(
     loyaltyTierId: string,
-    data: Partial<import("~/types/commerce7").C7LoyaltyTierCreateRequest>
-  ): Promise<import("~/types/commerce7").C7LoyaltyTier> {
-    const response = await fetch(`https://api.commerce7.com/v2/loyalty-tier/${loyaltyTierId}`, {
+    data: Partial<C7LoyaltyTierCreateRequest>
+  ): Promise<C7LoyaltyTier> {
+    const response = await fetch(`https://api.commerce7.com/v1/loyalty-tier/${loyaltyTierId}`, {
       method: "PATCH",
       headers: {
         Accept: "application/json",
@@ -1426,7 +1463,7 @@ export class Commerce7Provider implements CrmProvider {
    * @param loyaltyTierId - The loyalty tier's ID
    */
   async deleteLoyaltyTier(loyaltyTierId: string): Promise<void> {
-    const response = await fetch(`https://api.commerce7.com/v2/loyalty-tier/${loyaltyTierId}`, {
+    const response = await fetch(`https://api.commerce7.com/v1/loyalty-tier/${loyaltyTierId}`, {
       method: "DELETE",
       headers: {
         Accept: "application/json",
@@ -1442,8 +1479,8 @@ export class Commerce7Provider implements CrmProvider {
   /**
    * List all loyalty tiers
    */
-  async listLoyaltyTiers(): Promise<import("~/types/commerce7").C7LoyaltyTier[]> {
-    const response = await fetch("https://api.commerce7.com/v2/loyalty-tier", {
+  async listLoyaltyTiers(): Promise<C7LoyaltyTier[]> {
+    const response = await fetch("https://api.commerce7.com/v1/loyalty-tier", {
       headers: {
         Accept: "application/json",
         Authorization: getApiAuth(),
@@ -1467,9 +1504,9 @@ export class Commerce7Provider implements CrmProvider {
    * @param data - Transaction data (positive = add, negative = remove)
    */
   async addLoyaltyPoints(
-    data: import("~/types/commerce7").C7LoyaltyTransactionCreateRequest
-  ): Promise<import("~/types/commerce7").C7LoyaltyTransaction> {
-    const response = await fetch("https://api.commerce7.com/v2/loyalty-transaction", {
+    data: C7LoyaltyTransactionCreateRequest
+  ): Promise<C7LoyaltyTransaction> {
+    const response = await fetch("https://api.commerce7.com/v1/loyalty-transaction", {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -1484,5 +1521,273 @@ export class Commerce7Provider implements CrmProvider {
     handleC7ApiError(result, 'adding loyalty points');
 
     return result;
+  }
+
+  // ============================================
+  // ORCHESTRATION METHODS
+  // High-level business logic for tier creation
+  // ============================================
+
+  /**
+   * Creates multiple promotions with a promotion set (if more than 1)
+   * Handles the complex promotion set creation flow
+   */
+  async createPromotionsWithSet(
+    promotions: Array<{
+      title: string;
+      productDiscountType?: string;
+      productDiscount?: number;
+      shippingDiscountType?: string;
+      shippingDiscount?: number;
+      minimumCartAmount?: number;
+    }>,
+    clubId: string
+  ): Promise<Array<{ id: string; title: string }>> {
+    if (promotions.length === 0) {
+      return [];
+    }
+
+    const createdPromotions: Array<{ id: string; title: string }> = [];
+    let promotionSetId: string | null = null;
+
+    try {
+      // Create first promotion (no set yet)
+      const firstPromo = promotions[0];
+      const firstPromotion = await this.createPromotion({
+        title: firstPromo.title,
+        productDiscountType: (firstPromo.productDiscountType as any) || "No Discount",
+        productDiscount: firstPromo.productDiscount,
+        shippingDiscountType: (firstPromo.shippingDiscountType as any) || "No Discount",
+        shippingDiscount: firstPromo.shippingDiscount,
+        minimumCartAmount: firstPromo.minimumCartAmount,
+        availableTo: "Club",
+        availableToObjectIds: [clubId],
+        status: "Enabled",
+        usageLimitType: "Unlimited",
+        appliesTo: "Store",
+        startDate: new Date().toISOString(),
+      });
+
+      createdPromotions.push({
+        id: firstPromotion.id,
+        title: firstPromotion.title,
+      });
+
+      // If we have more promotions, create a set and link them
+      if (promotions.length > 1) {
+        // Create promotion set
+        const promotionSet = await this.createPromotionSet({
+          title: `${firstPromo.title} Benefits`,
+        });
+        promotionSetId = promotionSet.id;
+
+        // Update first promotion with set
+        await this.updatePromotion(firstPromotion.id, {
+          promotionSets: [promotionSetId],
+        } as any);
+
+        // Create remaining promotions with set
+        for (let i = 1; i < promotions.length; i++) {
+          const promo = promotions[i];
+          try {
+            const promotion = await this.createPromotion({
+              title: promo.title,
+              productDiscountType: (promo.productDiscountType as any) || "No Discount",
+              productDiscount: promo.productDiscount,
+              shippingDiscountType: (promo.shippingDiscountType as any) || "No Discount",
+              shippingDiscount: promo.shippingDiscount,
+              minimumCartAmount: promo.minimumCartAmount,
+              availableTo: "Club",
+              availableToObjectIds: [clubId],
+              status: "Enabled",
+              usageLimitType: "Unlimited",
+              appliesTo: "Store",
+              startDate: new Date().toISOString(),
+              promotionSets: [promotionSetId], // Include set!
+            } as any);
+
+            createdPromotions.push({
+              id: promotion.id,
+              title: promotion.title,
+            });
+          } catch (error) {
+            console.warn(`Failed to create promotion ${i + 1}:`, error);
+            // Continue with other promotions (graceful degradation)
+          }
+        }
+      }
+
+      return createdPromotions;
+    } catch (error) {
+      // Rollback: Delete created promotions
+      for (const promo of createdPromotions) {
+        try {
+          await this.deletePromotion(promo.id);
+        } catch (deleteError) {
+          console.warn(`Failed to delete promotion ${promo.id}:`, deleteError);
+        }
+      }
+
+      // Delete promotion set if created
+      if (promotionSetId) {
+        try {
+          await this.deletePromotionSet(promotionSetId);
+        } catch (deleteError) {
+          console.warn(`Failed to delete promotion set ${promotionSetId}:`, deleteError);
+        }
+      }
+
+      throw new Error(`Failed to create promotions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Creates a complete tier with club, promotions, and optional loyalty
+   * Implements the atomic creation flow with rollback
+   */
+  async createTierWithPromotionsAndLoyalty(
+    tierData: {
+      name: string;
+      description?: string;
+      durationMonths: number;
+      minPurchaseAmount: number;
+      promotions: Array<{
+        title: string;
+        productDiscountType?: string;
+        productDiscount?: number;
+        shippingDiscountType?: string;
+        shippingDiscount?: number;
+        minimumCartAmount?: number;
+      }>;
+      loyalty?: {
+        enabled: boolean;
+        earnRate: number; // e.g., 0.02 = 2%
+        initialPointsBonus?: number;
+      };
+    }
+  ): Promise<{
+    clubId: string;
+    promotionIds: string[];
+    loyaltyTierId?: string;
+  }> {
+    let clubId: string | null = null;
+    let loyaltyTierId: string | null = null;
+    const createdPromotionIds: string[] = [];
+
+    try {
+      // 1. Create C7 Club
+      const club = await this.createClub({
+        title: tierData.name,
+        slug: tierData.name.toLowerCase().replace(/\s+/g, '-'),
+        type: "Traditional",
+        seo: { title: tierData.name },
+        webStatus: "Not Available", // Hidden from customers
+        adminStatus: "Not Available", // Hidden from C7 admin
+      });
+      clubId = club.id;
+
+      // 2. Create Promotions (with promotion set if multiple)
+      const promotions = await this.createPromotionsWithSet(
+        tierData.promotions,
+        clubId
+      );
+      createdPromotionIds.push(...promotions.map(p => p.id));
+
+      // 3. Create Loyalty Tier (if enabled)
+      if (tierData.loyalty?.enabled) {
+        const loyaltyTier = await this.createLoyaltyTier({
+          title: `${tierData.name} Rewards`,
+          qualificationType: "Club",
+          clubsToQualify: [{ id: clubId }],
+          earnRate: tierData.loyalty.earnRate,
+          sortOrder: 0, // Will be updated based on tier order
+        });
+        loyaltyTierId = loyaltyTier.id;
+      }
+
+      return {
+        clubId,
+        promotionIds: createdPromotionIds,
+        loyaltyTierId: loyaltyTierId || undefined,
+      };
+    } catch (error) {
+      // Rollback: Clean up everything we created
+      await this.rollbackTierCreation({
+        clubId,
+        promotionIds: createdPromotionIds,
+        loyaltyTierId,
+      });
+
+      throw new Error(`Failed to create tier "${tierData.name}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Rollback tier creation - cleans up C7 resources
+   * Used when tier creation fails partway through
+   */
+  async rollbackTierCreation(created: {
+    clubId: string | null;
+    promotionIds: string[];
+    loyaltyTierId: string | null;
+  }): Promise<void> {
+    const errors: string[] = [];
+
+    // Delete loyalty tier first (if exists)
+    if (created.loyaltyTierId) {
+      try {
+        await this.deleteLoyaltyTier(created.loyaltyTierId);
+      } catch (error) {
+        errors.push(`Failed to delete loyalty tier: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    // Delete promotions
+    for (const promotionId of created.promotionIds) {
+      try {
+        await this.deletePromotion(promotionId);
+      } catch (error) {
+        errors.push(`Failed to delete promotion ${promotionId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    // Delete club last
+    if (created.clubId) {
+      try {
+        await this.deleteClub(created.clubId);
+      } catch (error) {
+        errors.push(`Failed to delete club: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      console.warn('Rollback completed with errors:', errors);
+    }
+  }
+
+  /**
+   * Preload bonus points for a customer when they join a premium tier
+   * Called after club membership is created
+   */
+  async preloadTierBonusPoints(
+    customerId: string,
+    points: number,
+    tierName: string
+  ): Promise<void> {
+    if (points <= 0) {
+      return; // No bonus points to add
+    }
+
+    try {
+      await this.addLoyaltyPoints({
+        customerId,
+        amount: points,
+        notes: `${tierName} Tier Welcome Bonus`,
+      });
+    } catch (error) {
+      // Don't fail the entire enrollment if bonus points fail
+      console.warn(`Failed to add bonus points for customer ${customerId}:`, error);
+      throw new Error(`Failed to add welcome bonus points: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }

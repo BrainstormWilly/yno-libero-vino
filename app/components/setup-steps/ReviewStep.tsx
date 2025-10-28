@@ -4,10 +4,30 @@ import type { Discount } from '~/types/discount';
 interface TierFormData {
   id: string;
   name: string;
-  discountPercentage: string;
   durationMonths: string;
   minPurchaseAmount: string;
   description?: string;
+  
+  // NEW ARCHITECTURE: Multiple promotions per tier
+  promotions: Array<{
+    id: string;
+    title: string;
+    productDiscountType?: string;
+    productDiscount?: number;
+    shippingDiscountType?: string;
+    shippingDiscount?: number;
+    minimumCartAmount?: number;
+  }>;
+  
+  // NEW ARCHITECTURE: Optional loyalty configuration
+  loyalty?: {
+    enabled: boolean;
+    earnRate: number;
+    initialPointsBonus?: number;
+  };
+  
+  // OLD FIELDS (deprecated, for backwards compatibility)
+  discountPercentage?: string;
   discount?: Discount;
 }
 

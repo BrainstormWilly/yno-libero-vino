@@ -1,20 +1,36 @@
-import { createClient } from '@supabase/supabase-js';
 import { redirect } from 'react-router';
 import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { createTierTagAndCoupon, syncTierTagAndCoupon } from '~/lib/tier-helpers.server';
 import { parseDiscount, type Discount } from '~/types/discount';
 import { addSessionToUrl } from '~/util/session';
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import * as db from '~/lib/db/supabase.server';
 
 interface TierFormDataSerialized {
   id: string;
   name: string;
-  discountPercentage: string;
   durationMonths: string;
   minPurchaseAmount: string;
   description?: string;
+  
+  // New: Array of promotions (can have multiple per tier)
+  promotions?: Array<{
+    title: string;
+    productDiscountType?: string;
+    productDiscount?: number;
+    shippingDiscountType?: string;
+    shippingDiscount?: number;
+    minimumCartAmount?: number;
+  }>;
+  
+  // New: Optional loyalty configuration
+  loyalty?: {
+    enabled: boolean;
+    earnRate: number; // decimal, e.g., 0.02 = 2%
+    initialPointsBonus?: number;
+  };
+  
+  // OLD FIELDS (deprecated, for backwards compatibility during migration)
+  discountPercentage?: string;
   discount?: any;
 }
 
@@ -75,98 +91,88 @@ export async function createClubProgram(
   clubName: string,
   clubDescription: string
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { data: clubProgram, error: clubError } = await supabase
-    .from('club_programs')
-    .insert({
-      client_id: clientId,
-      name: clubName,
-      description: clubDescription,
-      is_active: true,
-    })
-    .select()
-    .single();
-  
-  if (clubError || !clubProgram) {
-    throw new Error(`Failed to create club program: ${clubError?.message}`);
-  }
-  
-  return clubProgram;
+  return db.createClubProgram(clientId, clubName, clubDescription);
 }
 
 /**
- * Creates club tiers in the database
+ * Creates club tiers in the database (NEW ARCHITECTURE)
+ * Note: C7 club/promotion creation happens separately now
  */
 export async function createClubTiers(
   clubProgramId: string,
   tiers: TierFormDataSerialized[]
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const tierInserts = tiers.map((tier, index) => ({
-    club_program_id: clubProgramId,
+  const stages = tiers.map((tier, index) => ({
     name: tier.name,
-    discount_percentage: parseFloat(tier.discountPercentage),
-    duration_months: parseInt(tier.durationMonths),
-    min_purchase_amount: parseFloat(tier.minPurchaseAmount),
-    stage_order: index + 1,
-    is_active: true,
-    discount_code: tier.discount?.code,
-    discount_title: tier.discount?.title,
+    durationMonths: parseInt(tier.durationMonths),
+    minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+    stageOrder: index + 1,
   }));
   
-  const { data: createdTiers, error: tiersError } = await supabase
-    .from('club_stages')
-    .insert(tierInserts)
-    .select();
-  
-  if (tiersError || !createdTiers) {
-    throw new Error(`Failed to create tiers: ${tiersError?.message}`);
-  }
-  
-  return createdTiers;
+  return db.createClubStages(clubProgramId, stages);
 }
 
 /**
- * Creates discounts in CRM (Commerce7/Shopify) for tiers
+ * Creates C7 Clubs, Promotions, and Loyalty for tiers (NEW ARCHITECTURE)
+ * Uses orchestration methods for atomic operations with rollback
  */
-export async function createTierDiscounts(
+export async function createTiersInC7(
   tiers: TierFormDataSerialized[],
   createdTiers: any[],
   crmType: string,
   tenantShop: string
 ): Promise<string[]> {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  if (crmType !== 'commerce7') {
+    return ['Shopify not yet supported for new club architecture'];
+  }
+  
+  const provider = new Commerce7Provider(tenantShop);
   const errors: string[] = [];
   
   for (let i = 0; i < tiers.length; i++) {
     const tier = tiers[i];
     const createdTier = createdTiers[i];
     
-    if (!tier.discount) continue;
-    
     try {
-      const discount = parseDiscount(tier.discount);
+      // Use orchestration method for atomic creation
+      const result = await provider.createTierWithPromotionsAndLoyalty({
+        name: tier.name,
+        description: tier.description,
+        durationMonths: parseInt(tier.durationMonths),
+        minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+        promotions: tier.promotions || [],
+        loyalty: tier.loyalty,
+      });
       
-      if (crmType === 'commerce7') {
-        const provider = new Commerce7Provider(tenantShop);
-        const result = await createTierTagAndCoupon(provider, tier.name, discount);
-        
-        await supabase
-          .from('club_stages')
-          .update({ 
-            platform_tag_id: result.tagId,
-            platform_discount_id: result.couponId,
-            discount_code: result.couponCode,
-            discount_title: result.couponTitle,
-          })
-          .eq('id', createdTier.id);
-      } else if (crmType === 'shopify') {
-        throw new Error('Shopify discount creation not yet implemented');
+      // Update tier with C7 club ID
+      await db.updateClubStage(createdTier.id, {
+        c7ClubId: result.clubId,
+      });
+      
+      // Save promotions to club_stage_promotions table
+      if (result.promotionIds.length > 0) {
+        await db.createStagePromotions(
+          createdTier.id,
+          result.promotionIds.map(promoId => ({
+            crmId: promoId,
+            crmType: 'commerce7',
+          }))
+        );
       }
+      
+      // Save loyalty configuration if enabled
+      if (result.loyaltyTierId && tier.loyalty) {
+        await db.createTierLoyaltyConfig({
+          stageId: createdTier.id,
+          c7LoyaltyTierId: result.loyaltyTierId,
+          tierTitle: `${tier.name} Rewards`,
+          earnRate: tier.loyalty.earnRate,
+          initialPointsBonus: tier.loyalty.initialPointsBonus || 0,
+        });
+      }
+      
     } catch (error) {
-      const errorMsg = `Failed to create discount for tier "${tier.name}": ${error instanceof Error ? error.message : 'Unknown error'}`;
+      const errorMsg = `Failed to create C7 resources for tier "${tier.name}": ${error instanceof Error ? error.message : 'Unknown error'}`;
       console.error(errorMsg);
       errors.push(errorMsg);
     }
@@ -176,7 +182,22 @@ export async function createTierDiscounts(
 }
 
 /**
+ * DEPRECATED: Old createTierDiscounts (kept for backwards compatibility)
+ * Use createTiersInC7 instead
+ */
+export async function createTierDiscounts(
+  tiers: TierFormDataSerialized[],
+  createdTiers: any[],
+  crmType: string,
+  tenantShop: string
+): Promise<string[]> {
+  console.warn('createTierDiscounts is deprecated, use createTiersInC7 instead');
+  return createTiersInC7(tiers, createdTiers, crmType, tenantShop);
+}
+
+/**
  * Creates loyalty point rules in the database
+ * @deprecated Global loyalty rules are deprecated. Use tier-specific loyalty instead.
  */
 export async function createLoyaltyRules(
   clientId: string,
@@ -185,47 +206,27 @@ export async function createLoyaltyRules(
   pointDollarValue: string,
   minPointsRedemption: string
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { error: loyaltyError } = await supabase
-    .from('loyalty_point_rules')
-    .insert({
-      client_id: clientId,
-      points_per_dollar: parseFloat(pointsPerDollar || '1'),
-      min_membership_days: parseInt(minMembershipDays || '365'),
-      point_dollar_value: parseFloat(pointDollarValue || '0.01'),
-      min_points_for_redemption: parseInt(minPointsRedemption || '100'),
-      is_active: true,
-    });
-  
-  if (loyaltyError) {
-    throw new Error(`Failed to create loyalty rules: ${loyaltyError.message}`);
-  }
+  return db.createLoyaltyRules(
+    clientId,
+    parseFloat(pointsPerDollar || '1'),
+    parseInt(minMembershipDays || '365'),
+    parseFloat(pointDollarValue || '0.01'),
+    parseInt(minPointsRedemption || '100')
+  );
 }
 
 /**
  * Marks setup as complete for a client
  */
 export async function markSetupComplete(clientId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  await supabase
-    .from('clients')
-    .update({ 
-      setup_complete: true,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', clientId);
+  return db.markSetupComplete(clientId);
 }
 
 /**
  * Rollback helper - deletes club program and all related data
  */
 export async function rollbackClubProgram(clubProgramId: string) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  await supabase.from('club_stages').delete().eq('club_program_id', clubProgramId);
-  await supabase.from('club_programs').delete().eq('id', clubProgramId);
+  return db.deleteClubProgram(clubProgramId);
 }
 
 /**
@@ -236,85 +237,47 @@ export async function updateClubProgram(
   clubName: string,
   clubDescription: string
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { error: updateProgramError } = await supabase
-    .from('club_programs')
-    .update({
-      name: clubName,
-      description: clubDescription,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', clubProgramId);
-  
-  if (updateProgramError) {
-    throw new Error(`Failed to update club program: ${updateProgramError.message}`);
-  }
+  return db.updateClubProgram(clubProgramId, clubName, clubDescription);
 }
 
 /**
- * Updates an existing tier
+ * Updates an existing tier (NEW ARCHITECTURE)
+ * Note: C7 club/promotion updates need to be handled separately
  */
 export async function updateExistingTier(
   tier: TierFormDataSerialized,
   stageOrder: number
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { error: updateTierError } = await supabase
-    .from('club_stages')
-    .update({
-      name: tier.name,
-      discount_percentage: parseFloat(tier.discountPercentage),
-      duration_months: parseInt(tier.durationMonths),
-      min_purchase_amount: parseFloat(tier.minPurchaseAmount),
-      stage_order: stageOrder,
-      discount_code: tier.discount?.code,
-      discount_title: tier.discount?.title,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', tier.id);
-  
-  if (updateTierError) {
-    throw new Error(`Failed to update tier ${tier.name}: ${updateTierError.message}`);
-  }
+  return db.updateClubStage(tier.id, {
+    name: tier.name,
+    durationMonths: parseInt(tier.durationMonths),
+    minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+    stageOrder,
+  });
 }
 
 /**
- * Creates a new tier
+ * Creates a new tier (NEW ARCHITECTURE)
+ * Note: C7 club/promotion creation needs to be handled separately
  */
 export async function createNewTier(
   clubProgramId: string,
   tier: TierFormDataSerialized,
   stageOrder: number
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const stages = await db.createClubStages(clubProgramId, [{
+    name: tier.name,
+    durationMonths: parseInt(tier.durationMonths),
+    minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+    stageOrder,
+  }]);
   
-  const { data: newTier, error: createTierError } = await supabase
-    .from('club_stages')
-    .insert({
-      club_program_id: clubProgramId,
-      name: tier.name,
-      discount_percentage: parseFloat(tier.discountPercentage),
-      duration_months: parseInt(tier.durationMonths),
-      min_purchase_amount: parseFloat(tier.minPurchaseAmount),
-      stage_order: stageOrder,
-      is_active: true,
-      discount_code: tier.discount?.code,
-      discount_title: tier.discount?.title,
-    })
-    .select()
-    .single();
-  
-  if (createTierError || !newTier) {
-    throw new Error(`Failed to create new tier ${tier.name}: ${createTierError?.message}`);
-  }
-  
-  return newTier;
+  return stages[0];
 }
 
 /**
  * Syncs a tier's discount with Commerce7
+ * @deprecated This is for the old tag/coupon system. Use createTiersInC7 instead.
  */
 export async function syncTierDiscount(
   tier: TierFormDataSerialized,
@@ -338,7 +301,7 @@ export async function syncTierDiscount(
       existingTier?.platform_discount_id
     );
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = db.getSupabaseClient();
     await supabase
       .from('club_stages')
       .update({ 
@@ -358,7 +321,8 @@ export async function syncTierDiscount(
 }
 
 /**
- * Deletes a tier and its associated CRM resources
+ * Deletes a tier and its associated C7 resources (NEW ARCHITECTURE)
+ * Deletes club, promotions, and loyalty tier from C7
  */
 export async function deleteTier(
   tierId: string,
@@ -366,39 +330,30 @@ export async function deleteTier(
   crmType: string,
   tenantShop: string
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  if (crmType === 'commerce7') {
+  if (crmType === 'commerce7' && tierData?.c7_club_id) {
     const provider = new Commerce7Provider(tenantShop);
     
-    // Delete coupon
-    if (tierData?.platform_discount_id) {
-      try {
-        await provider.deleteC7Coupon(tierData.platform_discount_id);
-      } catch (error) {
-        console.error(`Failed to delete coupon for tier "${tierData?.name}":`, error);
-      }
-    }
+    // Get promotions for this tier
+    const promotions = await db.getStagePromotions(tierId);
     
-    // Delete tag
-    if (tierData?.platform_tag_id) {
-      try {
-        await provider.deleteTag(tierData.platform_tag_id);
-      } catch (error) {
-        console.error(`Failed to delete tag for tier "${tierData?.name}":`, error);
-      }
-    }
+    // Get loyalty tier for this tier
+    const loyaltyConfig = await db.getTierLoyaltyConfig(tierId);
+    
+    // Use rollback method to clean up C7 resources
+    await provider.rollbackTierCreation({
+      clubId: tierData.c7_club_id,
+      promotionIds: promotions?.map(p => p.crm_id) || [],
+      loyaltyTierId: loyaltyConfig?.c7_loyalty_tier_id || null,
+    });
   }
   
-  // Delete the tier from database
-  await supabase
-    .from('club_stages')
-    .delete()
-    .eq('id', tierId);
+  // Delete from database (CASCADE will handle related tables)
+  await db.deleteClubStage(tierId);
 }
 
 /**
  * Updates loyalty point rules
+ * @deprecated Global loyalty rules are deprecated. Use tier-specific loyalty instead.
  */
 export async function updateLoyaltyRules(
   clientId: string,
@@ -407,22 +362,13 @@ export async function updateLoyaltyRules(
   pointDollarValue: string,
   minPointsRedemption: string
 ) {
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  
-  const { error: updateLoyaltyError } = await supabase
-    .from('loyalty_point_rules')
-    .update({
-      points_per_dollar: parseFloat(pointsPerDollar || '1'),
-      min_membership_days: parseInt(minMembershipDays || '365'),
-      point_dollar_value: parseFloat(pointDollarValue || '0.01'),
-      min_points_for_redemption: parseInt(minPointsRedemption || '100'),
-      updated_at: new Date().toISOString()
-    })
-    .eq('client_id', clientId);
-  
-  if (updateLoyaltyError) {
-    throw new Error(`Failed to update loyalty rules: ${updateLoyaltyError.message}`);
-  }
+  return db.updateLoyaltyRules(
+    clientId,
+    parseFloat(pointsPerDollar || '1'),
+    parseInt(minMembershipDays || '365'),
+    parseFloat(pointDollarValue || '0.01'),
+    parseInt(minPointsRedemption || '100')
+  );
 }
 
 /**
