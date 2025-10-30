@@ -48,7 +48,17 @@ function getApiAuth(): string {
  */
 function handleC7ApiError(data: any, operation: string): void {
   // Check for status code errors
+  // console.log('################# Commerce7 API error:', data);
+  const errorMessages = data.errors
+  ? data.errors.map((e: any) => 
+      typeof e === 'string' ? e : (e.message || JSON.stringify(e))
+    ).join(', ')
+  : [];
+
   if (data.statusCode && data.statusCode !== 200) {
+    const message = errorMessages.join(', ') === '' 
+      ? data.message || data.type || 'Unknown error' 
+      : errorMessages.join(', ');
     throw new Error(
       `Commerce7 ${operation} error (${data.statusCode}): ${data.message || data.type || 'Unknown error'}`
     );
@@ -56,9 +66,6 @@ function handleC7ApiError(data: any, operation: string): void {
   
   // Check for errors array (success status but operation failed)
   if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-    const errorMessages = data.errors.map((e: any) => 
-      typeof e === 'string' ? e : (e.message || JSON.stringify(e))
-    ).join(', ');
     throw new Error(`Commerce7 ${operation} error: ${errorMessages}`);
   }
 }
@@ -1539,6 +1546,8 @@ export class Commerce7Provider implements CrmProvider {
       productDiscount?: number;
       shippingDiscountType?: string;
       shippingDiscount?: number;
+      appliesTo?: string;
+      appliesToObjectIds?: string[];
       minimumCartAmount?: number;
     }>,
     clubId: string
@@ -1553,20 +1562,49 @@ export class Commerce7Provider implements CrmProvider {
     try {
       // Create first promotion (no set yet)
       const firstPromo = promotions[0];
-      const firstPromotion = await this.createPromotion({
+      
+      // Determine promotion type (Product or Shipping)
+      const isProductPromo = firstPromo.productDiscountType && firstPromo.productDiscountType !== "No Discount";
+      const promoType = isProductPromo ? "Product" : "Shipping";
+      const discountType = isProductPromo ? firstPromo.productDiscountType : firstPromo.shippingDiscountType;
+      const discountAmount = isProductPromo ? firstPromo.productDiscount : firstPromo.shippingDiscount;
+      
+      const promoPayload: any = {
         title: firstPromo.title,
-        productDiscountType: (firstPromo.productDiscountType as any) || "No Discount",
-        productDiscount: firstPromo.productDiscount,
-        shippingDiscountType: (firstPromo.shippingDiscountType as any) || "No Discount",
-        shippingDiscount: firstPromo.shippingDiscount,
-        minimumCartAmount: firstPromo.minimumCartAmount,
+        actionMessage: "",
+        type: promoType,                         // "Product" or "Shipping"
+        discountType: discountType as string,   // "Percentage Off" | "Dollar Off"
+        discount: discountType === "Percentage Off" ?
+          (discountAmount || 0) * 100 :         // 10% → 1000 basis points
+          (discountAmount || 0),                 // $10 → 10 dollars
+        dollarOffDiscountApplies: "Once Per Order",
+        appliesTo: firstPromo.appliesTo || "Store",
+        appliesToObjectIds: firstPromo.appliesToObjectIds || [],  // Empty array = all products
+        excludes: null,
+        excludeObjectIds: [],
+        cartRequirementType: "None",
+        cartRequirement: null,
+        cartRequirementMaximum: null,
+        cartRequirementCountType: "All Items",
+        usageLimitType: "Unlimited",
+        usageLimit: null,
+        status: "Enabled",
         availableTo: "Club",
         availableToObjectIds: [clubId],
-        status: "Enabled",
-        usageLimitType: "Unlimited",
-        appliesTo: "Store",
+        clubFrequencies: [],
+        promotionSets: [],
         startDate: new Date().toISOString(),
-      });
+        endDate: null,
+      };
+      
+      // Add minimum cart requirement if specified
+      if (firstPromo.minimumCartAmount) {
+        promoPayload.cartRequirementType = "Minimum Amount";
+        promoPayload.cartRequirement = firstPromo.minimumCartAmount * 100; // Convert to cents
+      }
+      
+      console.log('Creating C7 promotion with payload:', JSON.stringify(promoPayload, null, 2));
+      const firstPromotion = await this.createPromotion(promoPayload as C7PromotionCreateRequest);
 
       createdPromotions.push({
         id: firstPromotion.id,
@@ -1590,21 +1628,48 @@ export class Commerce7Provider implements CrmProvider {
         for (let i = 1; i < promotions.length; i++) {
           const promo = promotions[i];
           try {
-            const promotion = await this.createPromotion({
+            // Determine promotion type (Product or Shipping)
+            const isProductPromo = promo.productDiscountType && promo.productDiscountType !== "No Discount";
+            const promoType = isProductPromo ? "Product" : "Shipping";
+            const discountType = isProductPromo ? promo.productDiscountType : promo.shippingDiscountType;
+            const discountAmount = isProductPromo ? promo.productDiscount : promo.shippingDiscount;
+            
+            const promoPayload: any = {
               title: promo.title,
-              productDiscountType: (promo.productDiscountType as any) || "No Discount",
-              productDiscount: promo.productDiscount,
-              shippingDiscountType: (promo.shippingDiscountType as any) || "No Discount",
-              shippingDiscount: promo.shippingDiscount,
-              minimumCartAmount: promo.minimumCartAmount,
+              actionMessage: "",
+              type: promoType,
+              discountType: discountType as string,
+              discount: discountType === "Percentage Off" ?
+                (discountAmount || 0) * 100 :
+                (discountAmount || 0),
+              dollarOffDiscountApplies: "Once Per Order",
+              appliesTo: promo.appliesTo || "Store",
+              appliesToObjectIds: promo.appliesToObjectIds || [],
+              excludes: null,
+              excludeObjectIds: [],
+              cartRequirementType: "None",
+              cartRequirement: null,
+              cartRequirementMaximum: null,
+              cartRequirementCountType: "All Items",
+              usageLimitType: "Unlimited",
+              usageLimit: null,
+              status: "Enabled",
               availableTo: "Club",
               availableToObjectIds: [clubId],
-              status: "Enabled",
-              usageLimitType: "Unlimited",
-              appliesTo: "Store",
-              startDate: new Date().toISOString(),
+              clubFrequencies: [],
               promotionSets: [promotionSetId], // Include set!
-            } as any);
+              startDate: new Date().toISOString(),
+              endDate: null,
+            };
+            
+            // Add minimum cart requirement if specified
+            if (promo.minimumCartAmount) {
+              promoPayload.cartRequirementType = "Minimum Amount";
+              promoPayload.cartRequirement = promo.minimumCartAmount * 100;
+            }
+            
+            console.log(`Creating C7 promotion ${i + 1} with payload:`, JSON.stringify(promoPayload, null, 2));
+            const promotion = await this.createPromotion(promoPayload);
 
             createdPromotions.push({
               id: promotion.id,

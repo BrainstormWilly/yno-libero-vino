@@ -81,6 +81,9 @@ async function handleC7Install(request: Request) {
   try {
     const payload = await request.json() as Commerce7InstallPayload;
     
+    // Debug: Log the full payload to see what C7 is sending
+    console.log('C7 Install Payload:', JSON.stringify(payload, null, 2));
+    
     // Validate required fields
     if (!payload.tenantId || !payload.user) {
       return { 
@@ -103,13 +106,18 @@ async function handleC7Install(request: Request) {
       return { success: true, message: 'Client already exists' };
     }
 
+    // Extract organization name
+    const orgName = payload['organization-name'] || payload.tenantId;
+    console.log('Organization name from payload:', payload['organization-name']);
+    console.log('Using org_name:', orgName);
+    
     // Create new client
     const { data: newClient, error: insertError } = await supabase
       .from('clients')
       .insert({
         tenant_shop: payload.tenantId,
         crm_type: 'commerce7',
-        org_name: payload['organization-name'] || payload.tenantId,
+        org_name: orgName,
         org_contact: `${payload.user.firstName} ${payload.user.lastName}`.trim(),
         user_id: payload.user.id,
         user_email: payload.user.email,

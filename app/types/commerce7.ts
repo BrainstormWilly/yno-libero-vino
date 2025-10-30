@@ -72,36 +72,54 @@ export interface C7Club {
  * Linked to clubs via availableTo + availableToObjectIds
  */
 
+export type C7PromotionType = "Product" | "Shipping";
 export type C7PromotionAppliesTo = "Store" | "Product" | "Collection";
 export type C7PromotionAvailableTo = "Everyone" | "Club" | "Customer";
-export type C7PromotionDiscountType = "Percentage Off" | "Dollar Off" | "No Discount";
+export type C7PromotionDiscountType = "Percentage Off" | "Dollar Off";
 export type C7PromotionUsageLimitType = "Unlimited" | "Limited";
 export type C7PromotionStatus = "Enabled" | "Disabled";
+export type C7PromotionDollarOffApplies = "Once Per Order" | "Each Item";
+export type C7PromotionCartRequirementType = "None" | "Minimum Amount" | "Minimum Quantity";
+export type C7PromotionCartRequirementCountType = "All Items" | "Specific Items";
 
 export interface C7PromotionCreateRequest {
-  title: string;                              // e.g., "Bronze Member Discount"
-  actionMessage?: string | null;              // Customer-facing message
-  usageLimitType: C7PromotionUsageLimitType;  // "Unlimited"
-  usageLimit?: number | null;                 // If Limited
+  title: string;
+  actionMessage?: string;
   
-  // Product discount
-  appliesTo: C7PromotionAppliesTo;            // "Store" = all products
-  appliesToObjectIds?: string[] | null;       // Product/collection IDs
-  productDiscountType: C7PromotionDiscountType;
-  productDiscount?: number | null;            // Discount value (need to verify format)
+  // Discount configuration - ONE type per promotion
+  type: C7PromotionType;                      // "Product" or "Shipping"
+  discountType: C7PromotionDiscountType;      // "Percentage Off" | "Dollar Off"
+  discount: number;                            // Basis points for %, dollars for $
+  dollarOffDiscountApplies?: C7PromotionDollarOffApplies;  // "Once Per Order" | "Each Item"
   
-  // Shipping discount
-  shippingDiscountType: C7PromotionDiscountType;
-  shippingDiscount?: number | null;
+  // Applies to (which products/collections)
+  appliesTo: C7PromotionAppliesTo;            // "Store" | "Product" | "Collection"
+  appliesToObjectIds?: string[];              // Empty array = all
+  excludes?: null;
+  excludeObjectIds?: string[];
   
-  // Availability
+  // Cart requirements (replaces minimumCartAmount)
+  cartRequirementType?: C7PromotionCartRequirementType;  // "None" | "Minimum Amount" | "Minimum Quantity"
+  cartRequirement?: number | null;
+  cartRequirementMaximum?: number | null;
+  cartRequirementCountType?: C7PromotionCartRequirementCountType;
+  
+  // Usage limits
+  usageLimitType: C7PromotionUsageLimitType;
+  usageLimit?: number | null;
+  
+  // Availability (who can use it)
   status: C7PromotionStatus;
-  minimumCartAmount?: number | null;
-  availableTo: C7PromotionAvailableTo;        // "Club"
-  availableToObjectIds?: string[] | null;     // [clubId]
+  availableTo: C7PromotionAvailableTo;
+  availableToObjectIds?: string[];            // Club IDs
+  clubFrequencies?: string[];
+  channels?: string[];                         // ["All"]
+  
+  // Promotion sets (for combining multiple promos)
+  promotionSets?: string[];
   
   // Timing
-  startDate?: string | null;
+  startDate?: string;
   endDate?: string | null;
 }
 
