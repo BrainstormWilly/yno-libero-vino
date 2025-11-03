@@ -127,3 +127,38 @@ export function isEmbedded(): boolean {
   }
 }
 
+/**
+ * Show a notification using Commerce7 SDK (for C7 embedded apps)
+ * Falls back to console if SDK not available
+ * @param message - The notification message
+ * @param type - 'success' or 'error'
+ */
+export function showC7Notification(message: string, type: 'success' | 'error' = 'success') {
+  if (typeof window === 'undefined') return false;
+  
+  try {
+    // Check if Commerce7 SDK is available
+    const c7 = (window as any).commerce7;
+    
+    if (c7 && typeof c7.showNotification === 'function') {
+      c7.showNotification({
+        message,
+        type,
+      });
+      return true;
+    }
+    
+    if (c7 && typeof c7.notification === 'function') {
+      c7.notification(message, type);
+      return true;
+    }
+    
+    // SDK not available
+    console.log(`[C7 Notification - ${type}]:`, message);
+    return false;
+  } catch (error) {
+    console.warn('Failed to show C7 notification:', error);
+    return false;
+  }
+}
+

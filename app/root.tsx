@@ -38,6 +38,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           type="text/javascript" 
           src="https://cdnjs.cloudflare.com/ajax/libs/iframe-resizer/4.3.2/iframeResizer.contentWindow.min.js"
         />
+        {/* Load Commerce7 embedded app SDK */}
+        <script 
+          type="text/javascript" 
+          src="https://dev-center.platform.commerce7.com/v2/commerce7.js"
+        />
       </head>
       <body className="font-sans antialiased">
         <AppProvider

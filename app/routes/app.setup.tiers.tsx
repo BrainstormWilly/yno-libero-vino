@@ -87,10 +87,10 @@ export async function action({ request }: ActionFunctionArgs) {
       stageOrder: tierCount + 1,
     }]);
     
-    // Redirect to edit the new tier
+    // Redirect to edit the new tier with 'new' flag
     return {
       success: true,
-      redirect: addSessionToUrl(`/app/setup/tiers/${newTiers[0].id}`, session.id),
+      redirect: addSessionToUrl(`/app/setup/tiers/${newTiers[0].id}?new=true`, session.id),
     };
   }
   
@@ -215,13 +215,12 @@ export default function SetupTiers() {
                       >
                         Edit
                       </Button>
-                      <Form method="post" style={{ display: 'inline' }}>
+                      <Form method="post">
                         <input type="hidden" name="action" value="delete_tier" />
                         <input type="hidden" name="tier_id" value={tier.id} />
                         <Button
                           tone="critical"
                           submit
-                          disabled={tiers.length === 1}
                         >
                           Delete
                         </Button>

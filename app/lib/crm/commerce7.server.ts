@@ -27,6 +27,18 @@ import type {
   C7LoyaltyTransactionCreateRequest,
   C7LoyaltyTransaction,
 } from "~/types/commerce7";
+import {
+  fromC7Customer,
+  fromC7Address,
+  fromC7Payment,
+  toC7Address,
+  calculateC7LTV,
+  type C7CustomerResponse,
+  type C7AddressResponse,
+  type C7CreditCardResponse,
+} from "~/types/customer-commerce7";
+import { toC7ClubMembership } from "~/types/member-commerce7";
+import type { Customer, CustomerAddress, CustomerPayment } from "~/types/customer";
 
 const API_URL = "https://api.commerce7.com/v1";
 const APP_NAME = "yno-liberovino-wine-club-and-loyalty";
@@ -47,20 +59,19 @@ function getApiAuth(): string {
  * 2. Success status (200) but operation failed - errors in { errors: [] }
  */
 function handleC7ApiError(data: any, operation: string): void {
+  if(!data) return;
+  
   // Check for status code errors
-  // console.log('################# Commerce7 API error:', data);
   const errorMessages = data.errors
   ? data.errors.map((e: any) => 
       typeof e === 'string' ? e : (e.message || JSON.stringify(e))
     ).join(', ')
-  : [];
+  : 'Unknown error';
 
   if (data.statusCode && data.statusCode !== 200) {
-    const message = errorMessages.join(', ') === '' 
-      ? data.message || data.type || 'Unknown error' 
-      : errorMessages.join(', ');
+    console.error('############# Commerce7 API error:', data);
     throw new Error(
-      `Commerce7 ${operation} error (${data.statusCode}): ${data.message || data.type || 'Unknown error'}`
+      `Commerce7 ${operation} error (${data.statusCode}): ${errorMessages}`
     );
   }
   
@@ -180,22 +191,40 @@ export class Commerce7Provider implements CrmProvider {
     });
 
     const data = await response.json();
+    handleC7ApiError(data, 'Get Customers');
 
-    if (data.errors) {
-      throw new Error(
-        `Error fetching Commerce7 customers: ${data.errors[0]?.message}`
-      );
+    return data.customers.map((customer: C7CustomerResponse) => fromC7Customer(customer));
+  }
+
+  async getCustomersWithLTV(params?: any): Promise<CrmCustomer[]> {
+    const customers = await this.getCustomers(params);
+    
+    // Calculate LTV for each customer using conversion function
+    const customersWithLtv = await Promise.all(
+      customers.map(async (customer) => {
+        try {
+          const orders = await this.getOrders({ customerId: customer.id });
+          const ltv = calculateC7LTV(orders); // Uses conversion helper
+          return { ...customer, ltv };
+        } catch {
+          return { ...customer, ltv: 0 };
+        }
+      })
+    );
+    
+    return customersWithLtv;
+  }
+
+  async getCustomerWithLTV(id: string): Promise<CrmCustomer> {
+    const customer = await this.getCustomer(id);
+    
+    try {
+      const orders = await this.getOrders({ customerId: id });
+      const ltv = calculateC7LTV(orders); // Uses conversion helper
+      return { ...customer, ltv };
+    } catch {
+      return { ...customer, ltv: 0 };
     }
-
-    return data.customers.map((customer: any) => ({
-      id: customer.id,
-      email: customer.email,
-      firstName: customer.firstName,
-      lastName: customer.lastName,
-      phone: customer.phone,
-      createdAt: customer.createdAt,
-      updatedAt: customer.updatedAt,
-    }));
   }
 
   async getCustomer(id: string): Promise<CrmCustomer> {
@@ -240,21 +269,53 @@ export class Commerce7Provider implements CrmProvider {
     });
 
     const data = await response.json();
+    handleC7ApiError(data, 'Create Customer');
 
-    if (data.errors) {
-      throw new Error(
-        `Error creating Commerce7 customer: ${data.errors[0]?.message}`
-      );
-    }
+    return fromC7Customer(data);
+  }
+
+  /**
+   * Create customer with billing address (Commerce7-specific)
+   * Uses /customer-address endpoint which creates both in one atomic call
+   */
+  async createCustomerWithAddress(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    address: CustomerAddress;
+  }): Promise<{ customer: Customer; billingAddressId: string }> {
+    const response = await fetch(`${API_URL}/customer-address`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        address: data.address.address1,
+        address2: data.address.address2,
+        city: data.address.city,
+        stateCode: data.address.state,
+        zipCode: data.address.zip,
+        countryCode: data.address.country || 'US',
+        emails: [{ email: data.email }],
+        phones: data.phone ? [{ phone: data.phone }] : [],
+        orderInformation: {
+          acquisitionChannel: "Inbound"
+        }
+      }),
+    });
+
+    const customerData = await response.json();
+    handleC7ApiError(customerData, 'Create Customer with Address');
 
     return {
-      id: data.id,
-      email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
+      customer: fromC7Customer(customerData),
+      billingAddressId: customerData.id, // Per docs: first address ID = customer ID
     };
   }
 
@@ -666,6 +727,11 @@ export class Commerce7Provider implements CrmProvider {
       },
     });
 
+    if (response.status === 204) {
+      console.info('Coupon deleted successfully');
+      return true;
+    }
+
     const data = await response.json();
     handleC7ApiError(data, 'deleting coupon');
 
@@ -718,6 +784,10 @@ export class Commerce7Provider implements CrmProvider {
         tenant: this.tenantId,
       },
     });
+
+    if (response.status === 204) {
+      return true;
+    }
 
     if (!response.ok) {
       throw new Error(
@@ -878,6 +948,10 @@ export class Commerce7Provider implements CrmProvider {
       },
     });
 
+    if (response.status === 204) {
+      return true;
+    }
+
     if (!response.ok) {
       throw new Error(
         `Error deleting Commerce7 webhook: ${response.statusText}`
@@ -1026,6 +1100,11 @@ export class Commerce7Provider implements CrmProvider {
       },
     });
 
+    if (response.status === 204) {
+      console.info('Tag deleted successfully');
+      return;
+    }
+
     const data = await response.json();
     handleC7ApiError(data, 'deleting tag');
   }
@@ -1157,7 +1236,7 @@ export class Commerce7Provider implements CrmProvider {
     data: Partial<C7ClubCreateRequest>
   ): Promise<C7Club> {
     const response = await fetch(`${API_URL}/club/${clubId}`, {
-      method: "PATCH",
+      method: "PUT",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -1174,6 +1253,41 @@ export class Commerce7Provider implements CrmProvider {
   }
 
   /**
+   * Idempotent upsert club (create or update)
+   * Implements CrmProvider interface - abstraction for tier/club sync
+   * @param tier - Tier data with optional c7ClubId
+   * @returns The CRM club ID
+   */
+  async upsertClub(tier: { 
+    id: string; 
+    name: string; 
+    c7ClubId?: string | null 
+  }): Promise<{ crmClubId: string }> {
+    if (tier.c7ClubId) {
+      // Update existing club (type field is immutable, exclude it)
+      await this.updateClub(tier.c7ClubId, {
+        title: tier.name,
+        slug: tier.name.toLowerCase().replace(/\s+/g, '-'),
+        seo: { title: tier.name },
+        webStatus: "Not Available" as const,
+        adminStatus: "Not Available" as const,
+      });
+      return { crmClubId: tier.c7ClubId };
+    } else {
+      // Create new club (type is required for creation)
+      const club = await this.createClub({
+        title: tier.name,
+        slug: tier.name.toLowerCase().replace(/\s+/g, '-'),
+        type: "Traditional" as const,
+        seo: { title: tier.name },
+        webStatus: "Not Available" as const,
+        adminStatus: "Not Available" as const,
+      });
+      return { crmClubId: club.id };
+    }
+  }
+
+  /**
    * Delete a club
    * @param clubId - The club's ID
    */
@@ -1186,6 +1300,11 @@ export class Commerce7Provider implements CrmProvider {
         tenant: this.tenantId,
       },
     });
+
+    if (response.status === 204) {
+      console.info('Club deleted successfully');
+      return;
+    }
 
     const result = await response.json();
     handleC7ApiError(result, 'deleting club');
@@ -1222,6 +1341,7 @@ export class Commerce7Provider implements CrmProvider {
   async createPromotion(
     data: C7PromotionCreateRequest
   ): Promise<C7Promotion> {
+    console.log('############# createPromotion', data);
     const response = await fetch(`${API_URL}/promotion`, {
       method: "POST",
       headers: {
@@ -1268,7 +1388,7 @@ export class Commerce7Provider implements CrmProvider {
     data: Partial<C7PromotionCreateRequest>
   ): Promise<C7Promotion> {
     const response = await fetch(`${API_URL}/promotion/${promotionId}`, {
-      method: "PATCH",
+      method: "PUT",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -1297,6 +1417,11 @@ export class Commerce7Provider implements CrmProvider {
         tenant: this.tenantId,
       },
     });
+
+    if(response.status === 204) {
+      console.info('Promotion deleted successfully');
+      return;
+    }
 
     const result = await response.json();
     handleC7ApiError(result, 'deleting promotion');
@@ -1384,6 +1509,11 @@ export class Commerce7Provider implements CrmProvider {
       },
     });
 
+    if (response.status === 204) {
+      console.info('Promotion set deleted successfully');
+      return;
+    }
+
     const result = await response.json();
     handleC7ApiError(result, 'deleting promotion set');
   }
@@ -1449,7 +1579,7 @@ export class Commerce7Provider implements CrmProvider {
     data: Partial<C7LoyaltyTierCreateRequest>
   ): Promise<C7LoyaltyTier> {
     const response = await fetch(`https://api.commerce7.com/v1/loyalty-tier/${loyaltyTierId}`, {
-      method: "PATCH",
+      method: "PUT",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -1478,6 +1608,11 @@ export class Commerce7Provider implements CrmProvider {
         tenant: this.tenantId,
       },
     });
+
+    if (response.status === 204) {
+      console.info('Loyalty tier deleted successfully');
+      return;
+    }
 
     const result = await response.json();
     handleC7ApiError(result, 'deleting loyalty tier');
@@ -1854,5 +1989,210 @@ export class Commerce7Provider implements CrmProvider {
       console.warn(`Failed to add bonus points for customer ${customerId}:`, error);
       throw new Error(`Failed to add welcome bonus points: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  // ============================================
+  // CUSTOMER ADDRESS METHODS
+  // ============================================
+
+  /**
+   * Get addresses for a customer
+   */
+  async getCustomerAddresses(customerId: string): Promise<CustomerAddress[]> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/address`, {
+      method: 'GET',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Get Customer Addresses');
+    
+    return (data.addresses || []).map((addr: C7AddressResponse) => fromC7Address(addr));
+  }
+
+  /**
+   * Create a new address for a customer
+   */
+  async createCustomerAddress(customerId: string, address: CustomerAddress): Promise<CustomerAddress> {
+    const c7Address = toC7Address(address); // Convert to C7 format
+    
+    const response = await fetch(`${API_URL}/customer/${customerId}/address`, {
+      method: 'POST',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(c7Address),
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Create Customer Address');
+    
+    return fromC7Address(data.address); // Convert back to unified format
+  }
+
+  // ============================================
+  // CUSTOMER PAYMENT METHODS
+  // ============================================
+
+  /**
+   * Get credit cards for a customer
+   */
+  async getCustomerCreditCards(customerId: string): Promise<CustomerPayment[]> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/credit-card`, {
+      method: 'GET',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Get Customer Credit Cards');
+    
+    return (data.creditCards || []).map((card: C7CreditCardResponse) => fromC7Payment(card));
+  }
+
+  /**
+   * Create a credit card for a customer
+   * Note: In production, this should be done via a secure tokenization service
+   * This is here for testing/development purposes
+   */
+  async createCustomerCreditCard(customerId: string, card: {
+    cardholderName: string;
+    cardNumber: string;
+    expiryMonth: string;
+    expiryYear: string;
+    cvv: string;
+    isDefault?: boolean;
+  }): Promise<CustomerPayment> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/credit-card`, {
+      method: 'POST',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify({
+        cardHolderName: card.cardholderName,
+        // Note: C7 handles tokenization - in production we'd send token, not raw card data
+        cardNumber: card.cardNumber,
+        expiryMo: parseInt(card.expiryMonth),
+        expiryYr: parseInt(card.expiryYear),
+        cvv: card.cvv,
+        isDefault: card.isDefault !== false, // Default to true
+      }),
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Create Customer Credit Card');
+    
+    return fromC7Payment(data.creditCard);
+  }
+
+  // ============================================
+  // CLUB MEMBERSHIP METHODS
+  // ============================================
+
+  /**
+   * Create a club membership for a customer
+   * Uses the /club-membership endpoint (not /club/{id}/member)
+   */
+  async createClubMembership(data: {
+    customerId: string;
+    clubId: string;
+    billingAddressId: string;
+    shippingAddressId: string;
+    paymentMethodId: string;
+    startDate: string;
+  }): Promise<{ id: string; status: string }> {
+    const payload = toC7ClubMembership(data); // Convert using type helper
+    
+    const response = await fetch(`${API_URL}/club-membership`, {
+      method: 'POST',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseData = await response.json();
+    handleC7ApiError(responseData, 'Create Club Membership');
+    
+    return {
+      id: responseData.id,
+      status: responseData.status,
+    };
+  }
+
+  /**
+   * Get club memberships for a customer
+   */
+  async getCustomerClubMemberships(customerId: string): Promise<any[]> {
+    const response = await fetch(`${API_URL}/customer/${customerId}/club`, {
+      method: 'GET',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Get Customer Club Memberships');
+    
+    return data.clubs || [];
+  }
+
+  /**
+   * Get members of a specific club
+   */
+  async getClubMembers(clubId: string): Promise<any[]> {
+    const response = await fetch(`${API_URL}/club/${clubId}/member`, {
+      method: 'GET',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Get Club Members');
+    
+    return data.members || [];
+  }
+
+  /**
+   * Remove a customer from a club
+   */
+  async removeClubMember(clubId: string, customerId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/club/${clubId}/member/${customerId}`, {
+      method: 'DELETE',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Remove Club Member');
   }
 }

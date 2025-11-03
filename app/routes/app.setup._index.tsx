@@ -25,6 +25,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   const client = await db.getClient(session.clientId);
   const existingProgram = await db.getClubProgram(session.clientId);
+
+  if(!client) {
+    throw new Response('Client not found', { status: 404 });
+  }
   
   return {
     session,
@@ -102,7 +106,7 @@ export default function SetupIndex() {
   return (
     <Page
       title={isEditMode ? "Edit Club Program" : "LiberoVino Club Setup"}
-      backAction={{ content: 'Cancel', onAction: () => navigate(addSessionToUrl('/app', session.id)) }}
+      backAction={client.setup_complete ? { content: 'Cancel', onAction: () => navigate(addSessionToUrl('/app', session.id)) } : undefined}
     >
       <Layout>
         {/* Error Messages */}

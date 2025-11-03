@@ -36,20 +36,17 @@ export default function TierSummary({ tier, promotions, loyalty }: TierSummaryPr
             </InlineGrid>
           </Box>
           
-          <Box>
-            <Text as="p" variant="headingSm">
-              {tier.name}
-            </Text>
-          </Box>
-          
           <dl className="onIndent">
-            <dt className="srOnly">Duration</dt>
+            <dd>
+              <Text as="span" variant="bodyMd">
+                <strong>Name:</strong> {tier.name}
+              </Text>
+            </dd>
             <dd>
               <Text as="span" variant="bodyMd">
                 <strong>Duration:</strong> {tier.duration_months} months
               </Text>
             </dd>
-            <dt className="srOnly">Minimum Purchase</dt>
             <dd>
               <Text as="span" variant="bodyMd">
                 <strong>Min Purchase:</strong> ${tier.min_purchase_amount}

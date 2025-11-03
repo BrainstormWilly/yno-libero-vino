@@ -182,8 +182,15 @@ export function getSessionId(request: Request): string | null {
 
 /**
  * Helper to create redirect response with session preserved
+ * Ensures HTTPS protocol for embedded Commerce7 apps
  */
 export function redirectWithSession(url: string, sessionId: string, init?: ResponseInit): Response {
-  const urlWithSession = withSession(url, sessionId);
+  let urlWithSession = withSession(url, sessionId);
+  
+  // If URL is absolute and uses HTTP, convert to HTTPS
+  if (urlWithSession.startsWith('http://')) {
+    urlWithSession = urlWithSession.replace('http://', 'https://');
+  }
+  
   throw redirect(urlWithSession, init);
 }

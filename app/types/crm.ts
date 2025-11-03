@@ -38,6 +38,7 @@ export interface CrmCustomer {
   phone?: string;
   createdAt: string;
   updatedAt: string;
+  ltv?: number; // Lifetime value in currency (not cents)
 }
 
 export interface CrmProduct {
@@ -117,11 +118,21 @@ export interface CrmProvider {
   
   // Customer operations
   getCustomers(params?: any): Promise<CrmCustomer[]>;
+  getCustomersWithLTV(params?: any): Promise<CrmCustomer[]>; // Get customers with LTV calculated
   getCustomer(id: string): Promise<CrmCustomer>;
+  getCustomerWithLTV(id: string): Promise<CrmCustomer>; // Get single customer with LTV calculated
   createCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer>;
   updateCustomer(id: string, customer: Partial<CrmCustomer>): Promise<CrmCustomer>;
   upsertCustomer(customer: Partial<CrmCustomer>): Promise<CrmCustomer>;
   findCustomerByEmail(email: string): Promise<CrmCustomer | null>;
+  
+  // Customer address operations
+  getCustomerAddresses(customerId: string): Promise<any[]>;
+  createCustomerAddress(customerId: string, address: any): Promise<any>;
+  
+  // Customer payment operations
+  getCustomerCreditCards(customerId: string): Promise<any[]>;
+  createCustomerCreditCard(customerId: string, card: any): Promise<any>;
   
   // Product operations
   getProducts(params?: any): Promise<CrmProduct[]>;
@@ -153,4 +164,7 @@ export interface CrmProvider {
   addCustomerToDiscount(discountId: string, customerId: string): Promise<void>;
   removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void>;
   getCouponCustomers(couponId: string): Promise<string[]>;
+  
+  // Club/Tier operations (idempotent)
+  upsertClub(tier: { id: string; name: string; c7ClubId?: string | null }): Promise<{ crmClubId: string }>;
 }

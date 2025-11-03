@@ -835,6 +835,39 @@ export type Database = {
           },
         ]
       }
+      enrollment_drafts: {
+        Row: {
+          address_verified: boolean | null
+          created_at: string | null
+          customer_data: Json | null
+          id: string
+          payment_verified: boolean | null
+          session_id: string
+          tier_data: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          address_verified?: boolean | null
+          created_at?: string | null
+          customer_data?: Json | null
+          id?: string
+          payment_verified?: boolean | null
+          session_id: string
+          tier_data?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          address_verified?: boolean | null
+          created_at?: string | null
+          customer_data?: Json | null
+          id?: string
+          payment_verified?: boolean | null
+          session_id?: string
+          tier_data?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       loyalty_point_rules: {
         Row: {
           bonus_points_percentage: number | null

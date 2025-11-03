@@ -11,7 +11,7 @@ import {
   InlineStack
 } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
-import { getClient } from '~/lib/supabase.server';
+import { getClient } from '~/lib/db/supabase.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Trust that parent /app route already checked authorization
@@ -113,7 +113,7 @@ export default function AppDashboard() {
                       Sync Customers
                     </Button>
                     <Button disabled>
-                      View Club Members [[memory:10077916]]
+                      View Club Members
                     </Button>
                     <Button disabled>
                       Manage Loyalty Rewards

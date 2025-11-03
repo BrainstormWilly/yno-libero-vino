@@ -1,6 +1,8 @@
 import type { CrmProvider } from '~/types/crm';
 import { ShopifyProvider } from './shopify.server';
 import { Commerce7Provider } from './commerce7.server';
+import { toC7Promotion, fromC7Promotion, type Discount } from '~/types';
+import type { AppSessionData } from '~/lib/session-storage.server';
 
 export class CrmManager {
   /**
@@ -25,3 +27,90 @@ export class CrmManager {
 
 // Singleton instance - still useful for factory pattern
 export const crmManager = new CrmManager();
+
+// ============================================
+// Promotion Service Functions
+// ============================================
+
+/**
+ * Create a promotion in the CRM
+ * @param session - App session with tenant info
+ * @param discount - Abstract Discount object
+ * @param clubId - CRM club ID to link promotion to
+ * @returns Created promotion with CRM ID and title
+ */
+export async function createPromotion(
+  session: AppSessionData,
+  discount: Discount,
+  clubId: string
+): Promise<{ id: string; title: string }> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    const c7Payload = toC7Promotion(discount, clubId);
+    const c7Promotion = await provider.createPromotion(c7Payload);
+    return { id: c7Promotion.id, title: c7Promotion.title };
+  }
+  
+  // Add Shopify support later
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Get a promotion from the CRM
+ * @param session - App session
+ * @param crmPromotionId - CRM promotion ID
+ * @returns Abstract Discount object
+ */
+export async function getPromotion(
+  session: AppSessionData,
+  crmPromotionId: string
+): Promise<Discount> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    const c7Promotion = await provider.getPromotion(crmPromotionId);
+    return fromC7Promotion(c7Promotion);
+  }
+  
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Update a promotion in the CRM
+ * @param session - App session
+ * @param crmPromotionId - CRM promotion ID
+ * @param discount - Updated Discount object
+ * @param clubId - CRM club ID
+ */
+export async function updatePromotion(
+  session: AppSessionData,
+  crmPromotionId: string,
+  discount: Discount,
+  clubId: string
+): Promise<void> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    const c7Payload = toC7Promotion(discount, clubId);
+    await provider.updatePromotion(crmPromotionId, c7Payload);
+    return;
+  }
+  
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Delete a promotion from the CRM
+ * @param session - App session
+ * @param crmPromotionId - CRM promotion ID
+ */
+export async function deletePromotion(
+  session: AppSessionData,
+  crmPromotionId: string
+): Promise<void> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    await provider.deletePromotion(crmPromotionId);
+    return;
+  }
+  
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}

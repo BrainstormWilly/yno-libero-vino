@@ -1,6 +1,10 @@
 /**
- * Unified Discount Types
- * Works with both Commerce7 and Shopify platforms
+ * Unified Discount Types (Promotions)
+ * Works with both Commerce7 (Promotions) and Shopify (Discounts) platforms
+ * 
+ * Note: These are PROMOTIONS that auto-apply, not coupons with codes
+ * - Commerce7: Creates Promotions (no code, auto-apply to club members)
+ * - Shopify: Creates Discounts (auto-apply)
  */
 
 /**
@@ -16,6 +20,7 @@ export type DiscountStatus = "active" | "inactive" | "scheduled";
 
 /**
  * Platform-agnostic minimum requirement type
+ * Note: Only applies to shipping promotions (minimum cart for free shipping)
  */
 export type MinimumRequirementType = "none" | "quantity" | "amount";
 
@@ -30,7 +35,7 @@ export type PlatformType = "commerce7" | "shopify";
 export type DiscountProduct = {
   id: string;
   title?: string;
-  variantIds?: string[]; // Shopify uses variants, C7 uses product IDs
+  variantIds?: string[];
 };
 
 /**
@@ -42,16 +47,8 @@ export type DiscountCollection = {
 };
 
 /**
- * Customer reference for discounts
- */
-export type DiscountCustomer = {
-  id: string;
-  email?: string;
-  name?: string;
-};
-
-/**
  * Customer segment/tag reference
+ * For targeting specific customer groups (club tiers in C7)
  */
 export type DiscountCustomerSegment = {
   id: string;
@@ -60,24 +57,18 @@ export type DiscountCustomerSegment = {
 
 /**
  * Items that the discount applies to
+ * Supports both product discounts and shipping discounts
  */
 export type DiscountAppliesTo = {
-  all: boolean; // If true, applies to all products
-  products: DiscountProduct[];
-  collections: DiscountCollection[];
-};
-
-/**
- * Customer selection for discount eligibility
- */
-export type DiscountCustomerSelection = {
-  all: boolean; // If true, available to all customers
-  customers: DiscountCustomer[];
-  segments: DiscountCustomerSegment[]; // Tags in C7, Segments in Shopify
+  target: "product" | "shipping"; // What type of discount
+  scope: "all" | "specific"; // All items or specific items
+  products: DiscountProduct[]; // For specific products (when scope="specific")
+  collections: DiscountCollection[]; // For specific collections (when scope="specific")
 };
 
 /**
  * Minimum purchase requirements
+ * Note: Only used for shipping promotions (minimum cart amount for free shipping)
  */
 export type DiscountMinimumRequirement = {
   type: MinimumRequirementType;
@@ -95,59 +86,37 @@ export type DiscountValue = {
 };
 
 /**
- * Discount combination settings
- * Controls which other discount types this can be combined with
- */
-export type DiscountCombinesWith = {
-  productDiscounts: boolean;
-  orderDiscounts: boolean;
-  shippingDiscounts: boolean;
-};
-
-/**
- * Usage limits for the discount
- */
-export type DiscountUsageLimits = {
-  total: number | null; // Total number of times discount can be used (null = unlimited)
-  perCustomer: number | null; // Max uses per customer (null = unlimited)
-  appliesOncePerCustomer: boolean; // If true, customer can only use once regardless of perCustomer limit
-};
-
-/**
- * Unified Discount Type
+ * Unified Discount Type (Promotion)
  * Core type that works across both Commerce7 and Shopify
  * 
- * Note: Discounts never expire. They remain active until the client uninstalls.
- * Customer duration/membership is tracked in Supabase separately.
+ * Note: Promotions auto-apply (no code needed) and never expire.
+ * They remain active until the client uninstalls.
+ * Customer tier/membership is tracked in Supabase separately.
  */
 export type Discount = {
   // Basic Information
   id?: string; // Platform-specific ID (undefined for new discounts)
-  code: string; // Discount code customers will use
   title: string; // Internal name/title for the discount
   platform?: PlatformType; // Which platform this discount is for
   
   // Status and Timing
   status: DiscountStatus;
   startsAt: Date;
-  // No endsAt - discounts never expire, only deleted on uninstall
+  // No endsAt - promotions never expire, only deleted on uninstall
   
   // Discount Configuration
   value: DiscountValue;
   appliesTo: DiscountAppliesTo;
   
   // Customer Eligibility
-  customerSelection: DiscountCustomerSelection;
+  customerSegments: DiscountCustomerSegment[]; // Club tiers in C7
   
-  // Requirements and Limits
+  // Requirements (only for shipping promotions)
   minimumRequirement: DiscountMinimumRequirement;
-  usageLimits: DiscountUsageLimits;
-  combinesWith: DiscountCombinesWith;
   
   // Metadata
   createdAt?: Date;
   updatedAt?: Date;
-  usageCount?: number; // How many times it's been used
   
   // Platform-specific data (stored as JSON for flexibility)
   platformData?: Record<string, any>;
@@ -165,19 +134,21 @@ export type SerializedDiscount = Omit<Discount, "startsAt" | "createdAt" | "upda
 /**
  * Input type for creating/updating discounts
  */
-export type DiscountInput = Omit<Discount, "id" | "createdAt" | "updatedAt" | "usageCount" | "status">;
+export type DiscountInput = Omit<Discount, "id" | "createdAt" | "updatedAt" | "status">;
 
 /**
  * Serialized input type
  */
-export type SerializedDiscountInput = Omit<SerializedDiscount, "id" | "createdAt" | "updatedAt" | "usageCount" | "status">;
+export type SerializedDiscountInput = Omit<SerializedDiscount, "id" | "createdAt" | "updatedAt" | "status">;
 
 /**
  * Helper to create a default discount object
- * Note: Discounts never expire, so no endsAt field
+ * Note: Promotions never expire, so no endsAt field
  */
-export const createDefaultDiscount = (platform: PlatformType): DiscountInput => ({
-  code: "",
+export const createDefaultDiscount = (
+  platform: PlatformType,
+  target: "product" | "shipping" = "product"
+): DiscountInput => ({
   title: "",
   platform,
   startsAt: new Date(),
@@ -186,27 +157,14 @@ export const createDefaultDiscount = (platform: PlatformType): DiscountInput => 
     percentage: 0,
   },
   appliesTo: {
-    all: false,
+    target,
+    scope: "all",
     products: [],
     collections: [],
   },
-  customerSelection: {
-    all: false, // Start with no customers, will be added later
-    customers: [],
-    segments: [],
-  },
+  customerSegments: [], // Will be set to club tier when creating
   minimumRequirement: {
     type: "none",
-  },
-  usageLimits: {
-    total: null,
-    perCustomer: null,
-    appliesOncePerCustomer: false,
-  },
-  combinesWith: {
-    productDiscounts: false,
-    orderDiscounts: false,
-    shippingDiscounts: false,
   },
 });
 

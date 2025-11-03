@@ -1,7 +1,7 @@
 import { redirect } from 'react-router';
 import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { createAppSession, getAppSession, redirectWithSession } from '~/lib/sessions.server';
-import { getClient, getClientbyCrmIdentifier, upsertFakeClient } from '~/lib/supabase.server';
+import { getClient, getClientbyCrmIdentifier, upsertFakeClient } from '~/lib/db/supabase.server';
 import type { Tables } from '~/types/supabase';
 import type { CrmTypes } from '~/types/crm';
 

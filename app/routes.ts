@@ -6,6 +6,14 @@ export default [
   route("uninstall", "routes/uninstall.tsx"),
   route("app", "routes/app.tsx", [
     index("routes/app._index.tsx"),
+    route("members", "routes/app.members.tsx"),
+    route("members/new", "routes/app.members.new.tsx", [
+      index("routes/app.members.new._index.tsx"),
+      route("customer", "routes/app.members.new.customer.tsx"),
+      route("address", "routes/app.members.new.address.tsx"),
+      route("payment", "routes/app.members.new.payment.tsx"),
+      route("review", "routes/app.members.new.review.tsx"),
+    ]),
     route("settings", "routes/app.settings.tsx"),
     route("setup", "routes/app.setup.tsx", [
       index("routes/app.setup._index.tsx"),
@@ -25,6 +33,8 @@ export default [
     route("shp", "routes/webhooks.shp.tsx"),
   ]),
   // API resource routes
-  route("api/products", "routes/api.products.tsx"),
-  route("api/collections", "routes/api.collections.tsx"),
+  route("api/products", "routes/api.products.ts"),
+  route("api/collections", "routes/api.collections.ts"),
+  route("api/customers", "routes/api.customers.ts"),
+  route("api/members", "routes/api.members.ts"),
 ] satisfies RouteConfig;

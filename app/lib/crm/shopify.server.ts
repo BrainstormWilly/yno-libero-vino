@@ -1,4 +1,4 @@
-import type { CrmProvider, CrmCustomer, CrmProduct, CrmOrder, CrmDiscount, WebhookPayload, WebhookTopic, WebhookRegistration } from '~/types/crm';
+import type { CrmProvider, CrmCustomer, CrmProduct, CrmCollection, CrmOrder, CrmDiscount, WebhookPayload, WebhookTopic, WebhookRegistration } from '~/types/crm';
 import { CrmNames, CrmSlugs } from '~/types/crm';
 import { redirect } from 'react-router';
 import crypto from 'crypto';
@@ -30,8 +30,20 @@ export class ShopifyProvider implements CrmProvider {
     throw new Error('Not implemented yet');
   }
 
+  async getCustomersWithLTV(params?: any): Promise<CrmCustomer[]> {
+    // For Shopify: amounts are already in currency, no conversion needed
+    // Implementation would fetch customers with order totals
+    throw new Error('Not implemented yet');
+  }
+
   async getCustomer(id: string): Promise<CrmCustomer> {
     // Implementation for fetching a single Shopify customer
+    throw new Error('Not implemented yet');
+  }
+
+  async getCustomerWithLTV(id: string): Promise<CrmCustomer> {
+    // For Shopify: amounts are already in currency, no conversion needed
+    // Implementation would fetch customer with order totals
     throw new Error('Not implemented yet');
   }
 
@@ -45,6 +57,26 @@ export class ShopifyProvider implements CrmProvider {
     throw new Error('Not implemented yet');
   }
 
+  async getCustomerAddresses(customerId: string): Promise<any[]> {
+    // Implementation for getting Shopify customer addresses
+    throw new Error('Not implemented yet');
+  }
+
+  async createCustomerAddress(customerId: string, address: any): Promise<any> {
+    // Implementation for creating Shopify customer address
+    throw new Error('Not implemented yet');
+  }
+
+  async getCustomerCreditCards(customerId: string): Promise<any[]> {
+    // Implementation for getting Shopify customer payment methods
+    throw new Error('Not implemented yet');
+  }
+
+  async createCustomerCreditCard(customerId: string, card: any): Promise<any> {
+    // Implementation for creating Shopify customer payment method
+    throw new Error('Not implemented yet');
+  }
+
   async getProducts(params?: any): Promise<CrmProduct[]> {
     // Implementation for fetching Shopify products
     throw new Error('Not implemented yet');
@@ -52,6 +84,16 @@ export class ShopifyProvider implements CrmProvider {
 
   async getProduct(id: string): Promise<CrmProduct> {
     // Implementation for fetching a single Shopify product
+    throw new Error('Not implemented yet');
+  }
+
+  async getCollections(params?: any): Promise<CrmCollection[]> {
+    // Implementation for fetching Shopify collections
+    throw new Error('Not implemented yet');
+  }
+
+  async getCollection(id: string): Promise<CrmCollection> {
+    // Implementation for fetching a single Shopify collection
     throw new Error('Not implemented yet');
   }
 
@@ -210,5 +252,21 @@ export class ShopifyProvider implements CrmProvider {
   async getCouponCustomers(couponId: string): Promise<string[]> {
     // TODO: Implement Shopify coupon customer list
     throw new Error('getCouponCustomers not implemented yet for Shopify');
+  }
+
+  /**
+   * Idempotent upsert club (create or update)
+   * Implements CrmProvider interface - abstraction for tier/club sync
+   * @param tier - Tier data
+   * @returns The CRM club ID (placeholder for Shopify)
+   */
+  async upsertClub(tier: { 
+    id: string; 
+    name: string; 
+    c7ClubId?: string | null 
+  }): Promise<{ crmClubId: string }> {
+    // TODO: Implement Shopify club/tier sync when needed
+    // For now, return the tier ID as a placeholder
+    return { crmClubId: tier.id };
   }
 }

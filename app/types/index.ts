@@ -10,3 +10,6 @@ export * from "./discount";
 export * from "./discount-commerce7";
 export * from "./discount-shopify";
 
+// Member types
+export * from "./member";
+

@@ -40,6 +40,85 @@ export async function getClient(clientId: string): Promise<Client | null> {
   return client;
 }
 
+export async function getClientbyCrmIdentifier(crmType: string, identifier: string): Promise<Client | null> {
+  const supabase = getSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('tenant_shop', identifier)
+    .eq('crm_type', crmType)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data;
+}
+
+export async function upsertFakeClient(crmType: 'commerce7' | 'shopify'): Promise<Client | null> {
+  const supabase = getSupabaseClient();
+  
+  if (crmType === 'commerce7') {
+    let { data: client } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('tenant_shop', 'yno-fanbase')
+      .single();
+    
+    if (!client) {
+      const { data: newClient, error } = await supabase
+        .from('clients')
+        .upsert({
+          id: 'a7f5c3e2-8d91-4b1e-9a2f-1c5b8e3d4f6a',
+          tenant_shop: 'yno-fanbase',
+          crm_type: 'commerce7',
+          org_name: 'Yno Fanbase',
+          org_contact: 'William Langley',
+          user_email: 'bill@ynoguy.com',
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Failed to create yno-fanbase client:', error);
+        return null;
+      }
+      client = newClient;
+    }
+    
+    return client;
+  } else {
+    // Shopify
+    let { data: client } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('tenant_shop', 'fake-client-shopify')
+      .single();
+    
+    if (!client) {
+      const { data: newClient, error } = await supabase
+        .from('clients')
+        .upsert({
+          id: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+          tenant_shop: 'fake-client-shopify',
+          crm_type: 'shopify',
+          org_name: 'Fake Shopify Client',
+          org_contact: 'William Langley',
+          user_email: 'will@ynosoftware.com',
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Failed to create fake shopify client:', error);
+        return null;
+      }
+      client = newClient;
+    }
+    
+    return client;
+  }
+}
+
 export async function markSetupComplete(clientId: string) {
   const supabase = getSupabaseClient();
   
@@ -84,11 +163,13 @@ export async function createClubProgram(
 export async function getClubProgram(clientId: string): Promise<(ClubProgram & { club_stages: ClubStage[] }) | null> {
   const supabase = getSupabaseClient();
   
-  const { data: program } = await supabase
+  const { data: program, error } = await supabase
     .from('club_programs')
     .select('*, club_stages(*)')
     .eq('client_id', clientId)
-    .single();
+    .maybeSingle();
+  
+  if (error) return null;
   
   return program;
 }
@@ -204,11 +285,13 @@ export async function deleteClubStage(stageId: string) {
 export async function getClubStageWithDetails(stageId: string): Promise<ClubStage | null> {
   const supabase = getSupabaseClient();
   
-  const { data: stage } = await supabase
+  const { data: stage, error } = await supabase
     .from('club_stages')
     .select('*')
     .eq('id', stageId)
-    .single();
+    .maybeSingle();
+  
+  if (error) return null;
   
   return stage;
 }
@@ -297,11 +380,13 @@ export async function createTierLoyaltyConfig(config: {
 export async function getTierLoyaltyConfig(stageId: string): Promise<TierLoyalty | null> {
   const supabase = getSupabaseClient();
   
-  const { data: loyalty } = await supabase
+  const { data: loyalty, error } = await supabase
     .from('tier_loyalty_config')
     .select('*')
     .eq('club_stage_id', stageId)
-    .single();
+    .maybeSingle();
+  
+  if (error) return null;
   
   return loyalty;
 }
@@ -347,11 +432,13 @@ export async function createLoyaltyRules(
 export async function getLoyaltyRules(clientId: string): Promise<LoyaltyRules | null> {
   const supabase = getSupabaseClient();
   
-  const { data: rules } = await supabase
+  const { data: rules, error } = await supabase
     .from('loyalty_point_rules')
     .select('*')
     .eq('client_id', clientId)
-    .single();
+    .maybeSingle();
+  
+  if (error) return null;
   
   return rules;
 }
@@ -379,5 +466,276 @@ export async function updateLoyaltyRules(
   if (error) {
     throw new Error(`Failed to update loyalty rules: ${error.message}`);
   }
+}
+
+// ============================================
+// CUSTOMER OPERATIONS
+// ============================================
+
+export async function createCustomer(
+  clientId: string,
+  data: {
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    phone: string | null;
+    crmId: string;
+    crmType: string;
+  }
+) {
+  const supabase = getSupabaseClient();
+  
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .insert({
+      client_id: clientId,
+      email: data.email,
+      first_name: data.firstName,
+      last_name: data.lastName,
+      phone: data.phone,
+      crm_id: data.crmId,
+      crm_type: data.crmType,
+    })
+    .select()
+    .single();
+  
+  if (error || !customer) {
+    throw new Error(`Failed to create customer: ${error?.message}`);
+  }
+  
+  return customer;
+}
+
+export async function getCustomerByCrmId(clientId: string, crmId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('crm_id', crmId)
+    .maybeSingle();
+  
+  if (error) return null;
+  
+  return customer;
+}
+
+export async function getCustomersByClientId(clientId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false });
+  
+  return customers || [];
+}
+
+// ============================================
+// CLUB ENROLLMENT OPERATIONS
+// ============================================
+
+export async function createClubEnrollment(data: {
+  customerId: string;
+  clubStageId: string;
+  status: 'active' | 'expired' | 'cancelled';
+  enrolledAt: string;
+  expiresAt: string; // Required - NOT NULL in schema
+  crmMembershipId: string | null;
+}) {
+  const supabase = getSupabaseClient();
+  
+  const { data: enrollment, error} = await supabase
+    .from('club_enrollments')
+    .insert({
+      customer_id: data.customerId,
+      club_stage_id: data.clubStageId,
+      status: data.status,
+      enrolled_at: data.enrolledAt,
+      expires_at: data.expiresAt,
+      c7_membership_id: data.crmMembershipId, // Column name is c7_membership_id
+    })
+    .select()
+    .single();
+  
+  if (error || !enrollment) {
+    throw new Error(`Failed to create enrollment: ${error?.message}`);
+  }
+  
+  return enrollment;
+}
+
+export async function getActiveEnrollment(customerId: string, clubStageId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: enrollment, error } = await supabase
+    .from('club_enrollments')
+    .select('*')
+    .eq('customer_id', customerId)
+    .eq('club_stage_id', clubStageId)
+    .eq('status', 'active')
+    .maybeSingle();
+  
+  if (error) return null;
+  
+  return enrollment;
+}
+
+export async function getEnrollmentsByStage(clubStageId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: enrollments } = await supabase
+    .from('club_enrollments')
+    .select(`
+      *,
+      customers (
+        id,
+        email,
+        first_name,
+        last_name,
+        phone,
+        crm_id
+      )
+    `)
+    .eq('club_stage_id', clubStageId)
+    .order('enrolled_at', { ascending: false });
+  
+  return enrollments || [];
+}
+
+export async function getEnrollmentsByClientId(clientId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: enrollments } = await supabase
+    .from('club_enrollments')
+    .select(`
+      *,
+      customers!inner (
+        id,
+        email,
+        first_name,
+        last_name,
+        phone,
+        crm_id,
+        client_id
+      ),
+      club_stages (
+        id,
+        name,
+        duration_months,
+        min_purchase_amount
+      )
+    `)
+    .eq('customers.client_id', clientId)
+    .order('enrolled_at', { ascending: false });
+  
+  return enrollments || [];
+}
+
+export async function updateEnrollmentStatus(
+  enrollmentId: string,
+  status: 'active' | 'expired' | 'cancelled'
+) {
+  const supabase = getSupabaseClient();
+  
+  const { error } = await supabase
+    .from('club_enrollments')
+    .update({
+      status,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', enrollmentId);
+  
+  if (error) {
+    throw new Error(`Failed to update enrollment status: ${error.message}`);
+  }
+}
+
+// ============================================
+// ENROLLMENT DRAFT OPERATIONS
+// ============================================
+
+export interface EnrollmentDraft {
+  customer?: {
+    id?: string;              // LV customer ID if exists
+    crmId: string;           // C7 customer ID
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    ltv?: number;            // Customer's lifetime value
+    isExisting: boolean;     // Whether customer already exists
+    billingAddressId?: string;   // C7 billing address ID
+    shippingAddressId?: string;  // C7 shipping address ID (defaults to billing)
+    paymentMethodId?: string;    // C7 credit card ID
+  };
+  tier?: {
+    id: string;
+    name: string;
+    qualified: boolean;
+    purchaseAmount: number;
+    durationMonths: number;
+    minPurchaseAmount: number;
+  };
+  addressVerified: boolean;
+  paymentVerified: boolean;
+}
+
+export async function getEnrollmentDraft(sessionId: string): Promise<EnrollmentDraft | null> {
+  const supabase = getSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from('enrollment_drafts')
+    .select('*')
+    .eq('session_id', sessionId)
+    .maybeSingle(); // Use maybeSingle() instead of single() to handle 0 rows
+  
+  if (error || !data) return null;
+  
+  return {
+    customer: data.customer_data as any,
+    tier: data.tier_data as any,
+    addressVerified: data.address_verified || false,
+    paymentVerified: data.payment_verified || false,
+  };
+}
+
+export async function updateEnrollmentDraft(
+  sessionId: string,
+  draft: Partial<EnrollmentDraft>
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  
+  // Get existing draft to merge
+  const existing = await getEnrollmentDraft(sessionId);
+  const merged = existing ? { ...existing, ...draft } : draft;
+  
+  const { error } = await supabase
+    .from('enrollment_drafts')
+    .upsert({
+      session_id: sessionId,
+      customer_data: merged.customer || null,
+      tier_data: merged.tier || null,
+      address_verified: merged.addressVerified || false,
+      payment_verified: merged.paymentVerified || false,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'session_id'
+    });
+  
+  if (error) {
+    throw new Error(`Failed to update enrollment draft: ${error.message}`);
+  }
+}
+
+export async function clearEnrollmentDraft(sessionId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  
+  await supabase
+    .from('enrollment_drafts')
+    .delete()
+    .eq('session_id', sessionId);
 }
 

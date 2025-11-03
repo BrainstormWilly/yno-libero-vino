@@ -1,0 +1,303 @@
+import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
+import { useLoaderData, Form, useActionData } from 'react-router';
+import { useState } from 'react';
+import {
+  Card,
+  Button,
+  Text,
+  BlockStack,
+  TextField,
+  InlineStack,
+  Banner,
+  Divider,
+  Box,
+} from '@shopify/polaris';
+
+import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
+import * as db from '~/lib/db/supabase.server';
+import { crmManager } from '~/lib/crm';
+import { addSessionToUrl } from '~/util/session';
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const session = await getAppSession(request);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  // Get draft
+  const draft = await db.getEnrollmentDraft(session.id);
+  if (!draft || !draft.customer || !draft.addressVerified) {
+    throw new Response('Address not verified', { status: 400 });
+  }
+  
+  // Get the appropriate CRM provider
+  const provider = crmManager.getProvider(
+    session.crmType,
+    session.tenantShop,
+    session.accessToken
+  );
+  
+  // Get existing credit cards
+  const creditCards = await provider.getCustomerCreditCards(draft.customer.crmId);
+  
+  return {
+    session,
+    draft,
+    creditCards,
+  };
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const session = await getAppSession(request);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  const formData = await request.formData();
+  const actionType = formData.get('action') as string;
+  
+  const draft = await db.getEnrollmentDraft(session.id);
+  if (!draft || !draft.customer) {
+    return { success: false, error: 'No customer in draft' };
+  }
+  
+  // Get the appropriate CRM provider
+  const provider = crmManager.getProvider(
+    session.crmType,
+    session.tenantShop,
+    session.accessToken
+  );
+  
+  try {
+    if (actionType === 'use_existing') {
+      // Use existing payment method
+      const paymentId = formData.get('payment_id') as string;
+      
+      if (!paymentId) {
+        return { success: false, error: 'Payment method ID required' };
+      }
+      
+      // Update draft with payment method ID
+      await db.updateEnrollmentDraft(session.id, {
+        ...draft,
+        customer: {
+          ...draft.customer!,
+          paymentMethodId: paymentId,
+        },
+        paymentVerified: true,
+      });
+      
+      return redirectWithSession('/app/members/new/review', session.id);
+    } else if (actionType === 'add_new') {
+      // Create new credit card
+      const cardholderName = formData.get('cardholder_name') as string;
+      const cardNumber = formData.get('card_number') as string;
+      const expiryMonth = formData.get('expiry_month') as string;
+      const expiryYear = formData.get('expiry_year') as string;
+      const cvv = formData.get('cvv') as string;
+      
+      if (!cardholderName || !cardNumber || !expiryMonth || !expiryYear || !cvv) {
+        return {
+          success: false,
+          error: 'All card fields are required',
+        };
+      }
+      
+      const paymentMethod = await provider.createCustomerCreditCard(draft.customer.crmId, {
+        cardholderName,
+        cardNumber,
+        expiryMonth,
+        expiryYear,
+        cvv,
+        isDefault: true,
+      });
+      
+      // Update draft with payment method ID
+      await db.updateEnrollmentDraft(session.id, {
+        ...draft,
+        customer: {
+          ...draft.customer!,
+          paymentMethodId: paymentMethod.id!,
+        },
+        paymentVerified: true,
+      });
+      
+      return redirectWithSession('/app/members/new/review', session.id);
+    }
+    
+    return { success: false, error: 'Invalid action' };
+  } catch (error) {
+    console.error('Payment error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to process payment method',
+    };
+  }
+}
+
+export default function PaymentVerification() {
+  const { draft, creditCards } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  
+  const [showAddForm, setShowAddForm] = useState(creditCards.length === 0);
+  const [cardholderName, setCardholderName] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiryMonth, setExpiryMonth] = useState('');
+  const [expiryYear, setExpiryYear] = useState('');
+  const [cvv, setCvv] = useState('');
+  
+  return (
+    <BlockStack gap="500">
+      {/* Error Banner */}
+      {actionData && !actionData.success && (
+        <Banner tone="critical" title="Error">
+          {actionData.error}
+        </Banner>
+      )}
+      
+      {/* Instructions */}
+      <Card>
+        <BlockStack gap="300">
+          <Text variant="headingMd" as="h2">
+            Step 4: Payment Verification
+          </Text>
+          <Text variant="bodyMd" as="p">
+            {creditCards.length > 0 
+              ? 'Use an existing payment method or add a new one.'
+              : 'Add a payment method for this customer.'}
+          </Text>
+          <Banner tone="warning">
+            <Text variant="bodySm" as="p">
+              <strong>Security Note:</strong> Card information is transmitted securely to Commerce7. 
+              This application does not store credit card details.
+            </Text>
+          </Banner>
+        </BlockStack>
+      </Card>
+      
+      {/* Existing Payment Methods */}
+      {creditCards.length > 0 && !showAddForm && (
+        <Card>
+          <BlockStack gap="400">
+            <Text variant="headingMd" as="h3">
+              Existing Payment Methods
+            </Text>
+            
+            {creditCards.map((card: any, index: number) => (
+              <div key={card.id || index}>
+                {index > 0 && <Divider />}
+                <BlockStack gap="300">
+                  <Text variant="bodyMd" as="p">
+                    {card.type || 'Card'} ending in {card.last4 || '****'}
+                    {card.expiryMonth && card.expiryYear && (
+                      <><br />Expires: {card.expiryMonth}/{card.expiryYear}</>
+                    )}
+                  </Text>
+                  <Form method="post">
+                    <input type="hidden" name="action" value="use_existing" />
+                    <input type="hidden" name="payment_id" value={card.id || ''} />
+                    <Button submit>Use This Card</Button>
+                  </Form>
+                </BlockStack>
+              </div>
+            ))}
+            
+            <Divider />
+            
+            <Button onClick={() => setShowAddForm(true)}>
+              Add New Payment Method
+            </Button>
+          </BlockStack>
+        </Card>
+      )}
+      
+      {/* Add New Payment Method Form */}
+      {showAddForm && (
+        <Card>
+          <Form method="post">
+            <input type="hidden" name="action" value="add_new" />
+            <input type="hidden" name="cardholder_name" value={cardholderName} />
+            <input type="hidden" name="card_number" value={cardNumber} />
+            <input type="hidden" name="expiry_month" value={expiryMonth} />
+            <input type="hidden" name="expiry_year" value={expiryYear} />
+            <input type="hidden" name="cvv" value={cvv} />
+            
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text variant="headingMd" as="h3">
+                  {creditCards.length > 0 ? 'Add New Payment Method' : 'Payment Information'}
+                </Text>
+                {creditCards.length > 0 && (
+                  <Button onClick={() => setShowAddForm(false)}>Cancel</Button>
+                )}
+              </InlineStack>
+              
+              <TextField
+                label="Cardholder Name"
+                value={cardholderName}
+                onChange={setCardholderName}
+                autoComplete="cc-name"
+                requiredIndicator
+              />
+              
+              <TextField
+                label="Card Number"
+                value={cardNumber}
+                onChange={setCardNumber}
+                autoComplete="cc-number"
+                placeholder="4111 1111 1111 1111"
+                requiredIndicator
+              />
+              
+              <InlineStack gap="200">
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Expiry Month"
+                    value={expiryMonth}
+                    onChange={setExpiryMonth}
+                    autoComplete="cc-exp-month"
+                    placeholder="MM"
+                    maxLength={2}
+                    requiredIndicator
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="Expiry Year"
+                    value={expiryYear}
+                    onChange={setExpiryYear}
+                    autoComplete="cc-exp-year"
+                    placeholder="YYYY"
+                    maxLength={4}
+                    requiredIndicator
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <TextField
+                    label="CVV"
+                    value={cvv}
+                    onChange={setCvv}
+                    autoComplete="cc-csc"
+                    placeholder="123"
+                    maxLength={4}
+                    requiredIndicator
+                  />
+                </div>
+              </InlineStack>
+              
+              <Button
+                variant="primary"
+                submit
+                disabled={!cardholderName || !cardNumber || !expiryMonth || !expiryYear || !cvv}
+                size="large"
+              >
+                Continue to Review →
+              </Button>
+            </BlockStack>
+          </Form>
+        </Card>
+      )}
+    </BlockStack>
+  );
+}
+
