@@ -19,7 +19,6 @@ import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
 import { crmManager } from '~/lib/crm';
-import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
 
 // Type for enriched promotions from the parent loader
@@ -118,9 +117,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         const existingLoyalty = await db.getTierLoyaltyConfig(tierId);
         
         if (!existingLoyalty && tier?.c7_club_id) {
-          // Create new loyalty tier in C7
+          // Create new loyalty tier in CRM
           const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
-          if (provider instanceof Commerce7Provider) {
+          try {
             const loyaltyTier = await provider.createLoyaltyTier({
               title: `${tier.name} Rewards`,
               qualificationType: "Club",
@@ -137,15 +136,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
               earnRate,
               initialPointsBonus: bonus,
             });
+          } catch (error) {
+            console.error('Failed to create loyalty tier:', error);
+            // Continue - loyalty is optional
           }
         }
       } else {
         // Delete loyalty config
         const loyalty = await db.getTierLoyaltyConfig(tierId);
-        if (loyalty && session.crmType === 'commerce7') {
+        if (loyalty) {
           const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
-          if (provider instanceof Commerce7Provider) {
+          try {
             await provider.deleteLoyaltyTier(loyalty.c7_loyalty_tier_id);
+          } catch (error) {
+            console.error('Failed to delete loyalty tier from CRM:', error);
+            // Continue - still delete from our DB
           }
         }
         await db.deleteTierLoyaltyConfig(tierId);

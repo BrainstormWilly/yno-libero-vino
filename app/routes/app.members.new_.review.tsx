@@ -16,7 +16,6 @@ import {
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { crmManager } from '~/lib/crm';
-import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { addSessionToUrl } from '~/util/session';
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -61,15 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!tier || !tier.c7_club_id) {
       return {
         success: false,
-        error: 'Invalid tier or tier not synced with Commerce7',
-      };
-    }
-    
-    // Club membership creation is Commerce7-specific for now
-    if (!(provider instanceof Commerce7Provider)) {
-      return {
-        success: false,
-        error: 'Club enrollment is currently only supported for Commerce7',
+        error: 'Invalid tier or tier not synced with CRM',
       };
     }
     
@@ -81,7 +72,7 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     }
     
-    // Create membership in Commerce7
+    // Create membership in CRM
     const enrollmentDate = new Date();
     const expirationDate = new Date(enrollmentDate);
     expirationDate.setMonth(expirationDate.getMonth() + tier.duration_months);

@@ -167,4 +167,27 @@ export interface CrmProvider {
   
   // Club/Tier operations (idempotent)
   upsertClub(tier: { id: string; name: string; c7ClubId?: string | null }): Promise<{ crmClubId: string }>;
+  
+  // Customer operations with address (atomic creation)
+  createCustomerWithAddress(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    address: any;
+  }): Promise<{ customer: any; billingAddressId: string }>;
+  
+  // Club membership operations
+  createClubMembership(data: {
+    customerId: string;
+    clubId: string;
+    billingAddressId: string;
+    shippingAddressId: string;
+    paymentMethodId: string;
+    startDate: string;
+  }): Promise<{ id: string; status: string }>;
+  
+  // Loyalty tier operations (optional feature)
+  createLoyaltyTier(data: any): Promise<any>;
+  deleteLoyaltyTier(loyaltyTierId: string): Promise<void>;
 }

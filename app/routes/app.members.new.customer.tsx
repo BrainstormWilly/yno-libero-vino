@@ -15,7 +15,6 @@ import {
 import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { crmManager } from '~/lib/crm';
-import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { addSessionToUrl } from '~/util/session';
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -72,14 +71,6 @@ export async function action({ request }: ActionFunctionArgs) {
       session.tenantShop,
       session.accessToken
     );
-    
-    // createCustomerWithAddress is Commerce7-specific for now
-    if (!(provider instanceof Commerce7Provider)) {
-      return {
-        success: false,
-        error: 'Customer creation with address is currently only supported for Commerce7',
-      };
-    }
     
     // Create customer + billing address in one call
     const result = await provider.createCustomerWithAddress({

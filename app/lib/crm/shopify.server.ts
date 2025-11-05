@@ -269,4 +269,53 @@ export class ShopifyProvider implements CrmProvider {
     // For now, return the tier ID as a placeholder
     return { crmClubId: tier.id };
   }
+
+  /**
+   * Create customer with billing address (atomic operation)
+   * @param data - Customer and address data
+   */
+  async createCustomerWithAddress(data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    address: any;
+  }): Promise<{ customer: any; billingAddressId: string }> {
+    // TODO: Implement Shopify customer with address creation
+    throw new Error('createCustomerWithAddress not implemented yet for Shopify');
+  }
+
+  /**
+   * Create a club membership for a customer
+   * @param data - Membership data
+   */
+  async createClubMembership(data: {
+    customerId: string;
+    clubId: string;
+    billingAddressId: string;
+    shippingAddressId: string;
+    paymentMethodId: string;
+    startDate: string;
+  }): Promise<{ id: string; status: string }> {
+    // TODO: Implement Shopify club membership creation
+    throw new Error('createClubMembership not implemented yet for Shopify');
+  }
+
+  /**
+   * Create a loyalty tier
+   * @param data - Loyalty tier data
+   */
+  async createLoyaltyTier(data: any): Promise<any> {
+    // TODO: Implement Shopify loyalty tier creation
+    throw new Error('createLoyaltyTier not implemented yet for Shopify');
+  }
+
+  /**
+   * Delete a loyalty tier
+   * @param loyaltyTierId - The loyalty tier's ID
+   */
+  async deleteLoyaltyTier(loyaltyTierId: string): Promise<void> {
+    // TODO: Implement Shopify loyalty tier deletion
+    throw new Error('deleteLoyaltyTier not implemented yet for Shopify');
+  }
 }
