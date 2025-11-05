@@ -5,6 +5,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { addSessionToUrl } from '~/util/session';
 import EnrollmentSummary from '~/components/EnrollmentSummary';
+import EnrollmentProgressBar from '~/components/EnrollmentProgressBar';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -50,6 +51,11 @@ export default function MemberEnrollmentLayout() {
         onAction: () => navigate(addSessionToUrl('/app/members', session.id)),
       }}
     >
+      {/* Progress Bar */}
+      <div style={{ marginBottom: '24px' }}>
+        <EnrollmentProgressBar currentStep={currentStep} />
+      </div>
+      
       <Layout>
         {/* Main content area */}
         <Layout.Section>

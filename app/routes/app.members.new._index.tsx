@@ -96,15 +96,17 @@ export async function action({ request }: ActionFunctionArgs) {
           durationMonths: tier.duration_months,
           minPurchaseAmount: tier.min_purchase_amount,
         },
+        addressVerified: false, // Reset - even existing customers need to verify address for enrollment
+        paymentVerified: false, // Reset - need to verify payment for enrollment
       });
       
       // Existing customer goes to address step
-      return redirectWithSession('/app/members/new/address', session.id);
+      throw redirectWithSession('/app/members/new/address', session.id);
     } else {
       // New customer with manual purchase amount
       const purchaseAmount = parseFloat(manualPurchaseAmount || '0');
       
-      // Save to draft
+      // Save to draft (clear previous enrollment data when selecting a new tier)
       await db.updateEnrollmentDraft(session.id, {
         tier: {
           id: tier.id,
@@ -114,12 +116,19 @@ export async function action({ request }: ActionFunctionArgs) {
           durationMonths: tier.duration_months,
           minPurchaseAmount: tier.min_purchase_amount,
         },
+        addressVerified: false, // Reset address verification when selecting new tier
+        paymentVerified: false, // Reset payment verification when selecting new tier
       });
       
       // New customer goes to customer details step
-      return redirectWithSession('/app/members/new/customer', session.id);
+      throw redirectWithSession('/app/members/new/customer', session.id);
     }
   } catch (error) {
+    // Re-throw Response objects (redirects)
+    if (error instanceof Response) {
+      throw error;
+    }
+    
     console.error('Tier qualification error:', error);
     return {
       success: false,

@@ -1,6 +1,8 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, redirect } from 'react-router';
+import { useLoaderData, Form, useActionData, useNavigate } from 'react-router';
 import {
+  Page,
+  Layout,
   Card,
   Button,
   Text,
@@ -103,7 +105,6 @@ export async function action({ request }: ActionFunctionArgs) {
         lastName: draft.customer.lastName,
         phone: draft.customer.phone || null,
         crmId: draft.customer.crmId,
-        crmType: session.crmType,
       });
     }
     
@@ -136,17 +137,17 @@ export async function action({ request }: ActionFunctionArgs) {
     await db.clearEnrollmentDraft(session.id);
     
     // Redirect to members list with success toast
-    let redirectUrl = addSessionToUrl('/app/members', session.id) +
+    const redirectUrl = addSessionToUrl('/app/members', session.id) +
       '&toast=' + encodeURIComponent(`${draft.customer.firstName} ${draft.customer.lastName} enrolled successfully! 🎉`) +
       '&toastType=success';
     
-    // Ensure HTTPS for embedded app
-    if (redirectUrl.startsWith('http://')) {
-      redirectUrl = redirectUrl.replace('http://', 'https://');
+    throw redirect(redirectUrl);
+  } catch (error) {
+    // Re-throw Response objects (redirects)
+    if (error instanceof Response) {
+      throw error;
     }
     
-    return Response.redirect(redirectUrl);
-  } catch (error) {
     console.error('Enrollment error:', error);
     return {
       success: false,
@@ -156,11 +157,21 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ReviewAndEnroll() {
-  const { draft } = useLoaderData<typeof loader>();
+  const { draft, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigate = useNavigate();
   
   return (
-    <BlockStack gap="500">
+    <Page
+      title="Review & Complete Enrollment"
+      backAction={{
+        content: 'Back',
+        onAction: () => navigate(addSessionToUrl('/app/members/new/payment', session.id)),
+      }}
+    >
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="500">
       {/* Error Banner */}
       {actionData && !actionData.success && (
         <Banner tone="critical" title="Error">
@@ -183,9 +194,17 @@ export default function ReviewAndEnroll() {
       {/* Customer Summary */}
       <Card>
         <BlockStack gap="400">
-          <Text variant="headingMd" as="h3">
-            Customer Information
-          </Text>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text variant="headingMd" as="h3">
+              Customer Information
+            </Text>
+            <Button
+              variant="plain"
+              onClick={() => navigate(addSessionToUrl('/app/members/new', session.id))}
+            >
+              Edit
+            </Button>
+          </InlineStack>
           
           <BlockStack gap="200">
             <InlineStack align="space-between">
@@ -243,9 +262,17 @@ export default function ReviewAndEnroll() {
       {/* Tier Summary */}
       <Card>
         <BlockStack gap="400">
-          <Text variant="headingMd" as="h3">
-            Selected Tier
-          </Text>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text variant="headingMd" as="h3">
+              Selected Tier
+            </Text>
+            <Button
+              variant="plain"
+              onClick={() => navigate(addSessionToUrl('/app/members/new', session.id))}
+            >
+              Edit
+            </Button>
+          </InlineStack>
           
           <BlockStack gap="200">
             <InlineStack align="space-between">
@@ -298,28 +325,101 @@ export default function ReviewAndEnroll() {
         </BlockStack>
       </Card>
       
-      {/* Verification Summary */}
+      {/* Address Summary */}
       <Card>
         <BlockStack gap="400">
-          <Text variant="headingMd" as="h3">
-            Verification Status
-          </Text>
+          <InlineStack align="space-between" blockAlign="center">
+            <Text variant="headingMd" as="h3">
+              Address
+            </Text>
+            <Button
+              variant="plain"
+              onClick={() => navigate(addSessionToUrl('/app/members/new/address', session.id))}
+            >
+              Edit
+            </Button>
+          </InlineStack>
           
-          <BlockStack gap="200">
-            <InlineStack align="space-between">
+          {draft.address?.billing && (
+            <BlockStack gap="300">
+              <BlockStack gap="100">
+                <Text variant="bodyMd" as="p">
+                  <strong>Billing Address</strong>
+                </Text>
+                <Text variant="bodyMd" as="p">
+                  {draft.address.billing.address1}
+                </Text>
+                {draft.address.billing.address2 && (
+                  <Text variant="bodyMd" as="p">
+                    {draft.address.billing.address2}
+                  </Text>
+                )}
+                <Text variant="bodyMd" as="p">
+                  {draft.address.billing.city}, {draft.address.billing.state} {draft.address.billing.zip}
+                </Text>
+                {draft.address.billing.country && (
+                  <Text variant="bodyMd" as="p">
+                    {draft.address.billing.country}
+                  </Text>
+                )}
+              </BlockStack>
+              
+              {draft.address.shipping && (
+                <>
+                  <Divider />
+                  <BlockStack gap="100">
+                    <Text variant="bodyMd" as="p">
+                      <strong>Shipping Address</strong>
+                    </Text>
+                    <Text variant="bodyMd" as="p">
+                      {draft.address.shipping.address1}
+                    </Text>
+                    {draft.address.shipping.address2 && (
+                      <Text variant="bodyMd" as="p">
+                        {draft.address.shipping.address2}
+                      </Text>
+                    )}
+                    <Text variant="bodyMd" as="p">
+                      {draft.address.shipping.city}, {draft.address.shipping.state} {draft.address.shipping.zip}
+                    </Text>
+                    {draft.address.shipping.country && (
+                      <Text variant="bodyMd" as="p">
+                        {draft.address.shipping.country}
+                      </Text>
+                    )}
+                  </BlockStack>
+                </>
+              )}
+            </BlockStack>
+          )}
+        </BlockStack>
+      </Card>
+      
+      {/* Payment Summary */}
+      <Card>
+        <BlockStack gap="400">
+          <InlineStack align="space-between" blockAlign="center">
+            <Text variant="headingMd" as="h3">
+              Payment Method
+            </Text>
+            <Button
+              variant="plain"
+              onClick={() => navigate(addSessionToUrl('/app/members/new/payment', session.id))}
+            >
+              Edit
+            </Button>
+          </InlineStack>
+          
+          {draft.payment && (
+            <BlockStack gap="100">
               <Text variant="bodyMd" as="p">
-                Address:
+                <strong>{draft.payment.brand || 'Card'} ending in {draft.payment.last4}</strong>
               </Text>
-              <Badge tone="success">Verified ✓</Badge>
-            </InlineStack>
-            
-            <InlineStack align="space-between">
-              <Text variant="bodyMd" as="p">
-                Payment Method:
+              <Text variant="bodyMd" as="p" tone="subdued">
+                Expires: {draft.payment.expiryMonth}/{draft.payment.expiryYear}
               </Text>
-              <Badge tone="success">Verified ✓</Badge>
-            </InlineStack>
-          </BlockStack>
+            </BlockStack>
+          )}
         </BlockStack>
       </Card>
       
@@ -342,7 +442,10 @@ export default function ReviewAndEnroll() {
           </BlockStack>
         </Form>
       </Card>
-    </BlockStack>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }
 

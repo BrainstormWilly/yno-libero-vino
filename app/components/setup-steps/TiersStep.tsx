@@ -8,6 +8,7 @@ interface TierFormData {
   name: string;
   durationMonths: string;
   minPurchaseAmount: string;
+  minLtvAmount?: string;
   description?: string;
   
   // NEW ARCHITECTURE: Multiple promotions per tier
@@ -149,6 +150,16 @@ export default function TiersStep({
                     type="number"
                     value={tier.minPurchaseAmount}
                     onChange={(value) => onUpdateTier(tier.id, 'minPurchaseAmount', value)}
+                    prefix="$"
+                    autoComplete="off"
+                  />
+                </Box>
+                <Box minWidth="200px">
+                  <TextField
+                    label="Min LTV"
+                    type="number"
+                    value={tier.minLtvAmount || '0'}
+                    onChange={(value) => onUpdateTier(tier.id, 'minLtvAmount', value)}
                     prefix="$"
                     autoComplete="off"
                   />

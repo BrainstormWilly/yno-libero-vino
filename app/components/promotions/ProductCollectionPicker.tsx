@@ -43,9 +43,14 @@ export function ProductCollectionPicker({
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
   
   const isProduct = type === 'product';
-  const items = isProduct ? crm.products : crm.collections;
-  const loading = isProduct ? crm.productsLoading : crm.collectionsLoading;
-  const getItems = isProduct ? crm.getProducts : crm.getCollections;
+  const items = isProduct ? crm?.products : crm?.collections;
+  const loading = isProduct ? crm?.productsLoading : crm?.collectionsLoading;
+  const getItems = isProduct ? crm?.getProducts : crm?.getCollections;
+  
+  // Debug log
+  if (typeof window !== 'undefined') {
+    console.log('[ProductCollectionPicker]', { type, crm, items, loading });
+  }
   
   // Auto-load items when search query changes
   useEffect(() => {

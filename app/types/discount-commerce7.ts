@@ -3,6 +3,7 @@
  * Converts between unified Discount type and Commerce7 Promotion API format
  * 
  * Note: This is for PROMOTIONS (auto-apply), not coupons (with codes)
+ * Legacy coupon types are kept at the bottom for backward compatibility
  */
 
 import type { 
@@ -16,6 +17,78 @@ import type {
   C7PromotionUsageLimitType,
 } from "./commerce7";
 import type { Discount, DiscountStatus } from "./discount";
+
+// ============================================
+// Legacy Coupon Types (for backward compatibility)
+// ============================================
+
+export enum C7CouponStatus {
+  ENABLED = "Enabled",
+  DISABLED = "Disabled",
+}
+
+export enum C7DiscountType {
+  PERCENTAGE_OFF = "Percentage Off",
+  DOLLAR_OFF = "Dollar Off",
+}
+
+export enum C7AppliesTo {
+  PRODUCT = "Product",
+  COLLECTION = "Collection",
+  DEPARTMENT = "Department",
+  STORE = "Store",
+  NONE = "None",
+}
+
+export enum C7AvailableTo {
+  EVERYONE = "Everyone",
+  TAG = "Tag",
+}
+
+export enum C7CartRequirementType {
+  NONE = "None",
+  MINIMUM_QUANTITY = "Minimum Quantity",
+  MINIMUM_PURCHASE = "Minimum Purchase Amount",
+}
+
+export enum C7UsageLimitType {
+  UNLIMITED = "Unlimited",
+  STORE = "Per Store",
+  CUSTOMER = "Per Customer",
+}
+
+export enum C7CartRequirementCountType {
+  ONLY_DISCOUNT_ITEMS = "Only Items In Discount",
+  ALL_ITEMS = "All Items",
+}
+
+export type C7CouponPayload = {
+  actionMessage: string;
+  appliesTo: C7AppliesTo;
+  appliesToObjectIds: string | string[];
+  availableTo: C7AvailableTo;
+  availableToObjectIds: string | string[];
+  cartContainsObjectIds: string | null;
+  cartContainsType: "Anything";
+  cartRequirement: number | null;
+  cartRequirementCountType: C7CartRequirementCountType;
+  cartRequirementMaximum: number | null;
+  cartRequirementType: C7CartRequirementType;
+  code: string;
+  discount: number;
+  discountType: C7DiscountType;
+  dollarOffDiscountApplies: string;
+  endDate: string | null;
+  excludeObjectIds?: string[];
+  excludes: C7AppliesTo | null;
+  id?: string;
+  startDate: string;
+  status: C7CouponStatus;
+  title: string;
+  type: "Product" | "Shipping";
+  usageLimit: number | null;
+  usageLimitType: C7UsageLimitType;
+};
 
 // ============================================
 // Helper Functions

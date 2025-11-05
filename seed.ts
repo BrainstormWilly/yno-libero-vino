@@ -17,7 +17,7 @@ await seed.$resetDatabase();
 // Seed the yno-fanbase client for development
 await seed.clients([
   {
-    id: "yno-fanbase-client-id",
+    id: "a7f5c3e2-8d91-4b1e-9a2f-1c5b8e3d4f6a", // Valid UUID
     tenant_shop: "yno-fanbase",
     crm_type: "commerce7",
     org_name: "Yno Fanbase",
@@ -30,7 +30,7 @@ await seed.clients([
 console.log("✅ Seeded LiberoVino database with yno-fanbase client");
 console.log("\n📝 Use these credentials for IN_COMMERCE7=no mode:");
 console.log("   tenant_shop: yno-fanbase");
-console.log("   client_id: yno-fanbase-client-id");
+console.log("   client_id: a7f5c3e2-8d91-4b1e-9a2f-1c5b8e3d4f6a");
 
 process.exit(0);
 

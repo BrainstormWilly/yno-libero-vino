@@ -76,7 +76,11 @@ export async function action({ request }: ActionFunctionArgs) {
         return { success: false, error: 'Address ID required' };
       }
       
-      // Update draft with address IDs
+      // Fetch addresses from C7 to get full details
+      const addresses = await provider.getCustomerAddresses(draft.customer.crmId);
+      const address = addresses.find((a: any) => a.id === addressId);
+      
+      // Update draft with address IDs and full details
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         customer: {
@@ -84,10 +88,28 @@ export async function action({ request }: ActionFunctionArgs) {
           billingAddressId: draft.customer!.billingAddressId || addressId,
           shippingAddressId: addressId,
         },
+        address: {
+          billing: draft.address?.billing || (address ? {
+            address1: address.address1,
+            address2: address.address2,
+            city: address.city,
+            state: address.state,
+            zip: address.zip,
+            country: address.country || 'US',
+          } : undefined),
+          shipping: address ? {
+            address1: address.address1,
+            address2: address.address2,
+            city: address.city,
+            state: address.state,
+            zip: address.zip,
+            country: address.country || 'US',
+          } : undefined,
+        },
         addressVerified: true,
       });
       
-      return redirectWithSession('/app/members/new/payment', session.id);
+      throw redirectWithSession('/app/members/new/payment', session.id);
     } else if (actionType === 'add_shipping') {
       // Add shipping address (different from billing)
       const address1 = formData.get('address_1') as string;
@@ -117,17 +139,28 @@ export async function action({ request }: ActionFunctionArgs) {
         isDefault: false, // Shipping address
       });
       
-      // Update draft with shipping address ID
+      // Update draft with shipping address ID and full details
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         customer: {
           ...draft.customer!,
           shippingAddressId: shippingAddress.id!,
         },
+        address: {
+          ...draft.address,
+          shipping: {
+            address1,
+            address2: address2 || undefined,
+            city,
+            state,
+            zip,
+            country: 'US',
+          },
+        },
         addressVerified: true,
       });
       
-      return redirectWithSession('/app/members/new/payment', session.id);
+      throw redirectWithSession('/app/members/new/payment', session.id);
     } else if (actionType === 'use_billing') {
       // Use billing address for shipping (new customers only)
       if (!draft.customer.billingAddressId) {
@@ -135,17 +168,26 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       
       // Already set shippingAddressId = billingAddressId in customer creation
-      // Just mark as verified and continue
+      // Shipping address details same as billing
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
+        address: {
+          ...draft.address,
+          // Shipping same as billing (already set in customer creation)
+        },
         addressVerified: true,
       });
       
-      return redirectWithSession('/app/members/new/payment', session.id);
+      throw redirectWithSession('/app/members/new/payment', session.id);
     }
     
     return { success: false, error: 'Invalid action' };
   } catch (error) {
+    // Re-throw Response objects (redirects)
+    if (error instanceof Response) {
+      throw error;
+    }
+    
     console.error('Address error:', error);
     return {
       success: false,

@@ -247,6 +247,7 @@ export async function updateClubStage(
     name?: string;
     durationMonths?: number;
     minPurchaseAmount?: number;
+    minLtvAmount?: number;
     stageOrder?: number;
     c7ClubId?: string;
   }
@@ -260,6 +261,7 @@ export async function updateClubStage(
   if (data.name) updateData.name = data.name;
   if (data.durationMonths) updateData.duration_months = data.durationMonths;
   if (data.minPurchaseAmount) updateData.min_purchase_amount = data.minPurchaseAmount;
+  if (data.minLtvAmount !== undefined) updateData.min_ltv_amount = data.minLtvAmount;
   if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder;
   if (data.c7ClubId) updateData.c7_club_id = data.c7ClubId;
   
@@ -480,7 +482,6 @@ export async function createCustomer(
     lastName: string | null;
     phone: string | null;
     crmId: string;
-    crmType: string;
   }
 ) {
   const supabase = getSupabaseClient();
@@ -494,7 +495,6 @@ export async function createCustomer(
       last_name: data.lastName,
       phone: data.phone,
       crm_id: data.crmId,
-      crm_type: data.crmType,
     })
     .select()
     .single();
@@ -605,10 +605,16 @@ export async function getEnrollmentsByStage(clubStageId: string) {
   return enrollments || [];
 }
 
-export async function getEnrollmentsByClientId(clientId: string) {
+export async function getEnrollmentsByClientId(
+  clientId: string,
+  options?: {
+    search?: string;
+    tierFilter?: string;
+  }
+) {
   const supabase = getSupabaseClient();
   
-  const { data: enrollments } = await supabase
+  let query = supabase
     .from('club_enrollments')
     .select(`
       *,
@@ -628,10 +634,75 @@ export async function getEnrollmentsByClientId(clientId: string) {
         min_purchase_amount
       )
     `)
-    .eq('customers.client_id', clientId)
-    .order('enrolled_at', { ascending: false });
+    .eq('customers.client_id', clientId);
+  
+  // Apply search filter if provided
+  if (options?.search) {
+    const searchTerm = `%${options.search}%`;
+    query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},email.ilike.${searchTerm}`, {
+      referencedTable: 'customers'
+    });
+  }
+  
+  // Apply tier filter if provided
+  if (options?.tierFilter) {
+    query = query.eq('club_stage_id', options.tierFilter);
+  }
+  
+  const { data: enrollments } = await query.order('enrolled_at', { ascending: false });
   
   return enrollments || [];
+}
+
+export async function getEnrollmentById(enrollmentId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: enrollment, error } = await supabase
+    .from('club_enrollments')
+    .select(`
+      *,
+      customers!inner (
+        id,
+        email,
+        first_name,
+        last_name,
+        phone,
+        crm_id,
+        client_id
+      ),
+      club_stages!inner (
+        id,
+        name,
+        duration_months,
+        min_purchase_amount,
+        min_ltv_amount,
+        c7_club_id
+      )
+    `)
+    .eq('id', enrollmentId)
+    .single();
+  
+  if (error) {
+    throw new Error(`Failed to fetch enrollment: ${error.message}`);
+  }
+  
+  return enrollment;
+}
+
+export async function cancelEnrollment(enrollmentId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { error } = await supabase
+    .from('club_enrollments')
+    .update({
+      status: 'cancelled',
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', enrollmentId);
+  
+  if (error) {
+    throw new Error(`Failed to cancel enrollment: ${error.message}`);
+  }
 }
 
 export async function updateEnrollmentStatus(
@@ -679,6 +750,30 @@ export interface EnrollmentDraft {
     durationMonths: number;
     minPurchaseAmount: number;
   };
+  address?: {
+    billing: {
+      address1: string;
+      address2?: string;
+      city: string;
+      state: string;
+      zip: string;
+      country?: string;
+    };
+    shipping?: {
+      address1: string;
+      address2?: string;
+      city: string;
+      state: string;
+      zip: string;
+      country?: string;
+    };
+  };
+  payment?: {
+    last4: string;
+    brand?: string;
+    expiryMonth?: string;
+    expiryYear?: string;
+  };
   addressVerified: boolean;
   paymentVerified: boolean;
 }
@@ -694,9 +789,13 @@ export async function getEnrollmentDraft(sessionId: string): Promise<EnrollmentD
   
   if (error || !data) return null;
   
+  const draftData = data.customer_data as any;
+  
   return {
-    customer: data.customer_data as any,
+    customer: draftData?.customer,
     tier: data.tier_data as any,
+    address: draftData?.address,
+    payment: draftData?.payment,
     addressVerified: data.address_verified || false,
     paymentVerified: data.payment_verified || false,
   };
@@ -712,11 +811,18 @@ export async function updateEnrollmentDraft(
   const existing = await getEnrollmentDraft(sessionId);
   const merged = existing ? { ...existing, ...draft } : draft;
   
+  // Store customer, address, and payment in customer_data JSONB
+  const customerData = {
+    customer: merged.customer || null,
+    address: merged.address || null,
+    payment: merged.payment || null,
+  };
+  
   const { error } = await supabase
     .from('enrollment_drafts')
     .upsert({
       session_id: sessionId,
-      customer_data: merged.customer || null,
+      customer_data: customerData,
       tier_data: merged.tier || null,
       address_verified: merged.addressVerified || false,
       payment_verified: merged.paymentVerified || false,

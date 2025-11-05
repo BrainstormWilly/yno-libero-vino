@@ -40,31 +40,24 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
                 {draft.customer.firstName} {draft.customer.lastName}
               </Text>
               <dl className="noIndent">
-                <dt className="srOnly">Email</dt>
                 <dd>
                   <Text as="span" variant="bodyMd" tone="subdued">
-                    {draft.customer.email}
+                    <strong>Email:</strong> {draft.customer.email}
                   </Text>
                 </dd>
                 {draft.customer.phone && (
-                  <>
-                    <dt className="srOnly">Phone</dt>
-                    <dd>
-                      <Text as="span" variant="bodyMd" tone="subdued">
-                        {draft.customer.phone}
-                      </Text>
-                    </dd>
-                  </>
+                  <dd>
+                    <Text as="span" variant="bodyMd" tone="subdued">
+                      <strong>Phone:</strong> {draft.customer.phone}
+                    </Text>
+                  </dd>
                 )}
                 {draft.customer.ltv !== undefined && (
-                  <>
-                    <dt className="srOnly">LTV</dt>
-                    <dd>
-                      <Text as="span" variant="bodyMd">
-                        <strong>LTV:</strong> ${draft.customer.ltv.toFixed(2)}
-                      </Text>
-                    </dd>
-                  </>
+                  <dd>
+                    <Text as="span" variant="bodyMd">
+                      <strong>LTV:</strong> ${draft.customer.ltv.toFixed(2)}
+                    </Text>
+                  </dd>
                 )}
               </dl>
             </BlockStack>
@@ -101,19 +94,16 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
                 {draft.tier.name}
               </Text>
               <dl className="noIndent">
-                <dt className="srOnly">Duration</dt>
                 <dd>
                   <Text as="span" variant="bodyMd">
                     <strong>Duration:</strong> {draft.tier.durationMonths} months
                   </Text>
                 </dd>
-                <dt className="srOnly">Min Purchase</dt>
                 <dd>
                   <Text as="span" variant="bodyMd">
                     <strong>Min Purchase:</strong> ${draft.tier.minPurchaseAmount}
                   </Text>
                 </dd>
-                <dt className="srOnly">Customer Purchase</dt>
                 <dd>
                   <Text as="span" variant="bodyMd">
                     <strong>Customer:</strong> ${draft.tier.purchaseAmount.toFixed(2)}
@@ -142,11 +132,65 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
             </InlineGrid>
           </Box>
           
-          <Text as="p" variant="bodySm" tone="subdued">
-            {draft?.addressVerified 
-              ? 'Customer address verified' 
-              : 'Address required for enrollment'}
-          </Text>
+          {!draft?.addressVerified && (
+            <Text as="p" variant="bodySm" tone="subdued">
+              Address required for enrollment
+            </Text>
+          )}
+          
+          {draft?.addressVerified && draft?.address?.billing && (
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd">
+                <strong>Billing:</strong>
+              </Text>
+              <dl className="noIndent">
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    {draft.address.billing.address1}
+                  </Text>
+                </dd>
+                {draft.address.billing.address2 && (
+                  <dd>
+                    <Text as="span" variant="bodySm" tone="subdued">
+                      {draft.address.billing.address2}
+                    </Text>
+                  </dd>
+                )}
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    {draft.address.billing.city}, {draft.address.billing.state} {draft.address.billing.zip}
+                  </Text>
+                </dd>
+              </dl>
+              
+              {draft.address.shipping && (
+                <>
+                  <Text as="p" variant="bodyMd">
+                    <strong>Shipping:</strong>
+                  </Text>
+                  <dl className="noIndent">
+                    <dd>
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        {draft.address.shipping.address1}
+                      </Text>
+                    </dd>
+                    {draft.address.shipping.address2 && (
+                      <dd>
+                        <Text as="span" variant="bodySm" tone="subdued">
+                          {draft.address.shipping.address2}
+                        </Text>
+                      </dd>
+                    )}
+                    <dd>
+                      <Text as="span" variant="bodySm" tone="subdued">
+                        {draft.address.shipping.city}, {draft.address.shipping.state} {draft.address.shipping.zip}
+                      </Text>
+                    </dd>
+                  </dl>
+                </>
+              )}
+            </BlockStack>
+          )}
         </BlockStack>
       </Card>
       
@@ -167,11 +211,22 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
             </InlineGrid>
           </Box>
           
-          <Text as="p" variant="bodySm" tone="subdued">
-            {draft?.paymentVerified 
-              ? 'Payment method verified' 
-              : 'Payment method required for enrollment'}
-          </Text>
+          {!draft?.paymentVerified && (
+            <Text as="p" variant="bodySm" tone="subdued">
+              Payment method required for enrollment
+            </Text>
+          )}
+          
+          {draft?.paymentVerified && draft?.payment && (
+            <BlockStack gap="100">
+              <Text as="p" variant="bodyMd">
+                <strong>{draft.payment.brand || 'Card'} •••• {draft.payment.last4}</strong>
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Expires: {draft.payment.expiryMonth}/{draft.payment.expiryYear}
+              </Text>
+            </BlockStack>
+          )}
         </BlockStack>
       </Card>
     </BlockStack>

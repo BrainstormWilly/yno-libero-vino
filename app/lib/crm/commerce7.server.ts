@@ -245,14 +245,17 @@ export class Commerce7Provider implements CrmProvider {
       );
     }
 
+    // Use the conversion function to properly handle C7 response
+    const customer = fromC7Customer(data);
+    
     return {
-      id: data.id,
-      email: data.email,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phone: data.phone,
-      createdAt: data.createdAt,
-      updatedAt: data.updatedAt,
+      id: customer.id,
+      email: customer.email,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      phone: customer.phone,
+      createdAt: customer.createdAt,
+      updatedAt: customer.updatedAt,
     };
   }
 
@@ -2012,7 +2015,9 @@ export class Commerce7Provider implements CrmProvider {
     const data = await response.json();
     handleC7ApiError(data, 'Get Customer Addresses');
     
-    return (data.addresses || []).map((addr: C7AddressResponse) => fromC7Address(addr));
+    // C7 returns customerAddresses, not addresses
+    const addresses = (data.customerAddresses || []).map((addr: C7AddressResponse) => fromC7Address(addr));
+    return addresses;
   }
 
   /**
@@ -2059,7 +2064,8 @@ export class Commerce7Provider implements CrmProvider {
     const data = await response.json();
     handleC7ApiError(data, 'Get Customer Credit Cards');
     
-    return (data.creditCards || []).map((card: C7CreditCardResponse) => fromC7Payment(card));
+    // C7 returns customerCreditCards, not creditCards
+    return (data.customerCreditCards || data.creditCards || []).map((card: C7CreditCardResponse) => fromC7Payment(card));
   }
 
   /**
@@ -2086,10 +2092,10 @@ export class Commerce7Provider implements CrmProvider {
       body: JSON.stringify({
         cardHolderName: card.cardholderName,
         // Note: C7 handles tokenization - in production we'd send token, not raw card data
-        cardNumber: card.cardNumber,
+        cardNumber: card.cardNumber.replace(/\D/g, ''), // Strip non-numeric characters (spaces, dashes, etc.)
         expiryMo: parseInt(card.expiryMonth),
         expiryYr: parseInt(card.expiryYear),
-        cvv: card.cvv,
+        cvv2: card.cvv, // C7 uses cvv2 field name
         isDefault: card.isDefault !== false, // Default to true
       }),
     });
@@ -2097,7 +2103,7 @@ export class Commerce7Provider implements CrmProvider {
     const data = await response.json();
     handleC7ApiError(data, 'Create Customer Credit Card');
     
-    return fromC7Payment(data.creditCard);
+    return fromC7Payment(data);
   }
 
   // ============================================

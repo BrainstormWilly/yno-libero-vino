@@ -70,12 +70,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const tierName = formData.get('tier_name') as string;
       const durationMonths = parseInt(formData.get('duration_months') as string);
       const minPurchaseAmount = parseFloat(formData.get('min_purchase_amount') as string);
+      const minLtvAmount = parseFloat(formData.get('min_ltv_amount') as string) || 0;
       
       // Update tier details in DB
       await db.updateClubStage(tierId, {
         name: tierName,
         durationMonths,
         minPurchaseAmount,
+        minLtvAmount,
       });
       
       // Sync with CRM
@@ -191,6 +193,7 @@ export default function TierDetails() {
   const [tierName, setTierName] = useState(tier.name);
   const [durationMonths, setDurationMonths] = useState(tier.duration_months.toString());
   const [minPurchaseAmount, setMinPurchaseAmount] = useState(tier.min_purchase_amount.toString());
+  const [minLtvAmount, setMinLtvAmount] = useState(tier.min_ltv_amount?.toString() || '0');
   
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(!!loyalty);
   const [earnRate, setEarnRate] = useState(
@@ -217,7 +220,8 @@ export default function TierDetails() {
   const tierDetailsChanged = 
     tierName !== tier.name ||
     durationMonths !== tier.duration_months.toString() ||
-    minPurchaseAmount !== tier.min_purchase_amount.toString();
+    minPurchaseAmount !== tier.min_purchase_amount.toString() ||
+    minLtvAmount !== (tier.min_ltv_amount?.toString() || '0');
   
   // Track if loyalty settings have been modified
   const loyaltyChanged = 
@@ -305,6 +309,17 @@ export default function TierDetails() {
                               value={minPurchaseAmount}
                               onChange={setMinPurchaseAmount}
                               name="min_purchase_amount"
+                              type="number"
+                              autoComplete="off"
+                            />
+                          </div>
+                          
+                          <div style={{ flex: 1 }}>
+                            <TextField
+                              label="Min LTV ($)"
+                              value={minLtvAmount}
+                              onChange={setMinLtvAmount}
+                              name="min_ltv_amount"
                               type="number"
                               autoComplete="off"
                             />
@@ -455,6 +470,26 @@ export default function TierDetails() {
                     </BlockStack>
                   </Card>
                 </Form>
+              </section>
+              
+              {/* Navigation */}
+              <section>
+                <Card>
+                  <InlineStack align="space-between">
+                    <Button
+                      onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
+                    >
+                      ← Back to Tiers
+                    </Button>
+                    
+                    <Button
+                      variant="primary"
+                      onClick={() => navigate(addSessionToUrl('/app/setup/review', session.id))}
+                    >
+                      Continue to Review →
+                    </Button>
+                  </InlineStack>
+                </Card>
               </section>
       </BlockStack>
     </Page>

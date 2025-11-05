@@ -194,7 +194,7 @@ export default function SetupTiers() {
                       </Text>
                       <BlockStack gap="100">
                         <Text variant="bodyMd" as="p" tone="subdued">
-                          Duration: {tier.duration_months} months · Min Purchase: ${tier.min_purchase_amount}
+                          Duration: {tier.duration_months} months · Min Purchase: ${tier.min_purchase_amount} · Min LTV: ${tier.min_ltv_amount || 0}
                         </Text>
                         <InlineStack gap="200">
                           <Badge tone={tier.promotionCount > 0 ? 'success' : 'attention'}>

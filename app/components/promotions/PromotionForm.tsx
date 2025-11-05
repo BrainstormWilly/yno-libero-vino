@@ -175,6 +175,26 @@ export function PromotionForm({
                 }
               />
               
+              {/* Product Selection */}
+              {appliesTo === 'Product' && (
+                <ProductCollectionPicker
+                  type="product"
+                  selected={selectedProducts}
+                  onChange={setSelectedProducts}
+                  crm={crm}
+                />
+              )}
+              
+              {/* Collection Selection */}
+              {appliesTo === 'Collection' && (
+                <ProductCollectionPicker
+                  type="collection"
+                  selected={selectedCollections}
+                  onChange={setSelectedCollections}
+                  crm={crm}
+                />
+              )}
+              
               <Divider />
               
               <InlineStack gap="300">
@@ -218,26 +238,6 @@ export function PromotionForm({
                   </div>
                 )}
               </InlineStack>
-              
-              {/* Product Selection */}
-              {appliesTo === 'Product' && (
-                <ProductCollectionPicker
-                  type="product"
-                  selected={selectedProducts}
-                  onChange={setSelectedProducts}
-                  crm={crm}
-                />
-              )}
-              
-              {/* Collection Selection */}
-              {appliesTo === 'Collection' && (
-                <ProductCollectionPicker
-                  type="collection"
-                  selected={selectedCollections}
-                  onChange={setSelectedCollections}
-                  crm={crm}
-                />
-              )}
               
               {/* Cart Requirements - Only for Shipping */}
               {appliesTo === 'Shipping' && (

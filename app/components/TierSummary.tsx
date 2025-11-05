@@ -6,6 +6,7 @@ interface TierSummaryProps {
     name: string;
     duration_months: number;
     min_purchase_amount: number;
+    min_ltv_amount?: number;
     c7_club_id?: string | null;
   };
   promotions: Array<{
@@ -50,6 +51,11 @@ export default function TierSummary({ tier, promotions, loyalty }: TierSummaryPr
             <dd>
               <Text as="span" variant="bodyMd">
                 <strong>Min Purchase:</strong> ${tier.min_purchase_amount}
+              </Text>
+            </dd>
+            <dd>
+              <Text as="span" variant="bodyMd">
+                <strong>Min LTV:</strong> ${tier.min_ltv_amount || 0}
               </Text>
             </dd>
           </dl>

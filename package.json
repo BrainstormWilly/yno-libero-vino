@@ -12,7 +12,11 @@
     "typecheck": "react-router typegen && tsc",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "db:export-seeds": "tsx scripts/export-seeds.ts",
+    "db:import-seeds": "tsx scripts/import-seeds.ts",
+    "db:export-seeds:local": "USE_LOCAL_SUPABASE=true tsx scripts/export-seeds.ts",
+    "db:import-seeds:local": "USE_LOCAL_SUPABASE=true tsx scripts/import-seeds.ts"
   },
   "dependencies": {
     "@react-router/fs-routes": "^7.9.1",
@@ -86,6 +90,7 @@
     "postgres": "^3.4.7",
     "supabase": "^2.51.0",
     "ts-jest": "^29.1.2",
+    "tsx": "^4.19.2",
     "typescript": "^5.1.6",
     "vite": "^6.3.2",
     "vite-tsconfig-paths": "^4.3.2"

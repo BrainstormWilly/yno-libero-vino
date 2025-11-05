@@ -32,7 +32,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   // If customer already exists in draft, redirect to address
   if (draft.customer?.isExisting) {
-    return Response.redirect(addSessionToUrl('/app/members/new/address', session.id));
+    throw Response.redirect(addSessionToUrl('/app/members/new/address', session.id));
   }
   
   return {
@@ -98,7 +98,7 @@ export async function action({ request }: ActionFunctionArgs) {
       },
     });
     
-    // Update draft with customer info and billing address
+    // Update draft with customer info and billing address (with full details)
     const draft = await db.getEnrollmentDraft(session.id);
     await db.updateEnrollmentDraft(session.id, {
       ...draft,
@@ -113,11 +113,27 @@ export async function action({ request }: ActionFunctionArgs) {
         billingAddressId: result.billingAddressId,
         shippingAddressId: result.billingAddressId, // Default to billing
       },
+      address: {
+        billing: {
+          address1,
+          address2: address2 || undefined,
+          city,
+          state,
+          zip,
+          country: 'US',
+        },
+        // Shipping same as billing initially
+      },
       addressVerified: true, // Billing address created
     });
     
-    return redirectWithSession('/app/members/new/address', session.id);
+    throw redirectWithSession('/app/members/new/address', session.id);
   } catch (error) {
+    // Re-throw Response objects (redirects)
+    if (error instanceof Response) {
+      throw error;
+    }
+    
     console.error('Customer creation error:', error);
     return {
       success: false,

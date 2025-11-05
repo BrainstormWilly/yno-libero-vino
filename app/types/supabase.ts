@@ -339,6 +339,7 @@ export type Database = {
           duration_months: number
           id: string
           is_active: boolean | null
+          min_ltv_amount: number
           min_purchase_amount: number
           name: string
           platform_discount_id: string | null
@@ -353,6 +354,7 @@ export type Database = {
           duration_months: number
           id?: string
           is_active?: boolean | null
+          min_ltv_amount?: number
           min_purchase_amount: number
           name: string
           platform_discount_id?: string | null
@@ -367,6 +369,7 @@ export type Database = {
           duration_months?: number
           id?: string
           is_active?: boolean | null
+          min_ltv_amount?: number
           min_purchase_amount?: number
           name?: string
           platform_discount_id?: string | null

@@ -4,7 +4,9 @@ import postgres from "postgres";
 
 export default defineConfig({
   adapter: () => {
-    const client = postgres(process.env.SUPABASE_DB_URL || "");
+    // Use local Supabase by default, or SUPABASE_DB_URL if set
+    const dbUrl = process.env.SUPABASE_DB_URL || "postgresql://postgres:postgres@127.0.0.1:54422/postgres";
+    const client = postgres(dbUrl);
     return new SeedPostgres(client);
   },
   select: [

@@ -68,6 +68,11 @@ export async function action({ request }: ActionFunctionArgs) {
     session.accessToken
   );
   
+  // Get existing credit cards (needed for use_existing action)
+  const creditCards = actionType === 'use_existing' 
+    ? await provider.getCustomerCreditCards(draft.customer.crmId)
+    : [];
+  
   try {
     if (actionType === 'use_existing') {
       // Use existing payment method
@@ -77,17 +82,26 @@ export async function action({ request }: ActionFunctionArgs) {
         return { success: false, error: 'Payment method ID required' };
       }
       
-      // Update draft with payment method ID
+      // Find the selected credit card details
+      const selectedCard = creditCards.find((c: any) => c.id === paymentId);
+      
+      // Update draft with payment method ID and details
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         customer: {
           ...draft.customer!,
           paymentMethodId: paymentId,
         },
+        payment: selectedCard ? {
+          last4: selectedCard.last4,
+          brand: selectedCard.type,
+          expiryMonth: selectedCard.expiryMonth?.toString(),
+          expiryYear: selectedCard.expiryYear?.toString(),
+        } : undefined,
         paymentVerified: true,
       });
       
-      return redirectWithSession('/app/members/new/review', session.id);
+      throw redirectWithSession('/app/members/new/review', session.id);
     } else if (actionType === 'add_new') {
       // Create new credit card
       const cardholderName = formData.get('cardholder_name') as string;
@@ -112,21 +126,32 @@ export async function action({ request }: ActionFunctionArgs) {
         isDefault: true,
       });
       
-      // Update draft with payment method ID
+      // Update draft with payment method ID and details
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         customer: {
           ...draft.customer!,
           paymentMethodId: paymentMethod.id!,
         },
+        payment: {
+          last4: cardNumber.replace(/\D/g, '').slice(-4), // Last 4 digits
+          brand: paymentMethod.type || 'Card',
+          expiryMonth,
+          expiryYear,
+        },
         paymentVerified: true,
       });
       
-      return redirectWithSession('/app/members/new/review', session.id);
+      throw redirectWithSession('/app/members/new/review', session.id);
     }
     
     return { success: false, error: 'Invalid action' };
   } catch (error) {
+    // Re-throw Response objects (redirects)
+    if (error instanceof Response) {
+      throw error;
+    }
+    
     console.error('Payment error:', error);
     return {
       success: false,
