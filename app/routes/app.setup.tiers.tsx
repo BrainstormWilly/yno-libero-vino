@@ -259,10 +259,10 @@ export default function SetupTiers() {
               
               <Button
                 variant="primary"
-                onClick={() => navigate(addSessionToUrl('/app/setup/review', session.id))}
+                onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
                 disabled={!canContinue}
               >
-                Continue to Review →
+                Continue to Communication →
               </Button>
             </InlineStack>
           </Card>

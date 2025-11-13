@@ -16,6 +16,7 @@ type ClubStage = Database['public']['Tables']['club_stages']['Row'];
 type StagePromotion = Database['public']['Tables']['club_stage_promotions']['Row'];
 type TierLoyalty = Database['public']['Tables']['tier_loyalty_config']['Row'];
 type LoyaltyRules = Database['public']['Tables']['loyalty_point_rules']['Row'];
+type CommunicationConfig = Database['public']['Tables']['communication_configs']['Row'];
 
 /**
  * Get a Supabase client with service role (typed)
@@ -843,5 +844,119 @@ export async function clearEnrollmentDraft(sessionId: string): Promise<void> {
     .from('enrollment_drafts')
     .delete()
     .eq('session_id', sessionId);
+}
+
+// ============================================
+// COMMUNICATION CONFIG OPERATIONS
+// ============================================
+
+export async function getCommunicationConfig(clientId: string): Promise<CommunicationConfig | null> {
+  const supabase = getSupabaseClient();
+  
+  const { data: config, error } = await supabase
+    .from('communication_configs')
+    .select('*')
+    .eq('client_id', clientId)
+    .maybeSingle();
+  
+  if (error) return null;
+  
+  return config;
+}
+
+export async function createCommunicationConfig(
+  clientId: string,
+  config: {
+    emailProvider: string;
+    emailApiKey?: string;
+    emailFromAddress?: string;
+    emailFromName?: string;
+    emailListId?: string;
+    smsProvider?: string;
+    smsApiKey?: string;
+    smsFromNumber?: string;
+    sendMonthlyStatus?: boolean;
+    sendExpirationWarnings?: boolean;
+    warningDaysBefore?: number;
+    providerData?: Record<string, unknown>;
+  }
+): Promise<CommunicationConfig> {
+  const supabase = getSupabaseClient();
+  
+  const { data: commConfig, error } = await supabase
+    .from('communication_configs')
+    .insert({
+      client_id: clientId,
+      email_provider: config.emailProvider,
+      email_api_key: config.emailApiKey || null,
+      email_from_address: config.emailFromAddress || null,
+      email_from_name: config.emailFromName || null,
+      email_list_id: config.emailListId || null,
+      sms_provider: config.smsProvider || null,
+      sms_api_key: config.smsApiKey || null,
+      sms_from_number: config.smsFromNumber || null,
+      send_monthly_status: config.sendMonthlyStatus !== undefined ? config.sendMonthlyStatus : true,
+      send_expiration_warnings: config.sendExpirationWarnings !== undefined ? config.sendExpirationWarnings : true,
+      warning_days_before: config.warningDaysBefore || 7,
+      provider_data: config.providerData ?? null,
+    })
+    .select()
+    .single();
+  
+  if (error || !commConfig) {
+    throw new Error(`Failed to create communication config: ${error?.message}`);
+  }
+  
+  return commConfig;
+}
+
+export async function updateCommunicationConfig(
+  clientId: string,
+  config: {
+    emailProvider?: string;
+    emailApiKey?: string | null;
+    emailFromAddress?: string | null;
+    emailFromName?: string | null;
+    emailListId?: string | null;
+    smsProvider?: string | null;
+    smsApiKey?: string | null;
+    smsFromNumber?: string | null;
+    sendMonthlyStatus?: boolean;
+    sendExpirationWarnings?: boolean;
+    warningDaysBefore?: number;
+    providerData?: Record<string, unknown> | null;
+  }
+): Promise<CommunicationConfig> {
+  const supabase = getSupabaseClient();
+  
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+  
+  if (config.emailProvider !== undefined) updateData.email_provider = config.emailProvider;
+  if (config.emailApiKey !== undefined) updateData.email_api_key = config.emailApiKey;
+  if (config.emailFromAddress !== undefined) updateData.email_from_address = config.emailFromAddress;
+  if (config.emailFromName !== undefined) updateData.email_from_name = config.emailFromName;
+  if (config.emailListId !== undefined) updateData.email_list_id = config.emailListId;
+  if (config.smsProvider !== undefined) updateData.sms_provider = config.smsProvider;
+  if (config.smsApiKey !== undefined) updateData.sms_api_key = config.smsApiKey;
+  if (config.smsFromNumber !== undefined) updateData.sms_from_number = config.smsFromNumber;
+  if (config.sendMonthlyStatus !== undefined) updateData.send_monthly_status = config.sendMonthlyStatus;
+  if (config.sendExpirationWarnings !== undefined) updateData.send_expiration_warnings = config.sendExpirationWarnings;
+  if (config.warningDaysBefore !== undefined) updateData.warning_days_before = config.warningDaysBefore;
+  if (config.providerData !== undefined) updateData.provider_data = config.providerData;
+  
+  const { data: commConfig, error } = await supabase
+    .from('communication_configs')
+    .update(updateData)
+    .eq('client_id', clientId)
+    .select()
+    .single();
+  
+  if (error || !commConfig) {
+    throw new Error(`Failed to update communication config: ${error?.message}`);
+  }
+  
+  return commConfig;
 }
 

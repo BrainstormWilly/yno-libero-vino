@@ -29,6 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   const client = await db.getClient(session.clientId);
   const clubProgram = await db.getClubProgram(session.clientId);
+  const communicationConfig = await db.getCommunicationConfig(session.clientId);
   
   if (!clubProgram) {
     throw new Response('Club program not found', { status: 404 });
@@ -71,6 +72,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       ...clubProgram,
       club_stages: tiersWithData,
     },
+    communicationConfig,
   };
 }
 
@@ -102,7 +104,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function SetupReview() {
-  const { clubProgram, session } = useLoaderData<typeof loader>();
+  const { clubProgram, session, communicationConfig } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   
@@ -121,12 +123,14 @@ export default function SetupReview() {
     (tier: any) => tier.promotions?.length > 0
   );
   
+  const canComplete = allTiersConfigured && communicationConfig;
+  
   return (
     <Page
       title="Review & Launch"
       backAction={{ 
-        content: 'Back to Tiers', 
-        onAction: () => navigate(addSessionToUrl('/app/setup/tiers', session.id)) 
+        content: 'Back to Communication', 
+        onAction: () => navigate(addSessionToUrl('/app/setup/communication', session.id)) 
       }}
     >
       <Layout>
@@ -141,6 +145,14 @@ export default function SetupReview() {
           <Layout.Section>
             <Banner tone="warning">
               Some tiers are missing promotions. All tiers must have at least one promotion to be functional.
+            </Banner>
+          </Layout.Section>
+        )}
+        
+        {!communicationConfig && (
+          <Layout.Section>
+            <Banner tone="warning">
+              Communication settings must be configured to send member notifications.
             </Banner>
           </Layout.Section>
         )}
@@ -247,6 +259,86 @@ export default function SetupReview() {
           </Card>
         </Layout.Section>
         
+        {/* Communication Settings */}
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between">
+                <Text variant="headingMd" as="h3">
+                  Communication Settings
+                </Text>
+                <Button
+                  variant="plain"
+                  onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
+                >
+                  Edit Settings
+                </Button>
+              </InlineStack>
+              
+              <Divider />
+              
+              {communicationConfig ? (
+                <BlockStack gap="300">
+                  <InlineStack align="space-between">
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                      Email Provider:
+                    </Text>
+                    <Text variant="bodyMd" as="p">
+                      {communicationConfig.email_provider === 'klaviyo' ? 'Klaviyo' : 
+                       communicationConfig.email_provider === 'mailchimp' ? 'Mailchimp' : 
+                       'SendGrid (LiberoVino Managed)'}
+                    </Text>
+                  </InlineStack>
+                  
+                  {communicationConfig.email_from_address && (
+                    <InlineStack align="space-between">
+                      <Text variant="bodyMd" as="p" fontWeight="semibold">
+                        From Email:
+                      </Text>
+                      <Text variant="bodyMd" as="p">
+                        {communicationConfig.email_from_address}
+                      </Text>
+                    </InlineStack>
+                  )}
+                  
+                  <InlineStack align="space-between">
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                      Monthly Status Emails:
+                    </Text>
+                    <Badge tone={communicationConfig.send_monthly_status ? 'success' : 'critical'}>
+                      {communicationConfig.send_monthly_status ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </InlineStack>
+                  
+                  <InlineStack align="space-between">
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                      Expiration Warnings:
+                    </Text>
+                    <Badge tone={communicationConfig.send_expiration_warnings ? 'success' : 'critical'}>
+                      {communicationConfig.send_expiration_warnings ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </InlineStack>
+                  
+                  {communicationConfig.send_expiration_warnings && (
+                    <InlineStack align="space-between">
+                      <Text variant="bodyMd" as="p" fontWeight="semibold">
+                        Warning Days Before:
+                      </Text>
+                      <Text variant="bodyMd" as="p">
+                        {communicationConfig.warning_days_before} days
+                      </Text>
+                    </InlineStack>
+                  )}
+                </BlockStack>
+              ) : (
+                <Banner tone="warning">
+                  Communication settings not configured. This is required for member notifications.
+                </Banner>
+              )}
+            </BlockStack>
+          </Card>
+        </Layout.Section>
+        
         {/* Submit */}
         <Layout.Section>
           <Form method="post">
@@ -259,7 +351,7 @@ export default function SetupReview() {
                 
                 <InlineStack align="space-between">
                   <Button
-                    onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
+                    onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
                   >
                     ← Back
                   </Button>
@@ -267,7 +359,7 @@ export default function SetupReview() {
                   <Button
                     variant="primary"
                     submit
-                    disabled={!allTiersConfigured}
+                    disabled={!canComplete}
                     size="large"
                   >
                     Complete Setup 🚀

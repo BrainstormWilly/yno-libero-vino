@@ -397,6 +397,7 @@ export type Database = {
           email_list_id: string | null
           email_provider: string | null
           id: string
+          provider_data: Json
           send_expiration_warnings: boolean | null
           send_monthly_status: boolean | null
           sms_api_key: string | null
@@ -414,6 +415,7 @@ export type Database = {
           email_list_id?: string | null
           email_provider?: string | null
           id?: string
+          provider_data?: Json
           send_expiration_warnings?: boolean | null
           send_monthly_status?: boolean | null
           sms_api_key?: string | null
@@ -431,6 +433,7 @@ export type Database = {
           email_list_id?: string | null
           email_provider?: string | null
           id?: string
+          provider_data?: Json
           send_expiration_warnings?: boolean | null
           send_monthly_status?: boolean | null
           sms_api_key?: string | null

@@ -92,6 +92,7 @@ CREATE TABLE communication_configs (
   email_from_address VARCHAR(255),
   email_from_name VARCHAR(255),
   email_list_id VARCHAR(255),  -- For Mailchimp/Klaviyo list
+  provider_data JSONB DEFAULT '{}'::jsonb,
   
   -- SMS Provider
   sms_provider VARCHAR(50) CHECK (sms_provider IN ('redchirp', 'twilio', 'klaviyo')),
@@ -472,6 +473,41 @@ async function calculateCustomerStatus(customer, enrollment) {
   };
 }
 ```
+
+## Klaviyo Automation Seeding
+
+- When a client selects Klaviyo during setup, we automatically:
+  - Seed custom metrics for every transactional trigger (`CLUB_SIGNUP`, `MONTHLY_STATUS`, `EXPIRATION_WARNING`, `EXPIRATION_NOTICE`).
+  - Optionally seed marketing triggers (`MONTHLY_STATUS_PROMO`, `ANNUAL_RESIGN`, `SALES_BLAST`) when the "Enable promotional Klaviyo flows" toggle is selected.
+  - Create a dedicated flow per metric with a ready-to-edit email message and attach the seeded metric as the trigger.
+  - Create HTML + text templates that follow the LiberoVino liberated tone and populate them with our dynamic placeholders.
+- Klaviyo resource identifiers are persisted in `communication_configs.provider_data`:
+
+```json
+{
+  "seededAt": "2025-11-12T19:42:00.000Z",
+  "includeMarketing": true,
+  "metrics": {
+    "MONTHLY_STATUS": { "id": "metric_123", "name": "LiberoVino.MonthlyStatus" }
+  },
+  "flows": {
+    "MONTHLY_STATUS": { "id": "flow_456", "metricId": "metric_123", "templateId": "template_789" }
+  },
+  "templates": {
+    "MONTHLY_STATUS": { "id": "template_789", "subject": "{{ first_name }}, your {{ current_stage }} benefits remain wide open" }
+  }
+}
+```
+
+- Re-run seeding at any time via:
+
+```
+npm run klaviyo:seed <client-id> [--marketing]
+```
+
+  - Uses the stored API key/from info in `communication_configs`.
+  - `--marketing` reseeds the optional marketing flows.
+  - Safe to re-run; templates update in place, flows are idempotent.
 
 ## Provider Implementations
 

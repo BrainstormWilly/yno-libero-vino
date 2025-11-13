@@ -144,6 +144,25 @@ export default function Settings() {
             </Card>
           </Layout.Section>
 
+          {/* Communication Settings Link */}
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  Communication Settings
+                </Text>
+                <Text variant="bodyMd" as="p" tone="subdued">
+                  Configure your email provider, monthly status notifications, and expiration warnings for member communications.
+                </Text>
+                <InlineStack gap="200">
+                  <Button url={addSessionToUrl("/app/setup/communication", session.id)}>
+                    Manage Communication
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
           {/* Organization Details Form */}
           <Layout.Section>
             <Card>

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "node16",
+    "target": "ES2022",
+    "verbatimModuleSyntax": false,
+    "types": ["node", "jest"],
+    "isolatedModules": false
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx"
+  ]
+}
