@@ -125,6 +125,7 @@ export async function seedKlaviyoResources(
   const metricKeys: KlaviyoMetricKey[] = [
     ...TRANSACTIONAL_METRICS,
     ...(options.includeMarketing ? MARKETING_METRICS : []),
+    'TEST',
   ];
 
   const metrics: KlaviyoProviderData['metrics'] = {};

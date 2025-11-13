@@ -62,19 +62,28 @@ export async function action({ request }: ActionFunctionArgs) {
       };
     }
 
+    const config = await db.getCommunicationConfig(session.clientId);
+    const providerKey = config?.email_provider?.toLowerCase();
+
     try {
       await sendClientTestEmail(session.clientId, testEmail);
+      const message = providerKey === 'klaviyo'
+        ? `Triggered the Klaviyo test flow for ${testEmail}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the message.`
+        : `Sent test email to ${testEmail}.`;
       return {
         success: true,
-        message: `Sent test email to ${testEmail}.`,
+        message,
       };
     } catch (error) {
+      const fallbackMessage =
+        providerKey === 'klaviyo'
+          ? 'Unable to trigger the Klaviyo test flow. Confirm the "LiberoVino – Test Flow" exists and is set to Live, then try again.'
+          : error instanceof Error
+            ? error.message
+            : 'Failed to send test email. Please check your configuration.';
       return {
         success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Failed to send test email. Please check your configuration.',
+        message: fallbackMessage,
       };
     }
   }

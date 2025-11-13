@@ -68,12 +68,13 @@ export class KlaviyoProvider implements CommunicationProvider {
       throw new Error('Klaviyo sendEmail requires a fromEmail value.');
     }
 
-    const response = await this.request('email-messages/', {
+    const response = await this.request('email-sends/', {
       method: 'POST',
       body: JSON.stringify({
         data: {
-          type: 'email-message',
+          type: 'email-send',
           attributes: {
+            channel: 'email',
             from: {
               email: fromEmail,
               name: fromName,
@@ -89,9 +90,6 @@ export class KlaviyoProvider implements CommunicationProvider {
                 name: params.toName ?? params.to,
               },
             ],
-            // Tags are optional metadata, Klaviyo expects as array of strings
-            // but the events API does not accept tags directly. We include as metadata.
-            metadata: params.tags ? { tags: params.tags } : undefined,
           },
         },
       }),

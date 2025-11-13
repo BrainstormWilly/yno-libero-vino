@@ -5,6 +5,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '~/types/supabase';
+import {
+  DEFAULT_COMMUNICATION_PREFERENCES,
+  normalizeCommunicationPreferences,
+  type CommunicationPreferences,
+} from '~/lib/communication/preferences';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -17,6 +22,7 @@ type StagePromotion = Database['public']['Tables']['club_stage_promotions']['Row
 type TierLoyalty = Database['public']['Tables']['tier_loyalty_config']['Row'];
 type LoyaltyRules = Database['public']['Tables']['loyalty_point_rules']['Row'];
 type CommunicationConfig = Database['public']['Tables']['communication_configs']['Row'];
+type CommunicationConfigInsert = Database['public']['Tables']['communication_configs']['Insert'];
 
 /**
  * Get a Supabase client with service role (typed)
@@ -534,6 +540,63 @@ export async function getCustomersByClientId(clientId: string) {
   return customers || [];
 }
 
+export function getDefaultCommunicationPreferences(): CommunicationPreferences {
+  return { ...DEFAULT_COMMUNICATION_PREFERENCES };
+}
+
+export async function getCommunicationPreferences(
+  customerId: string
+): Promise<CommunicationPreferences> {
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('communication_preferences')
+    .select('*')
+    .eq('customer_id', customerId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return getDefaultCommunicationPreferences();
+  }
+
+  return normalizeCommunicationPreferences({
+    emailMonthlyStatus: data.email_monthly_status ?? undefined,
+    emailExpirationWarnings: data.email_expiration_warnings ?? undefined,
+    emailPromotions: data.email_promotions ?? undefined,
+    smsMonthlyStatus: data.sms_monthly_status ?? undefined,
+    smsExpirationWarnings: data.sms_expiration_warnings ?? undefined,
+    smsPromotions: data.sms_promotions ?? undefined,
+    unsubscribedAll: data.unsubscribed_all ?? undefined,
+  });
+}
+
+export async function upsertCommunicationPreferences(
+  customerId: string,
+  preferences: CommunicationPreferences
+): Promise<void> {
+  const supabase = getSupabaseClient();
+
+  const payload = {
+    customer_id: customerId,
+    email_monthly_status: preferences.emailMonthlyStatus,
+    email_expiration_warnings: preferences.emailExpirationWarnings,
+    email_promotions: preferences.emailPromotions,
+    sms_monthly_status: preferences.smsMonthlyStatus,
+    sms_expiration_warnings: preferences.smsExpirationWarnings,
+    sms_promotions: preferences.smsPromotions,
+    unsubscribed_all: preferences.unsubscribedAll,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from('communication_preferences')
+    .upsert(payload, { onConflict: 'customer_id' });
+
+  if (error) {
+    throw new Error(`Failed to upsert communication preferences: ${error.message}`);
+  }
+}
+
 // ============================================
 // CLUB ENROLLMENT OPERATIONS
 // ============================================
@@ -775,6 +838,7 @@ export interface EnrollmentDraft {
     expiryMonth?: string;
     expiryYear?: string;
   };
+  preferences?: CommunicationPreferences;
   addressVerified: boolean;
   paymentVerified: boolean;
 }
@@ -797,6 +861,7 @@ export async function getEnrollmentDraft(sessionId: string): Promise<EnrollmentD
     tier: data.tier_data as any,
     address: draftData?.address,
     payment: draftData?.payment,
+    preferences: normalizeCommunicationPreferences(draftData?.preferences),
     addressVerified: data.address_verified || false,
     paymentVerified: data.payment_verified || false,
   };
@@ -808,15 +873,36 @@ export async function updateEnrollmentDraft(
 ): Promise<void> {
   const supabase = getSupabaseClient();
   
-  // Get existing draft to merge
   const existing = await getEnrollmentDraft(sessionId);
-  const merged = existing ? { ...existing, ...draft } : draft;
+
+  const mergedPreferences = normalizeCommunicationPreferences({
+    ...(existing?.preferences ?? {}),
+    ...(draft.preferences ?? {}),
+  });
+
+  const mergedCustomer = draft.customer
+    ? { ...(existing?.customer ?? {}), ...draft.customer }
+    : existing?.customer;
+
+  const mergedTier = draft.tier ?? existing?.tier;
+  const mergedAddress = draft.address ?? existing?.address;
+  const mergedPayment = draft.payment ?? existing?.payment;
+
+  const merged: EnrollmentDraft = {
+    customer: mergedCustomer,
+    tier: mergedTier,
+    address: mergedAddress,
+    payment: mergedPayment,
+    preferences: mergedPreferences,
+    addressVerified: draft.addressVerified ?? existing?.addressVerified ?? false,
+    paymentVerified: draft.paymentVerified ?? existing?.paymentVerified ?? false,
+  };
   
-  // Store customer, address, and payment in customer_data JSONB
   const customerData = {
     customer: merged.customer || null,
     address: merged.address || null,
     payment: merged.payment || null,
+    preferences: merged.preferences,
   };
   
   const { error } = await supabase
@@ -878,7 +964,7 @@ export async function createCommunicationConfig(
     sendMonthlyStatus?: boolean;
     sendExpirationWarnings?: boolean;
     warningDaysBefore?: number;
-    providerData?: Record<string, unknown>;
+    providerData?: CommunicationConfigInsert['provider_data'];
   }
 ): Promise<CommunicationConfig> {
   const supabase = getSupabaseClient();
@@ -924,7 +1010,7 @@ export async function updateCommunicationConfig(
     sendMonthlyStatus?: boolean;
     sendExpirationWarnings?: boolean;
     warningDaysBefore?: number;
-    providerData?: Record<string, unknown> | null;
+    providerData?: CommunicationConfigInsert['provider_data'] | null;
   }
 ): Promise<CommunicationConfig> {
   const supabase = getSupabaseClient();

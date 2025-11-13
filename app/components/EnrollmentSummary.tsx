@@ -229,6 +229,78 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
           )}
         </BlockStack>
       </Card>
+
+      {/* Communication Preferences */}
+      <Card>
+        <BlockStack gap="400">
+          <Box paddingBlockEnd="200">
+            <InlineGrid columns="1fr auto">
+              <Text as="h2" variant="headingMd">
+                Communication
+              </Text>
+              {draft?.preferences?.unsubscribedAll ? (
+                <Badge tone="critical">Unsubscribed</Badge>
+              ) : (
+                <Badge tone="success">Active</Badge>
+              )}
+            </InlineGrid>
+          </Box>
+
+          {!draft?.preferences && (
+            <Text as="p" variant="bodySm" tone="subdued">
+              Preferences will be set during enrollment.
+            </Text>
+          )}
+
+          {draft?.preferences && (
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm">
+                <strong>Email</strong>
+              </Text>
+              <dl className="noIndent">
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Monthly status: {draft.preferences.emailMonthlyStatus ? 'On' : 'Off'}
+                  </Text>
+                </dd>
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Duration reminders: {draft.preferences.emailExpirationWarnings ? 'On' : 'Off'}
+                  </Text>
+                </dd>
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Promotions: {draft.preferences.emailPromotions ? 'On' : 'Off'}
+                  </Text>
+                </dd>
+              </dl>
+
+              <Divider />
+
+              <Text as="p" variant="bodySm">
+                <strong>SMS</strong>
+              </Text>
+              <dl className="noIndent">
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Monthly status: {draft.preferences.smsMonthlyStatus ? 'On' : 'Off'}
+                  </Text>
+                </dd>
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Duration reminders: {draft.preferences.smsExpirationWarnings ? 'On' : 'Off'}
+                  </Text>
+                </dd>
+                <dd>
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Promotions: {draft.preferences.smsPromotions ? 'On' : 'Off'}
+                  </Text>
+                </dd>
+              </dl>
+            </BlockStack>
+          )}
+        </BlockStack>
+      </Card>
     </BlockStack>
   );
 }

@@ -75,6 +75,9 @@ export async function action({ request }: ActionFunctionArgs) {
       
       // Check if customer exists in LV database
       const lvCustomer = await db.getCustomerByCrmId(session.clientId, customerCrmId);
+      const preferences = lvCustomer
+        ? await db.getCommunicationPreferences(lvCustomer.id)
+        : db.getDefaultCommunicationPreferences();
       
       // Save to draft
       await db.updateEnrollmentDraft(session.id, {
@@ -96,6 +99,7 @@ export async function action({ request }: ActionFunctionArgs) {
           durationMonths: tier.duration_months,
           minPurchaseAmount: tier.min_purchase_amount,
         },
+        preferences,
         addressVerified: false, // Reset - even existing customers need to verify address for enrollment
         paymentVerified: false, // Reset - need to verify payment for enrollment
       });
@@ -116,6 +120,7 @@ export async function action({ request }: ActionFunctionArgs) {
           durationMonths: tier.duration_months,
           minPurchaseAmount: tier.min_purchase_amount,
         },
+        preferences: db.getDefaultCommunicationPreferences(),
         addressVerified: false, // Reset address verification when selecting new tier
         paymentVerified: false, // Reset payment verification when selecting new tier
       });

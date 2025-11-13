@@ -9,6 +9,7 @@ import type {
 } from '~/types/communication';
 
 import { createCommunicationManager, type CommunicationConfig } from './communication-manager.server';
+import { KLAVIYO_METRICS } from './klaviyo.constants';
 
 const communicationManager = createCommunicationManager();
 
@@ -48,13 +49,37 @@ export async function sendClientTestEmail(
   to: string,
   options?: { subject?: string; html?: string; text?: string }
 ) {
+  const config = ensureConfigForEmail(await getCommunicationConfig(clientId));
   const subject = options?.subject ?? 'LiberoVino Test Email';
   const html =
     options?.html ??
-    `<p>This is a test email sent from your LiberoVino/Klaviyo integration. 🎉</p><p>If you received this, your communication setup is working.</p>`;
+    `<p>This is a test message triggered from your LiberoVino integration. 🎉</p><p>If you received the corresponding Klaviyo flow, your communication setup is working.</p>`;
   const text =
     options?.text ??
-    'This is a test email sent from your LiberoVino/Klaviyo integration. If you received this, your communication setup is working.';
+    'This is a test message triggered from your LiberoVino integration. If you received the corresponding Klaviyo flow, your communication setup is working.';
+
+  if (config.email_provider?.toLowerCase() === 'klaviyo') {
+    const event: TrackEventParams = {
+      event: KLAVIYO_METRICS.TEST,
+      customer: {
+        email: to,
+        id: `test-${clientId}`,
+        properties: {
+          test_triggered_at: new Date().toISOString(),
+          source: 'LiberoVino::send-test',
+        },
+      },
+      properties: {
+        subject,
+        text_preview: text,
+        html_preview: html,
+        source: 'LiberoVino::send-test',
+      },
+    };
+
+    await trackClientEvent(clientId, event);
+    return { success: true } satisfies TrackEventResult;
+  }
 
   return sendClientEmail(clientId, {
     to,

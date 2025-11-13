@@ -17,6 +17,12 @@ import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { crmManager } from '~/lib/crm';
 import { addSessionToUrl } from '~/util/session';
+import { KLAVIYO_METRICS } from '~/lib/communication/klaviyo.constants';
+import { KlaviyoProvider } from '~/lib/communication/providers/klaviyo.server';
+import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
+import type { CommunicationPreferences } from '~/lib/communication/preferences';
+
+type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -46,6 +52,9 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!draft || !draft.customer || !draft.tier) {
     return { success: false, error: 'Incomplete enrollment data' };
   }
+
+  const communicationConfig = await db.getCommunicationConfig(session.clientId);
+  const client = await db.getClient(session.clientId);
   
   try {
     // Get the appropriate CRM provider
@@ -88,6 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
     
     // Create/update customer in LV database
     let lvCustomer = await db.getCustomerByCrmId(session.clientId, draft.customer.crmId);
+    const preferences = draft.preferences ?? db.getDefaultCommunicationPreferences();
     
     if (!lvCustomer) {
       lvCustomer = await db.createCustomer(session.clientId, {
@@ -98,6 +108,8 @@ export async function action({ request }: ActionFunctionArgs) {
         crmId: draft.customer.crmId,
       });
     }
+    
+    await db.upsertCommunicationPreferences(lvCustomer.id, preferences);
     
     // Create enrollment record
     await db.createClubEnrollment({
@@ -111,7 +123,12 @@ export async function action({ request }: ActionFunctionArgs) {
     
     // Award welcome bonus points if applicable
     const loyalty = await db.getTierLoyaltyConfig(draft.tier.id);
-    if (loyalty && loyalty.initial_points_bonus && loyalty.initial_points_bonus > 0) {
+    if (
+      loyalty &&
+      loyalty.initial_points_bonus &&
+      loyalty.initial_points_bonus > 0 &&
+      typeof provider.preloadTierBonusPoints === 'function'
+    ) {
       try {
         await provider.preloadTierBonusPoints(
           draft.customer.crmId,
@@ -122,6 +139,35 @@ export async function action({ request }: ActionFunctionArgs) {
         // Log but don't fail enrollment if bonus points fail
         console.warn('Failed to add welcome bonus points:', error);
       }
+    }
+    
+    if (communicationConfig) {
+      const providerData = (communicationConfig.provider_data ?? null) as unknown as KlaviyoProviderData | null;
+      await triggerKlaviyoClubSignup({
+        clientId: session.clientId,
+        clientName: client?.org_name ?? null,
+        communicationConfig,
+        providerData,
+        preferences,
+        customer: {
+          email: draft.customer.email,
+          firstName: draft.customer.firstName,
+          lastName: draft.customer.lastName,
+          phone: draft.customer.phone ?? null,
+          crmId: draft.customer.crmId,
+        },
+        lvCustomerId: lvCustomer.id,
+        crmMembershipId: crmMembership.id || null,
+        tier: {
+          id: draft.tier.id,
+          name: draft.tier.name,
+          durationMonths: draft.tier.durationMonths,
+          minPurchaseAmount: draft.tier.minPurchaseAmount,
+        },
+        enrollmentDate,
+        expirationDate,
+        purchaseAmount: draft.tier.purchaseAmount,
+      });
     }
     
     // Clear draft
@@ -144,6 +190,125 @@ export async function action({ request }: ActionFunctionArgs) {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to complete enrollment',
     };
+  }
+}
+
+async function triggerKlaviyoClubSignup(options: {
+  clientId: string;
+  clientName?: string | null;
+  communicationConfig: CommunicationConfigRow;
+  providerData: KlaviyoProviderData | null;
+  preferences: CommunicationPreferences;
+  customer: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone?: string | null;
+    crmId: string;
+  };
+  lvCustomerId: string;
+  crmMembershipId: string | null;
+  tier: {
+    id: string;
+    name: string;
+    durationMonths: number;
+    minPurchaseAmount: number;
+  };
+  enrollmentDate: Date;
+  expirationDate: Date;
+  purchaseAmount?: number;
+}): Promise<void> {
+  const { communicationConfig } = options;
+
+  if (!communicationConfig || communicationConfig.email_provider !== 'klaviyo') {
+    return;
+  }
+
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Klaviyo ClubSignup event: member unsubscribed from all communications.');
+    return;
+  }
+
+  const apiKey = communicationConfig.email_api_key ?? process.env.KLAVIYO_API_KEY;
+  if (!apiKey) {
+    console.warn('Klaviyo ClubSignup skipped: missing API key.');
+    return;
+  }
+
+  if (!options.providerData?.metrics?.CLUB_SIGNUP?.id) {
+    console.warn('Klaviyo provider data missing ClubSignup metric id; sending event anyway.');
+  }
+
+  const provider = new KlaviyoProvider({
+    apiKey,
+    defaultFromEmail: communicationConfig.email_from_address ?? undefined,
+    defaultFromName: communicationConfig.email_from_name ?? undefined,
+  });
+
+  const wineryName = options.clientName ?? undefined;
+  const profileProperties: Record<string, unknown> = {
+    client_id: options.clientId,
+    winery_name: wineryName,
+    libero_member: true,
+    membership_status: 'active',
+    membership_started_at: options.enrollmentDate.toISOString(),
+    membership_expires_at: options.expirationDate.toISOString(),
+    tier_id: options.tier.id,
+    tier_name: options.tier.name,
+    tier_duration_months: options.tier.durationMonths,
+    tier_min_purchase_amount: options.tier.minPurchaseAmount,
+    communication_preferences: options.preferences,
+    include_marketing_flows: options.providerData?.includeMarketing ?? false,
+    seeded_at: options.providerData?.seededAt ?? null,
+  };
+
+  if (options.purchaseAmount !== undefined) {
+    profileProperties.tier_purchase_amount = options.purchaseAmount;
+  }
+
+  const eventProperties = {
+    ...profileProperties,
+    lv_customer_id: options.lvCustomerId,
+    crm_customer_id: options.customer.crmId,
+    crm_membership_id: options.crmMembershipId,
+    signup_channel: 'sales-associate',
+    flow_id: options.providerData?.flows?.CLUB_SIGNUP?.id ?? null,
+    metric_id: options.providerData?.metrics?.CLUB_SIGNUP?.id ?? null,
+  };
+
+  try {
+    await provider.updateProfile({
+      email: options.customer.email,
+      phone: options.customer.phone || undefined,
+      firstName: options.customer.firstName,
+      lastName: options.customer.lastName,
+      properties: profileProperties,
+    });
+
+    await provider.trackEvent({
+      event: KLAVIYO_METRICS.CLUB_SIGNUP,
+      customer: {
+        email: options.customer.email,
+        phone: options.customer.phone || undefined,
+        id: options.customer.crmId,
+        properties: {
+          membership_status: 'active',
+          membership_expires_at: options.expirationDate.toISOString(),
+          tier_name: options.tier.name,
+          communication_preferences: options.preferences,
+        },
+      },
+      properties: eventProperties,
+      time: options.enrollmentDate.toISOString(),
+    });
+
+    console.info('Klaviyo ClubSignup event sent', {
+      clientId: options.clientId,
+      email: options.customer.email,
+      crmCustomerId: options.customer.crmId,
+    });
+  } catch (error) {
+    console.warn('Klaviyo ClubSignup trigger failed:', error);
   }
 }
 
@@ -401,14 +566,85 @@ export default function ReviewAndEnroll() {
             </Button>
           </InlineStack>
           
-          {draft.payment && (
-            <BlockStack gap="100">
+          {!draft.paymentVerified && (
+            <Banner tone="warning" title="Payment details missing">
+              Add or select a payment method before enrolling the member.
+            </Banner>
+          )}
+          
+          {draft.paymentVerified && draft.payment && (
+            <BlockStack gap="200">
               <Text variant="bodyMd" as="p">
-                <strong>{draft.payment.brand || 'Card'} ending in {draft.payment.last4}</strong>
+                <strong>{draft.payment.brand || 'Card'} •••• {draft.payment.last4}</strong>
               </Text>
-              <Text variant="bodyMd" as="p" tone="subdued">
-                Expires: {draft.payment.expiryMonth}/{draft.payment.expiryYear}
+              <Text variant="bodySm" as="p" tone="subdued">
+                Expires {draft.payment.expiryMonth}/{draft.payment.expiryYear}
               </Text>
+            </BlockStack>
+          )}
+        </BlockStack>
+      </Card>
+
+      {/* Communication Preferences */}
+      <Card>
+        <BlockStack gap="400">
+          <InlineStack align="space-between" blockAlign="center">
+            <Text variant="headingMd" as="h3">
+              Communication Preferences
+            </Text>
+            <Button
+              variant="plain"
+              onClick={() => navigate(addSessionToUrl('/app/members/new/customer', session.id))}
+            >
+              Edit
+            </Button>
+          </InlineStack>
+
+          {!draft.preferences && (
+            <Banner tone="info" title="Preferences not captured">
+              Set the member's communication preferences before completing enrollment.
+            </Banner>
+          )}
+
+          {draft.preferences && (
+            <BlockStack gap="300">
+              {draft.preferences.unsubscribedAll && (
+                <Banner tone="critical" title="Member unsubscribed">
+                  All email and SMS communications are disabled.
+                </Banner>
+              )}
+
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h4">
+                  Email
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Monthly status: {draft.preferences.emailMonthlyStatus ? 'On' : 'Off'}
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Duration reminders: {draft.preferences.emailExpirationWarnings ? 'On' : 'Off'}
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Promotions: {draft.preferences.emailPromotions ? 'On' : 'Off'}
+                </Text>
+              </BlockStack>
+
+              <Divider />
+
+              <BlockStack gap="200">
+                <Text variant="headingSm" as="h4">
+                  SMS
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Monthly status: {draft.preferences.smsMonthlyStatus ? 'On' : 'Off'}
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Duration reminders: {draft.preferences.smsExpirationWarnings ? 'On' : 'Off'}
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  Promotions: {draft.preferences.smsPromotions ? 'On' : 'Off'}
+                </Text>
+              </BlockStack>
             </BlockStack>
           )}
         </BlockStack>
