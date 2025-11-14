@@ -128,10 +128,10 @@ export async function action({ request }: ActionFunctionArgs) {
     
     const configData = {
       emailProvider: provider,
-      emailApiKey: provider === 'klaviyo' ? apiKey : undefined,
-      emailFromAddress: provider === 'klaviyo' ? fromEmail : undefined,
-      emailFromName: provider === 'klaviyo' ? fromName : undefined,
-      emailListId: provider === 'klaviyo' && listId ? listId : undefined,
+      emailApiKey: provider === 'klaviyo' ? apiKey : null,
+      emailFromAddress: provider === 'klaviyo' ? fromEmail : null,
+      emailFromName: provider === 'klaviyo' ? fromName : null,
+      emailListId: provider === 'klaviyo' && listId ? listId : null,
       sendMonthlyStatus,
       sendExpirationWarnings,
       warningDaysBefore: parseInt(warningDays) || 7,
@@ -428,7 +428,7 @@ export default function SetupCommunication() {
         </Layout.Section>
 
         {/* Test Email */}
-        {provider === 'klaviyo' && (
+        {(provider === 'klaviyo' || provider === 'sendgrid') && (
           <Layout.Section>
             <Card>
               <BlockStack gap="300">
@@ -436,7 +436,9 @@ export default function SetupCommunication() {
                   Send Test Email
                 </Text>
                 <Text variant="bodyMd" as="p" tone="subdued">
-                  Sends a simple message via Klaviyo using your current settings. Use this to confirm API keys and sender info are correct.
+                  {provider === 'klaviyo'
+                    ? 'Triggers the LiberoVino Test Flow in Klaviyo using your current settings. Use this to confirm API keys, sender info, and that the flow is set to Live.'
+                    : 'Sends a simple transactional email via SendGrid using your current settings. Use this to confirm API keys and domain settings are correct.'}
                 </Text>
 
                 <Form method="post">

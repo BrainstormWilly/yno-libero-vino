@@ -21,6 +21,7 @@ import { KLAVIYO_METRICS } from '~/lib/communication/klaviyo.constants';
 import { KlaviyoProvider } from '~/lib/communication/providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from '~/lib/communication/preferences';
+import { sendClientEmail } from '~/lib/communication/communication.service.server';
 
 type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
 
@@ -143,31 +144,56 @@ export async function action({ request }: ActionFunctionArgs) {
     
     if (communicationConfig) {
       const providerData = (communicationConfig.provider_data ?? null) as unknown as KlaviyoProviderData | null;
-      await triggerKlaviyoClubSignup({
-        clientId: session.clientId,
-        clientName: client?.org_name ?? null,
-        communicationConfig,
-        providerData,
-        preferences,
-        customer: {
-          email: draft.customer.email,
-          firstName: draft.customer.firstName,
-          lastName: draft.customer.lastName,
-          phone: draft.customer.phone ?? null,
-          crmId: draft.customer.crmId,
-        },
-        lvCustomerId: lvCustomer.id,
-        crmMembershipId: crmMembership.id || null,
-        tier: {
-          id: draft.tier.id,
-          name: draft.tier.name,
-          durationMonths: draft.tier.durationMonths,
-          minPurchaseAmount: draft.tier.minPurchaseAmount,
-        },
-        enrollmentDate,
-        expirationDate,
-        purchaseAmount: draft.tier.purchaseAmount,
-      });
+      if (communicationConfig.email_provider?.toLowerCase() === 'klaviyo') {
+        await triggerKlaviyoClubSignup({
+          clientId: session.clientId,
+          clientName: client?.org_name ?? null,
+          communicationConfig,
+          providerData,
+          preferences,
+          customer: {
+            email: draft.customer.email,
+            firstName: draft.customer.firstName,
+            lastName: draft.customer.lastName,
+            phone: draft.customer.phone ?? null,
+            crmId: draft.customer.crmId,
+          },
+          lvCustomerId: lvCustomer.id,
+          crmMembershipId: crmMembership.id || null,
+          tier: {
+            id: draft.tier.id,
+            name: draft.tier.name,
+            durationMonths: draft.tier.durationMonths,
+            minPurchaseAmount: draft.tier.minPurchaseAmount,
+          },
+          enrollmentDate,
+          expirationDate,
+          purchaseAmount: draft.tier.purchaseAmount,
+        });
+      } else {
+        try {
+          await sendSendGridWelcomeEmail({
+            clientId: session.clientId,
+            clientName: client?.org_name ?? null,
+            communicationConfig,
+            preferences,
+            customer: {
+              email: draft.customer.email,
+              firstName: draft.customer.firstName,
+              lastName: draft.customer.lastName,
+            },
+            tier: {
+              name: draft.tier.name,
+              durationMonths: draft.tier.durationMonths,
+              minPurchaseAmount: draft.tier.minPurchaseAmount,
+            },
+            enrollmentDate,
+            expirationDate,
+          });
+        } catch (error) {
+          console.warn('SendGrid welcome email failed:', error);
+        }
+      }
     }
     
     // Clear draft
@@ -310,6 +336,75 @@ async function triggerKlaviyoClubSignup(options: {
   } catch (error) {
     console.warn('Klaviyo ClubSignup trigger failed:', error);
   }
+}
+
+async function sendSendGridWelcomeEmail(options: {
+  clientId: string;
+  clientName?: string | null;
+  communicationConfig: CommunicationConfigRow;
+  preferences: CommunicationPreferences;
+  customer: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+  tier: {
+    name: string;
+    durationMonths: number;
+    minPurchaseAmount: number;
+  };
+  enrollmentDate: Date;
+  expirationDate: Date;
+}): Promise<void> {
+  if (options.preferences.unsubscribedAll) {
+    return;
+  }
+
+  const subject = `${options.clientName ?? 'Your winery'} – Membership Confirmed`;
+  const expirationFormatted = options.expirationDate.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const html = `<!doctype html>
+    <html lang="en">
+      <body style="font-family: Helvetica, Arial, sans-serif; color: #202124;">
+        <h1 style="font-size:22px;">Welcome to ${options.clientName ?? 'LiberoVino'}!</h1>
+        <p>Hi ${options.customer.firstName},</p>
+        <p>Thanks for joining the ${options.tier.name} tier. We’ve confirmed your membership and logged it in your account.</p>
+        <ul>
+          <li><strong>Tier duration:</strong> ${options.tier.durationMonths} months</li>
+          <li><strong>Minimum purchase commitment:</strong> $${options.tier.minPurchaseAmount.toFixed(2)}</li>
+          <li><strong>Membership duration ends:</strong> ${expirationFormatted}</li>
+        </ul>
+        <p>You’re in control—shop when you’re ready and keep an eye on your inbox for monthly status updates.</p>
+        <p style="margin-top:24px;">Cheers,<br/>${options.clientName ?? 'The LiberoVino Team'}</p>
+      </body>
+    </html>`;
+
+  const text = `Welcome to ${options.clientName ?? 'LiberoVino'}!
+
+Hi ${options.customer.firstName},
+
+Thanks for joining the ${options.tier.name} tier. Your membership is active and will run for ${options.tier.durationMonths} months.
+
+• Minimum purchase commitment: $${options.tier.minPurchaseAmount.toFixed(2)}
+• Membership duration ends: ${expirationFormatted}
+
+Shop when you’re ready and watch for future status updates.
+
+Cheers,
+${options.clientName ?? 'The LiberoVino Team'}`;
+
+  await sendClientEmail(options.clientId, {
+    to: options.customer.email,
+    toName: `${options.customer.firstName} ${options.customer.lastName}`,
+    subject,
+    html,
+    text,
+    tags: ['membership', 'welcome'],
+  });
 }
 
 export default function ReviewAndEnroll() {

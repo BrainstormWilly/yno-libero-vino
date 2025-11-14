@@ -42,6 +42,12 @@ export class SendGridProvider implements CommunicationProvider {
     const fromEmail = params.fromEmail ?? this.defaultFromEmail;
     const fromName = params.fromName ?? this.defaultFromName;
 
+    const content: Array<{ type: string; value: string }> = [];
+    if (params.text) {
+      content.push({ type: 'text/plain', value: params.text });
+    }
+    content.push({ type: 'text/html', value: params.html });
+
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
@@ -66,33 +72,23 @@ export class SendGridProvider implements CommunicationProvider {
           name: fromName,
         },
         subject: params.subject,
-        content: [
-          {
-            type: 'text/html',
-            value: params.html,
-          },
-          params.text
-            ? {
-                type: 'text/plain',
-                value: params.text,
-              }
-            : undefined,
-        ].filter(Boolean),
+        content,
         template_id: params.templateId,
         categories: params.tags,
       }),
     });
 
+    const responseBody = await response.text();
+
     if (!response.ok) {
-      const errorBody = await response.text();
       throw new Error(
-        `SendGrid API error (${response.status} ${response.statusText}): ${errorBody}`
+        `SendGrid API error (${response.status} ${response.statusText}): ${responseBody}`
       );
     }
 
     return {
       success: true,
-      response: await response.text(),
+      response: responseBody,
     };
   }
 

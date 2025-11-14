@@ -107,9 +107,9 @@ export class CommunicationManager {
 
 export function createCommunicationManager() {
   return new CommunicationManager({
-    defaultSendgridApiKey: process.env.LV_SENDGRID_API_KEY ?? process.env.SENDGRID_API_KEY,
-    defaultSendgridFromEmail: process.env.LV_SENDGRID_FROM_EMAIL,
-    defaultSendgridFromName: process.env.LV_SENDGRID_FROM_NAME,
+    defaultSendgridApiKey: process.env.SENDGRID_API_KEY,
+    defaultSendgridFromEmail: process.env.SENDGRID_FROM_EMAIL,
+    defaultSendgridFromName: process.env.SENDGRID_FROM_NAME,
     defaultKlaviyoApiKey: process.env.KLAVIYO_API_KEY,
   });
 }
