@@ -1,6 +1,6 @@
 # SendGrid Setup & Testing Guide
 
-Authoritative checklist for wiring SendGrid into LiberoVino during client onboarding. Use this when Klaviyo isn’t available or the winery prefers SendGrid for transactional messaging.
+Authoritative checklist for wiring SendGrid into LiberoVino during client onboarding. Use this when Klaviyo or Mailchimp isn’t available and the winery prefers SendGrid for transactional messaging.
 
 ## 1. Prerequisites
 
@@ -13,9 +13,9 @@ Authoritative checklist for wiring SendGrid into LiberoVino during client onboar
 Add the following to `.env.local` (or the environment that runs Remix):
 
 ```
-LV_SENDGRID_API_KEY=SG.xxxxxx
-LV_SENDGRID_FROM_EMAIL=support@ynosoftware.com
-LV_SENDGRID_FROM_NAME=LiberoVino Support
+SENDGRID_API_KEY=SG.xxxxxx
+SENDGRID_FROM_EMAIL=support@ynosoftware.com
+SENDGRID_FROM_NAME=LiberoVino Support
 ```
 
 `createCommunicationManager()` falls back to these defaults when Supabase does not yet have a stored provider config.
@@ -24,14 +24,14 @@ LV_SENDGRID_FROM_NAME=LiberoVino Support
 
 1. Go to **Setup → Email Communication** in the LiberoVino app.
 2. Select **SendGrid** as the provider.
-3. Paste the API key (it is encrypted at rest in `communication_configs`).
-4. Enter the default **From Email/Name** that matches the authenticated domain.
-5. Click **Save**. Switching providers automatically clears leftover Klaviyo keys to avoid accidental reuse.
+3. LiberoVino-managed SendGrid uses the `SENDGRID_*` defaults; leave the API key blank unless the client insists on using their own key.
+4. Enter the default **From Email/Name** that matches the authenticated domain (required even when using LiberoVino’s key).
+5. Click **Save**. Switching providers automatically clears leftover Klaviyo/Mailchimp keys to avoid accidental reuse.
 
 ## 4. Test Email Flow
 
 1. In the same screen, click **Send Test Email**.
-2. The server calls `sendClientTestEmail()` which routes directly through `SendGridProvider.sendEmail()`.
+2. The server calls `sendClientTestEmail()` which routes through `SendGridProvider.sendEmail()` using the LiberoVino-managed API key.
 3. Expected response: HTTP 202 with empty body (SendGrid queues the message). Console log shows `SendGrid response ""`.
 4. In SendGrid → Activity Feed, the event should progress `Received → Processed → Delivered`.
 

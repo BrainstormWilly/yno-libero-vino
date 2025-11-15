@@ -18,10 +18,11 @@ import * as db from '~/lib/db/supabase.server';
 import { crmManager } from '~/lib/crm';
 import { addSessionToUrl } from '~/util/session';
 import { KLAVIYO_METRICS } from '~/lib/communication/klaviyo.constants';
+import { MAILCHIMP_TAGS } from '~/lib/communication/mailchimp.constants';
 import { KlaviyoProvider } from '~/lib/communication/providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from '~/lib/communication/preferences';
-import { sendClientEmail } from '~/lib/communication/communication.service.server';
+import { sendClientEmail, trackClientEvent } from '~/lib/communication/communication.service.server';
 
 type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
 
@@ -144,7 +145,8 @@ export async function action({ request }: ActionFunctionArgs) {
     
     if (communicationConfig) {
       const providerData = (communicationConfig.provider_data ?? null) as unknown as KlaviyoProviderData | null;
-      if (communicationConfig.email_provider?.toLowerCase() === 'klaviyo') {
+      const providerKey = communicationConfig.email_provider?.toLowerCase();
+      if (providerKey === 'klaviyo') {
         await triggerKlaviyoClubSignup({
           clientId: session.clientId,
           clientName: client?.org_name ?? null,
@@ -169,6 +171,29 @@ export async function action({ request }: ActionFunctionArgs) {
           enrollmentDate,
           expirationDate,
           purchaseAmount: draft.tier.purchaseAmount,
+        });
+      } else if (providerKey === 'mailchimp') {
+        await triggerMailchimpClubSignup({
+          clientId: session.clientId,
+          clientName: client?.org_name ?? null,
+          communicationConfig,
+          preferences,
+          customer: {
+            email: draft.customer.email,
+            firstName: draft.customer.firstName,
+            lastName: draft.customer.lastName,
+            crmId: draft.customer.crmId,
+          },
+          lvCustomerId: lvCustomer.id,
+          crmMembershipId: crmMembership.id || null,
+          tier: {
+            id: draft.tier.id,
+            name: draft.tier.name,
+            durationMonths: draft.tier.durationMonths,
+            minPurchaseAmount: draft.tier.minPurchaseAmount,
+          },
+          enrollmentDate,
+          expirationDate,
         });
       } else {
         try {
@@ -335,6 +360,82 @@ async function triggerKlaviyoClubSignup(options: {
     });
   } catch (error) {
     console.warn('Klaviyo ClubSignup trigger failed:', error);
+  }
+}
+
+async function triggerMailchimpClubSignup(options: {
+  clientId: string;
+  clientName?: string | null;
+  communicationConfig: CommunicationConfigRow;
+  preferences: CommunicationPreferences;
+  customer: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    crmId: string;
+  };
+  lvCustomerId: string;
+  crmMembershipId: string | null;
+  tier: {
+    id: string;
+    name: string;
+    durationMonths: number;
+    minPurchaseAmount: number;
+  };
+  enrollmentDate: Date;
+  expirationDate: Date;
+}): Promise<void> {
+  if (!options.communicationConfig || options.communicationConfig.email_provider !== 'mailchimp') {
+    return;
+  }
+
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Mailchimp ClubSignup event: member unsubscribed from all communications.');
+    return;
+  }
+
+  const membershipProps = {
+    client_id: options.clientId,
+    client_name: options.clientName ?? undefined,
+    membership_status: 'active',
+    membership_started_at: options.enrollmentDate.toISOString(),
+    membership_expires_at: options.expirationDate.toISOString(),
+    tier_id: options.tier.id,
+    tier_name: options.tier.name,
+    tier_duration_months: options.tier.durationMonths,
+    tier_min_purchase_amount: options.tier.minPurchaseAmount,
+    communication_preferences: options.preferences,
+    lv_customer_id: options.lvCustomerId,
+    crm_membership_id: options.crmMembershipId,
+  };
+
+  try {
+    await trackClientEvent(options.clientId, {
+      event: MAILCHIMP_TAGS.CLUB_SIGNUP,
+      customer: {
+        email: options.customer.email,
+        id: options.customer.crmId,
+        properties: {
+          first_name: options.customer.firstName,
+          last_name: options.customer.lastName,
+          ...membershipProps,
+        },
+      },
+      properties: {
+        ...membershipProps,
+        signup_channel: 'sales-associate',
+        source: 'LiberoVino::ClubSignup',
+      },
+      time: options.enrollmentDate.toISOString(),
+    });
+
+    console.info('Mailchimp ClubSignup event sent', {
+      clientId: options.clientId,
+      email: options.customer.email,
+      crmCustomerId: options.customer.crmId,
+    });
+  } catch (error) {
+    console.warn('Mailchimp ClubSignup trigger failed:', error);
   }
 }
 

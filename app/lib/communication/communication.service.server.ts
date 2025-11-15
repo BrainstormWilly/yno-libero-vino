@@ -10,6 +10,7 @@ import type {
 
 import { createCommunicationManager, type CommunicationConfig } from './communication-manager.server';
 import { KLAVIYO_METRICS } from './klaviyo.constants';
+import { MAILCHIMP_TAGS } from './mailchimp.constants';
 
 const communicationManager = createCommunicationManager();
 
@@ -58,9 +59,34 @@ export async function sendClientTestEmail(
     options?.text ??
     'This is a test message triggered from your LiberoVino integration. If you received the corresponding Klaviyo flow, your communication setup is working.';
 
-  if (config.email_provider?.toLowerCase() === 'klaviyo') {
+  const providerKey = config.email_provider?.toLowerCase();
+
+  if (providerKey === 'klaviyo') {
     const event: TrackEventParams = {
       event: KLAVIYO_METRICS.TEST,
+      customer: {
+        email: to,
+        id: `test-${clientId}`,
+        properties: {
+          test_triggered_at: new Date().toISOString(),
+          source: 'LiberoVino::send-test',
+        },
+      },
+      properties: {
+        subject,
+        text_preview: text,
+        html_preview: html,
+        source: 'LiberoVino::send-test',
+      },
+    };
+
+    await trackClientEvent(clientId, event);
+    return { success: true } satisfies TrackEventResult;
+  }
+
+  if (providerKey === 'mailchimp') {
+    const event: TrackEventParams = {
+      event: MAILCHIMP_TAGS.TEST,
       customer: {
         email: to,
         id: `test-${clientId}`,

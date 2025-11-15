@@ -92,10 +92,10 @@ const TEMPLATE_CONFIG: Record<KlaviyoTemplateKey, TemplateConfig> = {
     marketing: true,
   },
   TEST: {
-    subject: 'Test – confirm your LiberoVino Klaviyo integration',
+    subject: 'Test – confirm your LiberoVino automation',
     previewText: 'A friendly diagnostic to confirm delivery.',
     headline: 'Integration test',
-    intro: 'If you can read this in Klaviyo, the integration is ready.',
+    intro: 'If you can read this, your LiberoVino email automation is ready.',
     cta: 'View your dashboard',
   },
 };

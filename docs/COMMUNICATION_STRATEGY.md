@@ -983,13 +983,14 @@ Add to `env.example`:
 
 # Mailchimp
 MAILCHIMP_API_KEY=your_mailchimp_api_key
-MAILCHIMP_DEFAULT_LIST_ID=your_list_id
 
 # Klaviyo
 KLAVIYO_API_KEY=your_klaviyo_api_key
 
-# SendGrid (backup)
+# SendGrid (LiberoVino managed defaults)
 SENDGRID_API_KEY=your_sendgrid_api_key
+SENDGRID_FROM_EMAIL=noreply@liberovino.com
+SENDGRID_FROM_NAME=LiberoVino
 
 # RedChirp
 REDCHIRP_API_KEY=your_redchirp_api_key

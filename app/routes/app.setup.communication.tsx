@@ -19,10 +19,12 @@ import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import type { Database } from '~/types/supabase';
+
+type ProviderDataJson =
+  Database['public']['Tables']['communication_configs']['Insert']['provider_data'];
 import { sendClientTestEmail } from '~/lib/communication/communication.service.server';
 import { seedKlaviyoResources } from '~/lib/communication/klaviyo-seeding.server';
-import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
-
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
   if (!session) {
@@ -67,20 +69,30 @@ export async function action({ request }: ActionFunctionArgs) {
 
     try {
       await sendClientTestEmail(session.clientId, testEmail);
-      const message = providerKey === 'klaviyo'
-        ? `Triggered the Klaviyo test flow for ${testEmail}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the message.`
-        : `Sent test email to ${testEmail}.`;
+      let message: string;
+      if (providerKey === 'klaviyo') {
+        message = `Triggered the Klaviyo test flow for ${testEmail}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the message.`;
+      } else if (providerKey === 'mailchimp') {
+        message = `Triggered the Mailchimp test tag for ${testEmail}. Check the "LiberoVino – Test" journey to confirm delivery.`;
+      } else {
+        message = `Sent test email to ${testEmail}.`;
+      }
       return {
         success: true,
         message,
       };
     } catch (error) {
-      const fallbackMessage =
-        providerKey === 'klaviyo'
-          ? 'Unable to trigger the Klaviyo test flow. Confirm the "LiberoVino – Test Flow" exists and is set to Live, then try again.'
-          : error instanceof Error
-            ? error.message
-            : 'Failed to send test email. Please check your configuration.';
+      let fallbackMessage: string;
+      if (providerKey === 'klaviyo') {
+        fallbackMessage =
+          'Unable to trigger the Klaviyo test flow. Confirm the "LiberoVino – Test Flow" exists and is set to Live, then try again.';
+      } else if (providerKey === 'mailchimp') {
+        fallbackMessage =
+          'Unable to trigger the Mailchimp test automation. Confirm the audience and templates are seeded and that the "LiberoVino – Test" journey is active.';
+      } else {
+        fallbackMessage =
+          error instanceof Error ? error.message : 'Failed to send test email. Please check your configuration.';
+      }
       return {
         success: false,
         message: fallbackMessage,
@@ -93,6 +105,10 @@ export async function action({ request }: ActionFunctionArgs) {
   const fromEmail = formData.get('from_email') as string;
   const fromName = formData.get('from_name') as string;
   const listId = formData.get('list_id') as string;
+  const serverPrefix = formData.get('server_prefix') as string;
+  const marketingAccessToken = formData.get('marketing_access_token') as string;
+  const audienceName = formData.get('audience_name') as string;
+  const mailchimpAck = formData.get('mailchimp_ack') === 'true';
   const sendMonthlyStatus = formData.get('send_monthly_status') === 'true';
   const sendExpirationWarnings = formData.get('send_expiration_warnings') === 'true';
   const warningDays = formData.get('warning_days') as string;
@@ -115,23 +131,46 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
   
-  // Mailchimp not yet supported
   if (provider === 'mailchimp') {
-    return {
-      success: false,
-      message: 'Mailchimp support coming soon',
-    };
+    if (!fromEmail || !fromName || !serverPrefix) {
+      return {
+        success: false,
+        message: 'Mailchimp requires server prefix plus From Email/Name.',
+      };
+    }
+
+    if (!marketingAccessToken) {
+      return {
+        success: false,
+        message: 'Provide a Mailchimp Marketing access token or API key so we can manage audiences.',
+      };
+    }
+
+    if (!mailchimpAck) {
+      return {
+        success: false,
+        message: 'Confirm that journeys/flows are created for the LiberoVino tags before continuing.',
+      };
+    }
   }
   
   try {
     const existingConfig = await db.getCommunicationConfig(session.clientId);
     
+    const needsApiKey = provider === 'klaviyo';
+    const needsIdentity = provider === 'klaviyo' || provider === 'mailchimp';
+
     const configData = {
       emailProvider: provider,
-      emailApiKey: provider === 'klaviyo' ? apiKey : null,
-      emailFromAddress: provider === 'klaviyo' ? fromEmail : null,
-      emailFromName: provider === 'klaviyo' ? fromName : null,
-      emailListId: provider === 'klaviyo' && listId ? listId : null,
+      emailApiKey: needsApiKey ? apiKey : undefined,
+      emailFromAddress: needsIdentity ? fromEmail : undefined,
+      emailFromName: needsIdentity ? fromName : undefined,
+      emailListId:
+        provider === 'klaviyo' && listId
+          ? listId
+          : provider === 'mailchimp' && listId
+            ? listId
+            : undefined,
       sendMonthlyStatus,
       sendExpirationWarnings,
       warningDaysBefore: parseInt(warningDays) || 7,
@@ -154,7 +193,7 @@ export async function action({ request }: ActionFunctionArgs) {
         });
 
         savedConfig = await db.updateCommunicationConfig(session.clientId, {
-          providerData: providerData as unknown as Record<string, unknown>,
+          providerData: providerData as unknown as ProviderDataJson,
         });
       } catch (error) {
         console.error('Klaviyo seeding failed', error);
@@ -166,9 +205,31 @@ export async function action({ request }: ActionFunctionArgs) {
               : 'Failed to initialize Klaviyo automations.',
         };
       }
+    } else if (provider === 'mailchimp') {
+      const previousProviderData =
+        (savedConfig?.provider_data && typeof savedConfig.provider_data === 'object' && !Array.isArray(savedConfig.provider_data)
+          ? (savedConfig.provider_data as Record<string, unknown>)
+          : {}) ?? {};
+
+      const nextProviderData = {
+        ...previousProviderData,
+        serverPrefix,
+        marketingAccessToken,
+        audienceName: audienceName || null,
+      };
+
+      await db.updateCommunicationConfig(session.clientId, {
+        providerData: nextProviderData as unknown as ProviderDataJson,
+      });
+    } else if (provider === 'sendgrid') {
+      await db.updateCommunicationConfig(session.clientId, {
+        emailApiKey: null,
+        emailFromAddress: null,
+        emailFromName: null,
+      });
     } else if (savedConfig?.provider_data && provider !== 'klaviyo') {
       await db.updateCommunicationConfig(session.clientId, {
-        providerData: {},
+        providerData: {} as ProviderDataJson,
       });
     }
     
@@ -190,12 +251,24 @@ export default function SetupCommunication() {
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
  
-  const providerData = (existingConfig?.provider_data as KlaviyoProviderData | null) ?? null;
+  const providerData = (existingConfig?.provider_data as Record<string, unknown> | null) ?? null;
+
+  const readProviderString = (key: string) => {
+    const value = providerData?.[key];
+    return typeof value === 'string' ? value : '';
+  };
+
+  const readProviderBoolean = (key: string, fallback = false) => {
+    const value = providerData?.[key];
+    return typeof value === 'boolean' ? (value as boolean) : fallback;
+  };
 
   const [provider, setProvider] = useState(
     existingConfig?.email_provider || 'sendgrid'
   );
-  const [apiKey, setApiKey] = useState(existingConfig?.email_api_key || '');
+  const initialApiKey =
+    existingConfig?.email_provider === 'klaviyo' ? existingConfig.email_api_key ?? '' : '';
+  const [apiKey, setApiKey] = useState(initialApiKey);
   const [fromEmail, setFromEmail] = useState(existingConfig?.email_from_address || '');
   const [fromName, setFromName] = useState(existingConfig?.email_from_name || '');
   const [listId, setListId] = useState(existingConfig?.email_list_id || '');
@@ -209,7 +282,15 @@ export default function SetupCommunication() {
     (existingConfig?.warning_days_before || 7).toString()
   );
   const [testEmail, setTestEmail] = useState(existingConfig?.email_from_address || '');
-  const [includeMarketing, setIncludeMarketing] = useState(providerData?.includeMarketing ?? false);
+  const [includeMarketing, setIncludeMarketing] = useState(readProviderBoolean('includeMarketing'));
+  const [mailchimpServerPrefix, setMailchimpServerPrefix] = useState(readProviderString('serverPrefix'));
+  const [mailchimpMarketingToken, setMailchimpMarketingToken] = useState(
+    readProviderString('marketingAccessToken')
+  );
+  const [mailchimpAudienceName, setMailchimpAudienceName] = useState(readProviderString('audienceName'));
+  const [mailchimpChecklistAcknowledged, setMailchimpChecklistAcknowledged] = useState(
+    Boolean(existingConfig?.provider_data && provider === 'mailchimp')
+  );
   
   useEffect(() => {
     setupAutoResize();
@@ -223,6 +304,7 @@ export default function SetupCommunication() {
   }, [actionData, navigate]);
   
   const isKlaviyo = provider === 'klaviyo';
+  const isMailchimp = provider === 'mailchimp';
   
   return (
     <Page
@@ -283,10 +365,9 @@ export default function SetupCommunication() {
                       helpText: 'Use your own Klaviyo account for advanced email marketing and automation',
                     },
                     {
-                      label: 'Mailchimp (Coming Soon)',
+                      label: 'Mailchimp',
                       value: 'mailchimp',
-                      disabled: true,
-                      helpText: 'Mailchimp support will be available soon',
+                      helpText: 'Connect your Mailchimp account for audience management and automations',
                     },
                     {
                       label: 'SendGrid (LiberoVino Managed)',
@@ -344,6 +425,92 @@ export default function SetupCommunication() {
                   </BlockStack>
                 )}
                 
+                {isMailchimp && (
+                  <Card>
+                    <BlockStack gap="200">
+                      <Banner tone="warning">
+                        Mailchimp needs your data-center prefix, marketing access token, and verified sender info.
+                        Set up your journeys/flows in Mailchimp before turning on automations here.
+                      </Banner>
+                      <Text variant="headingMd" as="h3">
+                        Mailchimp Automations Checklist
+                      </Text>
+                      <Text variant="bodyMd" tone="subdued" as="p">
+                        LiberoVino will only trigger tags—Journeys/Flows must be created and activated in Mailchimp.
+                      </Text>
+                      <BlockStack gap="100">
+                        <InlineStack align="space-between">
+                          <Text as="p">Audience</Text>
+                          <Text as="p" tone="subdued">`LiberoVino Members`</Text>
+                        </InlineStack>
+                        <ul>
+                          <li><strong>LiberoVino::Test</strong> – Send the seeded “LiberoVino – Test” template.</li>
+                          <li><strong>LiberoVino::ClubSignup</strong> – Welcome members immediately after enrollment.</li>
+                          <li><strong>LiberoVino::MonthlyStatus</strong> – Monthly status update automation.</li>
+                          <li><strong>LiberoVino::ExpirationWarning</strong> – Warn members 7 days before duration end.</li>
+                        </ul>
+                      </BlockStack>
+                      <Checkbox
+                        label="Journeys/flows created and activated"
+                        helpText="Required: the app only publishes tags; you must wire each tag to an active automation."
+                        checked={mailchimpChecklistAcknowledged}
+                        onChange={setMailchimpChecklistAcknowledged}
+                      />
+                    </BlockStack>
+                  </Card>
+                )}
+
+                {/* Mailchimp Configuration */}
+                {isMailchimp && (
+                  <BlockStack gap="400">
+                    <TextField
+                      label="Server Prefix (data center)"
+                      value={mailchimpServerPrefix}
+                      onChange={setMailchimpServerPrefix}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="Found in your Mailchimp API URL (e.g., us21)"
+                    />
+
+                    <TextField
+                      label="Marketing access token or API key"
+                      type="password"
+                      value={mailchimpMarketingToken}
+                      onChange={setMailchimpMarketingToken}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="OAuth access token or classic API key for Marketing API calls"
+                    />
+
+                    <TextField
+                      label="From Email Address"
+                      type="email"
+                      value={fromEmail}
+                      onChange={setFromEmail}
+                      autoComplete="email"
+                      requiredIndicator
+                      helpText="Must match a verified domain in Mailchimp"
+                    />
+
+                    <TextField
+                      label="From Name"
+                      value={fromName}
+                      onChange={setFromName}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="Displayed sender name"
+                    />
+
+                    <TextField
+                      label="Audience name (optional)"
+                      value={mailchimpAudienceName}
+                      onChange={setMailchimpAudienceName}
+                      autoComplete="off"
+                      helpText="Used as the default audience when seeding resources"
+                    />
+                  </BlockStack>
+                )}
+
                 {/* SendGrid Info */}
                 {provider === 'sendgrid' && (
                   <Banner tone="success">
@@ -398,7 +565,11 @@ export default function SetupCommunication() {
                 {/* Hidden Inputs */}
                 <input type="hidden" name="intent" value="save" />
                 <input type="hidden" name="provider" value={provider} />
-                <input type="hidden" name="api_key" value={apiKey} />
+                <input
+                  type="hidden"
+                  name="api_key"
+                  value={provider === 'klaviyo' ? apiKey : ''}
+                />
                 <input type="hidden" name="from_email" value={fromEmail} />
                 <input type="hidden" name="from_name" value={fromName} />
                 <input type="hidden" name="list_id" value={listId} />
@@ -406,6 +577,14 @@ export default function SetupCommunication() {
                 <input type="hidden" name="send_expiration_warnings" value={sendExpirationWarnings.toString()} />
                 <input type="hidden" name="warning_days" value={warningDays} />
                 <input type="hidden" name="include_marketing" value={includeMarketing.toString()} />
+                <input type="hidden" name="server_prefix" value={mailchimpServerPrefix} />
+                <input type="hidden" name="marketing_access_token" value={mailchimpMarketingToken} />
+                <input type="hidden" name="audience_name" value={mailchimpAudienceName} />
+                <input
+                  type="hidden"
+                  name="mailchimp_ack"
+                  value={mailchimpChecklistAcknowledged ? 'true' : 'false'}
+                />
                 
                 <InlineStack align="space-between">
                   <Button
@@ -428,7 +607,9 @@ export default function SetupCommunication() {
         </Layout.Section>
 
         {/* Test Email */}
-        {(provider === 'klaviyo' || provider === 'sendgrid') && (
+        {(provider === 'klaviyo' ||
+          provider === 'sendgrid' ||
+          (provider === 'mailchimp' && mailchimpChecklistAcknowledged)) && (
           <Layout.Section>
             <Card>
               <BlockStack gap="300">
@@ -438,7 +619,9 @@ export default function SetupCommunication() {
                 <Text variant="bodyMd" as="p" tone="subdued">
                   {provider === 'klaviyo'
                     ? 'Triggers the LiberoVino Test Flow in Klaviyo using your current settings. Use this to confirm API keys, sender info, and that the flow is set to Live.'
-                    : 'Sends a simple transactional email via SendGrid using your current settings. Use this to confirm API keys and domain settings are correct.'}
+                    : provider === 'mailchimp'
+                      ? 'Applies the LiberoVino::Test tag in Mailchimp. Make sure the “LiberoVino – Test” journey is active to receive the email.'
+                      : 'Sends a simple transactional email via SendGrid using your current settings. Use this to confirm API keys and domain settings are correct.'}
                 </Text>
 
                 <Form method="post">

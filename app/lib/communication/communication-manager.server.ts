@@ -10,6 +10,7 @@ import type {
 } from '~/types/communication';
 
 import { KlaviyoProvider } from './providers/klaviyo.server';
+import { MailchimpProvider } from './providers/mailchimp.server';
 import { SendGridProvider } from './providers/sendgrid.server';
 
 export type CommunicationConfig = Database['public']['Tables']['communication_configs']['Row'];
@@ -21,6 +22,11 @@ interface CommunicationManagerOptions {
   defaultKlaviyoApiKey?: string;
   defaultKlaviyoFromEmail?: string;
   defaultKlaviyoFromName?: string;
+  defaultMailchimpServerPrefix?: string;
+  defaultMailchimpMarketingToken?: string;
+  defaultMailchimpAudienceId?: string;
+  defaultMailchimpFromEmail?: string;
+  defaultMailchimpFromName?: string;
 }
 
 export class CommunicationManager {
@@ -42,7 +48,47 @@ export class CommunicationManager {
       });
     }
 
-    const sendgridApiKey = config?.email_api_key ?? this.options.defaultSendgridApiKey;
+    if (providerKey === 'mailchimp') {
+      const providerData = MailchimpProvider.parseProviderData(config?.provider_data ?? null);
+      const serverPrefix =
+        providerData.serverPrefix ??
+        this.options.defaultMailchimpServerPrefix ??
+        process.env.MAILCHIMP_SERVER_PREFIX ??
+        null;
+      const marketingToken =
+        providerData.marketingAccessToken ??
+        this.options.defaultMailchimpMarketingToken ??
+        process.env.MAILCHIMP_ACCESS_TOKEN ??
+        null;
+      const audienceId =
+        config?.email_list_id ??
+        providerData.audienceId ??
+        this.options.defaultMailchimpAudienceId ??
+        null;
+
+      if (!serverPrefix) {
+        throw new Error('Mailchimp provider selected but no data center/server prefix is configured.');
+      }
+
+      return new MailchimpProvider({
+        serverPrefix,
+        defaultFromEmail:
+          config?.email_from_address ??
+          this.options.defaultMailchimpFromEmail ??
+          this.options.defaultSendgridFromEmail ??
+          '',
+        defaultFromName:
+          config?.email_from_name ??
+          this.options.defaultMailchimpFromName ??
+          this.options.defaultSendgridFromName ??
+          undefined,
+        marketingAccessToken: marketingToken,
+        audienceId,
+      });
+    }
+
+    const sendgridApiKey =
+      config?.email_api_key ?? process.env.SENDGRID_API_KEY ?? this.options.defaultSendgridApiKey;
     const sendgridFromEmail = config?.email_from_address ?? this.options.defaultSendgridFromEmail;
     const sendgridFromName = config?.email_from_name ?? this.options.defaultSendgridFromName;
 
@@ -111,5 +157,9 @@ export function createCommunicationManager() {
     defaultSendgridFromEmail: process.env.SENDGRID_FROM_EMAIL,
     defaultSendgridFromName: process.env.SENDGRID_FROM_NAME,
     defaultKlaviyoApiKey: process.env.KLAVIYO_API_KEY,
+    defaultMailchimpServerPrefix: process.env.MAILCHIMP_SERVER_PREFIX,
+    defaultMailchimpMarketingToken: process.env.MAILCHIMP_ACCESS_TOKEN,
+    defaultMailchimpFromEmail: process.env.MAILCHIMP_FROM_EMAIL,
+    defaultMailchimpFromName: process.env.MAILCHIMP_FROM_NAME,
   });
 }
