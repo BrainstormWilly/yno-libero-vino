@@ -5,7 +5,7 @@ import { Banner, Box, Button, InlineStack, BlockStack } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { sendClientTestEmail } from '~/lib/communication/communication.service.server';
-import { getEmailProviderComponent, getSMSProviderComponent } from '~/components/communication/providers';
+import { getEmailProviderComponent } from '~/components/communication/providers';
 import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
 import { seedKlaviyoResources } from '~/lib/communication/klaviyo-seeding.server';
 import { seedMailchimpResources } from '~/lib/communication/mailchimp-seeding.server';
@@ -61,6 +61,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   // Handle confirm provider - save config temporarily before testing
   if (intent === 'confirm_provider') {
     const testEmail = formData.get('test_email') as string;
+    const testPhone = formData.get('test_phone') as string | null;
 
     if (!testEmail) {
       return {
@@ -87,7 +88,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
       
       // Read config from form data
       const emailProvider = formData.get('email_provider') as string | null;
+      const previousProvider = existingConfig?.email_provider?.toLowerCase();
+      const newProvider = emailProvider?.toLowerCase();
+      const isProviderChanging = existingConfig && previousProvider !== newProvider;
+      
       if (emailProvider) configData.emailProvider = emailProvider;
+
+      // If switching providers, clear provider-specific data
+      if (isProviderChanging) {
+        // Clear Mailchimp-specific fields when switching away
+        if (previousProvider === 'mailchimp') {
+          configData.emailListId = null;
+          configData.providerData = {}; // provider_data is NOT NULL, use empty object
+        }
+        // Clear Klaviyo-specific fields when switching away
+        if (previousProvider === 'klaviyo') {
+          configData.providerData = {}; // provider_data is NOT NULL, use empty object
+        }
+        // Clear API keys when switching to SendGrid (uses env vars)
+        if (newProvider === 'sendgrid') {
+          configData.emailApiKey = null;
+        }
+      }
 
       const emailApiKey = formData.get('email_api_key') as string | null;
       if (emailApiKey !== null) configData.emailApiKey = emailApiKey || null;
@@ -235,10 +257,39 @@ export async function action({ request, params }: ActionFunctionArgs) {
         });
         
         let message: string;
+        let smsResult: { success: boolean; message?: string } | null = null;
+        
+        // Send SMS test if phone number is provided
+        if (testPhone) {
+          const { sendClientTestSMS } = await import('~/lib/communication/communication.service.server');
+          try {
+            smsResult = await sendClientTestSMS(session.clientId, testPhone);
+          } catch (smsError) {
+            smsResult = {
+              success: false,
+              message: smsError instanceof Error ? smsError.message : 'Failed to send test SMS',
+            };
+          }
+        }
+        
         if (providerKey === 'klaviyo') {
-          message = `Triggered the Klaviyo test flow for ${testEmail}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the message.`;
+          if (testPhone && smsResult?.success) {
+            message = `Triggered the Klaviyo test flow for ${testEmail} and ${testPhone}. The flow includes both email and SMS steps. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the messages.`;
+          } else if (testPhone && !smsResult?.success) {
+            message = `Triggered the Klaviyo test flow for ${testEmail}. SMS test failed: ${smsResult?.message || 'Unknown error'}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo.`;
+          } else {
+            message = `Triggered the Klaviyo test flow for ${testEmail}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the message.`;
+          }
         } else if (providerKey === 'mailchimp') {
-                  message = `Triggered the Mailchimp test tag for ${testEmail}. Check your LiberoVino test flow to confirm delivery.`;
+          message = `Triggered the Mailchimp test tag for ${testEmail}. Check your LiberoVino test flow to confirm delivery.`;
+        } else if (providerKey === 'sendgrid') {
+          if (testPhone && smsResult?.success) {
+            message = `Sent test email to ${testEmail} and test SMS to ${testPhone}. Check your inbox and phone to confirm delivery. Allow 5-10 minutes.`;
+          } else if (testPhone && !smsResult?.success) {
+            message = `Sent test email to ${testEmail}. SMS test failed: ${smsResult?.message || 'Unknown error'}. Check your inbox to confirm email delivery. Allow 5-10 minutes.`;
+          } else {
+            message = `Sent test email to ${testEmail}. Check your inbox to confirm delivery. Allow 5-10 minutes.`;
+          }
         } else {
           message = `Sent test email to ${testEmail}.`;
         }
@@ -254,7 +305,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
             'Unable to trigger the Klaviyo test flow. Confirm the "LiberoVino – Test Flow" exists and is set to Live, then try again.';
         } else if (providerKey === 'mailchimp') {
           fallbackMessage =
-                    'Unable to trigger the Mailchimp test automation. Confirm the audience and templates are seeded and that your LiberoVino test flow is active.';
+            'Unable to trigger the Mailchimp test automation. Confirm the audience and templates are seeded and that your LiberoVino test flow is active.';
+        } else if (providerKey === 'sendgrid') {
+          fallbackMessage =
+            error instanceof Error ? `Error: ${error.message}` : 'Failed to send test email. Please check your configuration.';
         } else {
           fallbackMessage =
             error instanceof Error ? error.message : 'Failed to send test email. Please check your configuration.';
@@ -299,7 +353,6 @@ export default function ProviderSetup() {
   
   // For LV-managed, also show SMS option if configured
   const showSMS = provider === 'sendgrid' && existingConfig?.sms_provider === 'twilio';
-  const SMSProviderComponent = showSMS ? getSMSProviderComponent('twilio') : null;
 
   return (
     <>
@@ -333,18 +386,6 @@ export default function ProviderSetup() {
           onContinue={() => navigate(addSessionToUrl('/app/setup/communication/templates', session.id))}
           hasSms={showSMS}
         />
-        {SMSProviderComponent && (
-          <Box paddingBlockStart="400">
-            <SMSProviderComponent 
-              existingConfig={existingConfig}
-              actionData={actionData ?? null}
-              session={session}
-              onBack={() => {}}
-              onContinue={() => navigate(addSessionToUrl('/app/setup/communication/templates', session.id))}
-              hasEmail={true}
-            />
-          </Box>
-        )}
       </Box>
     </>
   );

@@ -68,15 +68,19 @@ export async function sendClientTestEmail(
   options?: { subject?: string; html?: string; text?: string }
 ) {
   const config = ensureConfigForEmail(await getCommunicationConfig(clientId));
-  const subject = options?.subject ?? 'LiberoVino Test Email';
-  const html =
-    options?.html ??
-    `<p>This is a test message triggered from your LiberoVino integration. 🎉</p><p>If you received the corresponding Klaviyo flow, your communication setup is working.</p>`;
-  const text =
-    options?.text ??
-    'This is a test message triggered from your LiberoVino integration. If you received the corresponding Klaviyo flow, your communication setup is working.';
-
   const providerKey = config.email_provider?.toLowerCase();
+
+  // Get provider-specific test email content
+  const provider = communicationManager.resolveEmailProvider(config);
+  const defaultContent = provider.getTestEmailContent?.() ?? {
+    subject: 'LiberoVino Test Email',
+    html: '<p>This is a test message from your LiberoVino integration.</p>',
+    text: 'This is a test message from your LiberoVino integration.',
+  };
+
+  const subject = options?.subject ?? defaultContent.subject;
+  const html = options?.html ?? defaultContent.html;
+  const text = options?.text ?? defaultContent.text;
 
   if (providerKey === 'klaviyo') {
     const event: TrackEventParams = {

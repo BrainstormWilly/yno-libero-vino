@@ -5,6 +5,7 @@ import type {
   CommunicationProvider,
   EmailParams,
   EmailResult,
+  TestEmailContent,
   TrackEventParams,
   TrackEventResult,
   UpdateProfileParams,
@@ -474,6 +475,14 @@ export class MailchimpProvider implements CommunicationProvider {
     }
 
     return response;
+  }
+
+  getTestEmailContent(): TestEmailContent {
+    return {
+      subject: 'LiberoVino Test Email',
+      html: '<p>This is a test message triggered from your LiberoVino integration. 🎉</p><p>If you received the corresponding Mailchimp automation, your communication setup is working.</p>',
+      text: 'This is a test message triggered from your LiberoVino integration. If you received the corresponding Mailchimp automation, your communication setup is working.',
+    };
   }
 }
 

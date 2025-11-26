@@ -60,6 +60,12 @@ export interface UpdateProfileParams {
   properties?: Record<string, unknown>;
 }
 
+export interface TestEmailContent {
+  subject: string;
+  html: string;
+  text: string;
+}
+
 export interface CommunicationProvider {
   name: string;
   supportsEmail: boolean;
@@ -69,4 +75,5 @@ export interface CommunicationProvider {
   sendSMS?(params: SMSParams): Promise<SMSResult>;
   trackEvent?(params: TrackEventParams): Promise<TrackEventResult>;
   updateProfile?(params: UpdateProfileParams): Promise<void>;
+  getTestEmailContent?(): TestEmailContent;
 }

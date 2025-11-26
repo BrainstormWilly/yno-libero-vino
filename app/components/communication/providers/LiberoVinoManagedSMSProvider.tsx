@@ -23,7 +23,7 @@ export default function LiberoVinoManagedSMSProvider({ existingConfig }: SMSProv
                 No Configuration Needed
               </Text>
               <Text as="p" variant="bodySm">
-                LiberoVino will handle all SMS sending using our managed Twilio account.
+                LiberoVino will handle all SMS sending using our managed service.
                 You can always switch to Klaviyo, Mailchimp, or RedChirp later for advanced features.
               </Text>
             </BlockStack>

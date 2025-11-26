@@ -4,6 +4,7 @@ import type {
   EmailResult,
   SMSParams,
   SMSResult,
+  TestEmailContent,
   TrackEventParams,
   TrackEventResult,
   UpdateProfileParams,
@@ -754,5 +755,13 @@ export class KlaviyoProvider implements CommunicationProvider {
         `Failed to update flow ${params.flowId} to include SMS: ${errorMessage}`
       );
     }
+  }
+
+  getTestEmailContent(): TestEmailContent {
+    return {
+      subject: 'LiberoVino Test Email',
+      html: '<p>This is a test message triggered from your LiberoVino integration. 🎉</p><p>If you received the corresponding Klaviyo flow, your communication setup is working.</p>',
+      text: 'This is a test message triggered from your LiberoVino integration. If you received the corresponding Klaviyo flow, your communication setup is working.',
+    };
   }
 }

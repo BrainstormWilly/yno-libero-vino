@@ -221,6 +221,8 @@ export async function action({ request }: ActionFunctionArgs) {
           }
         } else if (providerKey === 'mailchimp') {
           message = `Triggered the Mailchimp test tag for ${testEmail}. Check your LiberoVino test flow to confirm delivery.`;
+        } else if (providerKey === 'sendgrid') {
+          message = `Sent test email to ${testEmail}. Check your inbox to confirm delivery.`;
         } else {
           message = `Sent test email to ${testEmail}.`;
         }
@@ -246,6 +248,9 @@ export async function action({ request }: ActionFunctionArgs) {
         } else if (providerKey === 'mailchimp') {
           fallbackMessage =
             'Unable to trigger the Mailchimp test automation. Confirm the audience and templates are seeded and that your LiberoVino test flow is active.';
+        } else if (providerKey === 'sendgrid') {
+          fallbackMessage =
+            error instanceof Error ? `Error: ${error.message}` : 'Failed to send test email. Please check your configuration.';
         } else {
           fallbackMessage =
             error instanceof Error ? error.message : 'Failed to send test email. Please check your configuration.';

@@ -4,7 +4,7 @@ import { Card, BlockStack, Text, Banner, TextField, InlineStack, Button } from '
 import EmailPreferencesForm from '../EmailPreferencesForm';
 import type { EmailProviderComponentProps } from './types';
 
-export default function LiberoVinoManagedEmailProvider({ existingConfig, actionData }: EmailProviderComponentProps) {
+export default function LiberoVinoManagedEmailProvider({ existingConfig, actionData, hasSms, onContinue }: EmailProviderComponentProps) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
   
@@ -13,7 +13,8 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
   const [warningDays, setWarningDays] = useState(
     (config?.warning_days_before || 7).toString()
   );
-  const [testEmail, setTestEmail] = useState(config?.email_from_address || '');
+  const [testEmail, setTestEmail] = useState('');
+  const [testPhone, setTestPhone] = useState('');
 
   const handleWarningDaysChange = (value: string) => {
     setWarningDays(value);
@@ -34,7 +35,7 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
                 No Configuration Needed
               </Text>
               <Text as="p" variant="bodySm">
-                LiberoVino will handle all email sending using our managed SendGrid account. 
+                LiberoVino will handle all email sending using our managed service. 
                 You can always switch to Klaviyo or Mailchimp later for advanced features.
               </Text>
             </BlockStack>
@@ -54,7 +55,7 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
               Confirm Provider
             </Text>
             <Text variant="bodyMd" as="p" tone="subdued">
-              Send a test email to verify your SendGrid configuration. This will send a simple transactional email via SendGrid using your current settings. Once confirmed, you can proceed to template setup.
+              Send a test email{hasSms ? ' and SMS' : ''} to verify your configuration. This will send a simple transactional message{hasSms ? 's' : ''} using your current settings. Once confirmed, you can proceed to template setup.
             </Text>
 
             {/* Result Banner - Hide during submission to clear previous results */}
@@ -67,10 +68,8 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
 
             <Form method="post">
               <input type="hidden" name="intent" value="confirm_provider" />
-              {/* Include current config for temporary save before testing */}
-              {config?.email_provider && (
-                <input type="hidden" name="email_provider" value={config.email_provider} />
-              )}
+              {/* Always send sendgrid as the provider for LiberoVino Managed */}
+              <input type="hidden" name="email_provider" value="sendgrid" />
               {/* Transactional notifications are always enabled */}
               <input type="hidden" name="send_monthly_status" value="true" />
               <input type="hidden" name="send_expiration_warnings" value="true" />
@@ -91,10 +90,31 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
 
                 <input type="hidden" name="test_email" value={testEmail} />
 
+                {hasSms && (
+                  <TextField
+                    label="Recipient phone (optional)"
+                    type="tel"
+                    value={testPhone}
+                    onChange={setTestPhone}
+                    autoComplete="tel"
+                    placeholder="+15551234567"
+                    disabled={isSubmitting}
+                    helpText="Test SMS will be sent via LiberoVino Managed"
+                  />
+                )}
+
+                {hasSms && <input type="hidden" name="test_phone" value={testPhone} />}
+
                 <InlineStack gap="200">
-                  <Button submit variant="primary" loading={isSubmitting} disabled={isSubmitting}>
-                    {isSubmitting ? 'Sending test email...' : 'Confirm Provider'}
-                  </Button>
+                  {actionData?.confirmed ? (
+                    <Button variant="primary" onClick={onContinue}>
+                      Continue to Templates →
+                    </Button>
+                  ) : (
+                    <Button submit variant="primary" loading={isSubmitting} disabled={isSubmitting}>
+                      {isSubmitting ? (hasSms && testPhone ? 'Sending test email and SMS...' : 'Sending test email...') : 'Confirm Provider'}
+                    </Button>
+                  )}
                 </InlineStack>
               </BlockStack>
             </Form>

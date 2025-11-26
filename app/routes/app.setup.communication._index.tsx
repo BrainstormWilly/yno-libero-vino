@@ -1,5 +1,6 @@
-import { type LoaderFunctionArgs } from 'react-router';
-import { useNavigate, useLoaderData } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
+import { useNavigate, useLoaderData, useActionData, Form } from 'react-router';
+import { useEffect } from 'react';
 import { useState } from 'react';
 import { 
   Card, 
@@ -15,6 +16,7 @@ import {
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { addSessionToUrl } from '~/util/session';
+import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
 import type { CommunicationConfig } from '~/lib/communication';
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -38,11 +40,84 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 }
 
-// No action needed - config is managed via context, saved at review step
+export async function action({ request }: ActionFunctionArgs) {
+  const session = await getAppSession(request);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const formData = await request.formData();
+  const intent = formData.get('intent') as string;
+
+  if (intent === 'save_providers') {
+    const emailProvider = formData.get('email_provider') as string | null;
+    const smsProvider = formData.get('sms_provider') as string | null;
+
+    if (!emailProvider) {
+      return {
+        success: false,
+        message: 'Email provider is required.',
+      };
+    }
+
+    try {
+      const existingConfig = await db.getCommunicationConfig(session.clientId);
+      const previousEmailProvider = existingConfig?.email_provider?.toLowerCase();
+      const newEmailProvider = emailProvider?.toLowerCase();
+      const isSwitchingFromSendGrid = previousEmailProvider === 'sendgrid' && newEmailProvider !== 'sendgrid';
+      
+      // Clear SMS provider when switching away from SendGrid (Mailchimp/Klaviyo handle SMS in their own accounts)
+      let finalSmsProvider = smsProvider || null;
+      if (isSwitchingFromSendGrid) {
+        finalSmsProvider = null;
+      } else if (newEmailProvider !== 'sendgrid') {
+        // If not SendGrid, don't allow SMS provider selection (Mailchimp/Klaviyo handle SMS separately)
+        finalSmsProvider = null;
+      }
+
+      if (existingConfig) {
+        // Update existing config
+        await db.updateCommunicationConfig(session.clientId, {
+          emailProvider,
+          smsProvider: finalSmsProvider,
+        });
+      } else {
+        // Create new config
+        await db.createCommunicationConfig(
+          session.clientId,
+          normalizeConfigForCreate(
+            {
+              emailProvider,
+              smsProvider: finalSmsProvider || undefined,
+            },
+            'sendgrid'
+          )
+        );
+      }
+
+      return {
+        success: true,
+        emailProvider,
+        smsProvider,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to save provider selection.',
+      };
+    }
+  }
+
+  return {
+    success: false,
+    message: 'Invalid action',
+  };
+}
 
 
 export default function CommunicationProviderSelection() {
   const { session, existingConfig } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
 
   // Use local state initialized from loader data to avoid hydration issues
@@ -99,6 +174,13 @@ export default function CommunicationProviderSelection() {
   const canProceed = hasSelection;
   const showWarning = isDirty && !hasSelection;
 
+  // Navigate after successful save
+  useEffect(() => {
+    if (actionData?.success && actionData.emailProvider) {
+      navigate(addSessionToUrl(`/app/setup/communication/${actionData.emailProvider}`, session.id));
+    }
+  }, [actionData, navigate, session.id]);
+
   return (
     <BlockStack gap="400">
       {/* Navigation Buttons at Top */}
@@ -110,20 +192,21 @@ export default function CommunicationProviderSelection() {
             ← Back to Tiers
           </Button>
           
-          <Button
-            variant="primary"
-            size="large"
-            onClick={() => {
-              if (emailProvider) {
-                navigate(addSessionToUrl(`/app/setup/communication/${emailProvider}`, session.id));
-              }
-            }}
-            disabled={!emailProvider}
-          >
-            {emailProvider 
-              ? `Continue to ${emailProvider === 'klaviyo' ? 'Klaviyo' : emailProvider === 'mailchimp' ? 'Mailchimp' : 'LiberoVino Managed'}` 
-              : 'Select a Provider'} →
-          </Button>
+          <Form method="post">
+            <input type="hidden" name="intent" value="save_providers" />
+            <input type="hidden" name="email_provider" value={emailProvider || ''} />
+            <input type="hidden" name="sms_provider" value={smsProvider || ''} />
+            <Button
+              variant="primary"
+              size="large"
+              submit
+              disabled={!emailProvider}
+            >
+              {emailProvider 
+                ? `Continue to ${emailProvider === 'klaviyo' ? 'Klaviyo' : emailProvider === 'mailchimp' ? 'Mailchimp' : 'LiberoVino Managed'}` 
+                : 'Select a Provider'} →
+            </Button>
+          </Form>
         </InlineStack>
       </Box>
 
@@ -162,12 +245,19 @@ export default function CommunicationProviderSelection() {
                     onChange={(checked) => {
                       setIsDirty(true);
                       const newProvider = checked ? choice.value : null;
+                      const previousProvider = emailProvider;
                       
                       // Update email provider
                       setEmailProvider(newProvider);
                       
+                      // Clear SMS provider when switching away from SendGrid
+                      // (Mailchimp and Klaviyo handle SMS in their own accounts)
+                      if (previousProvider === 'sendgrid' && newProvider !== 'sendgrid') {
+                        setSmsProvider(null);
+                      }
+                      
                       // Clear SMS provider if deselecting Klaviyo email
-                      if (!newProvider && emailProvider === 'klaviyo' && smsProvider === 'klaviyo') {
+                      if (!newProvider && previousProvider === 'klaviyo' && smsProvider === 'klaviyo') {
                         setSmsProvider(null);
                       }
                     }}

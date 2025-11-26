@@ -4,6 +4,7 @@ import type {
   EmailResult,
   SMSParams,
   SMSResult,
+  TestEmailContent,
   TrackEventParams,
   TrackEventResult,
   UpdateProfileParams,
@@ -102,5 +103,13 @@ export class SendGridProvider implements CommunicationProvider {
 
   async updateProfile(_params: UpdateProfileParams): Promise<void> {
     // SendGrid does not manage profiles in the same way; no-op for fallback provider.
+  }
+
+  getTestEmailContent(): TestEmailContent {
+    return {
+      subject: 'LiberoVino Test Email',
+      html: '<p>This is a test message from your LiberoVino integration. 🎉</p><p>If you received this email, your configuration is working correctly.</p>',
+      text: 'This is a test message from your LiberoVino integration. If you received this email, your configuration is working correctly.',
+    };
   }
 }
