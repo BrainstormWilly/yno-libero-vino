@@ -25,6 +25,6 @@ export interface MailchimpProviderData {
   audienceName?: string | null;
   audience?: MailchimpAudienceSeedResult;
   templates?: Record<string, MailchimpTemplateSeedResult | undefined>;
-  journeys?: Record<string, { id?: string; name: string; status?: string; seededAt?: string }>;
+  flows?: Record<string, { id?: string; name: string; status?: string; seededAt?: string }>;
 }
 

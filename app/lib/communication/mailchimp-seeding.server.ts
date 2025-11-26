@@ -1,4 +1,9 @@
-import { MAILCHIMP_SEQUENCE_ORDER, MAILCHIMP_TEMPLATE_NAMES, type MailchimpTemplateKey } from '~/lib/communication/mailchimp.constants';
+import {
+  MAILCHIMP_MERGE_FIELD_DEFINITIONS,
+  MAILCHIMP_SEQUENCE_ORDER,
+  MAILCHIMP_TEMPLATE_NAMES,
+  type MailchimpTemplateKey,
+} from '~/lib/communication/mailchimp.constants';
 import { buildTemplateSeed } from '~/lib/communication/klaviyo-seeding.server';
 import type { KlaviyoMetricKey } from '~/lib/communication/klaviyo.constants';
 import type {
@@ -58,6 +63,11 @@ export async function seedMailchimpResources(options: SeedMailchimpOptions): Pro
       options.permissionReminder ??
       'You are receiving this email because you opted into the LiberoVino membership updates.',
   });
+
+  // Create merge fields for tracking event dates
+  if (audience?.id) {
+    await client.ensureMergeFields(audience.id);
+  }
 
   const templates: Record<string, MailchimpTemplateSeedResult | undefined> = {};
 
@@ -179,6 +189,50 @@ class MailchimpSeedClient {
     const template = (await response.json()) as MailchimpTemplateSeedResult;
 
     return template;
+  }
+
+  async ensureMergeFields(audienceId: string): Promise<void> {
+    // Get existing merge fields to avoid duplicates
+    const existingFieldsResponse = await this.request(`/lists/${audienceId}/merge-fields?count=1000`, {
+      method: 'GET',
+    });
+    const existingFieldsData = await existingFieldsResponse.json();
+    const existingFields = (existingFieldsData?.merge_fields || []) as Array<{ tag: string; name: string }>;
+    const existingFieldTags = new Set(existingFields.map((f) => f.tag));
+
+    // Create merge fields that don't exist
+    for (const fieldDef of MAILCHIMP_MERGE_FIELD_DEFINITIONS) {
+      if (existingFieldTags.has(fieldDef.name)) {
+        console.log(`[Mailchimp Seeding] Merge field ${fieldDef.name} already exists, skipping`);
+        continue;
+      }
+
+      try {
+        await this.request(`/lists/${audienceId}/merge-fields`, {
+          method: 'POST',
+          body: JSON.stringify({
+            tag: fieldDef.name,
+            name: fieldDef.name,
+            type: fieldDef.type,
+            public: fieldDef.public,
+            required: fieldDef.required,
+            default_value: fieldDef.default_value,
+            help_text: fieldDef.help_text,
+            date_format: 'YYYY/MM/DD', // Required for date fields - matches ISO date format
+          }),
+        });
+        console.log(`[Mailchimp Seeding] Created merge field: ${fieldDef.name}`);
+      } catch (error) {
+        // Check if error is because field already exists - this is fine, just log and continue
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('already exists') || errorMessage.includes('Invalid Resource')) {
+          console.log(`[Mailchimp Seeding] Merge field ${fieldDef.name} already exists, skipping`);
+        } else {
+          console.error(`[Mailchimp Seeding] Failed to create merge field ${fieldDef.name}:`, error);
+        }
+        // Continue with other fields even if one fails
+      }
+    }
   }
 
   private async findAudienceByName(name: string) {

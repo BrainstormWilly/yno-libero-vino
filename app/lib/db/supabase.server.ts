@@ -1011,6 +1011,8 @@ export async function updateCommunicationConfig(
     sendExpirationWarnings?: boolean;
     warningDaysBefore?: number;
     providerData?: CommunicationConfigInsert['provider_data'] | null;
+    emailProviderConfirmed?: boolean;
+    smsProviderConfirmed?: boolean;
   }
 ): Promise<CommunicationConfig> {
   const supabase = getSupabaseClient();
@@ -1031,6 +1033,8 @@ export async function updateCommunicationConfig(
   if (config.sendExpirationWarnings !== undefined) updateData.send_expiration_warnings = config.sendExpirationWarnings;
   if (config.warningDaysBefore !== undefined) updateData.warning_days_before = config.warningDaysBefore;
   if (config.providerData !== undefined) updateData.provider_data = config.providerData;
+  if (config.emailProviderConfirmed !== undefined) updateData.email_provider_confirmed = config.emailProviderConfirmed;
+  if (config.smsProviderConfirmed !== undefined) updateData.sms_provider_confirmed = config.smsProviderConfirmed;
   
   const { data: commConfig, error } = await supabase
     .from('communication_configs')

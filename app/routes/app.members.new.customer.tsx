@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData } from 'react-router';
+import { useLoaderData, Form, useActionData, useNavigate } from 'react-router';
 import { useState } from 'react';
 import {
   Card,
@@ -12,6 +12,7 @@ import {
   Divider,
   Checkbox,
   Modal,
+  Box,
 } from '@shopify/polaris';
 
 import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
@@ -159,8 +160,9 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function CustomerDetails() {
-  const { draft } = useLoaderData<typeof loader>();
+  const { draft, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigate = useNavigate();
   
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -219,12 +221,19 @@ export default function CustomerDetails() {
   return (
     <>
       <BlockStack gap="500">
-        {/* Error Banner */}
+        {/* Banners at Top */}
         {actionData && !actionData.success && (
           <Banner tone="critical" title="Error">
             {actionData.error}
           </Banner>
         )}
+
+        {/* Navigation Button at Top */}
+        <Box paddingBlockEnd="400">
+          <Button onClick={() => navigate(addSessionToUrl('/app/members', session.id))}>
+            ← Back to Members
+          </Button>
+        </Box>
         
         {/* Instructions */}
         <Card>
@@ -447,14 +456,16 @@ export default function CustomerDetails() {
                 value={unsubscribedAll ? 'true' : 'false'}
               />
               
-              <Button
-                variant="primary"
-                submit
-                disabled={!email || !firstName || !lastName || !address1 || !city || !state || !zip}
-                size="large"
-              >
-                Continue to Additional Addresses →
-              </Button>
+              <Box paddingBlockStart="400">
+                <Button
+                  variant="primary"
+                  submit
+                  disabled={!email || !firstName || !lastName || !address1 || !city || !state || !zip}
+                  size="large"
+                >
+                  Continue to Additional Addresses →
+                </Button>
+              </Box>
             </BlockStack>
           </Form>
         </Card>

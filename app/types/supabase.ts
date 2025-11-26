@@ -396,6 +396,7 @@ export type Database = {
           email_from_name: string | null
           email_list_id: string | null
           email_provider: string | null
+          email_provider_confirmed: boolean | null
           id: string
           provider_data: Json
           send_expiration_warnings: boolean | null
@@ -403,6 +404,7 @@ export type Database = {
           sms_api_key: string | null
           sms_from_number: string | null
           sms_provider: string | null
+          sms_provider_confirmed: boolean | null
           updated_at: string | null
           warning_days_before: number | null
         }
@@ -414,6 +416,7 @@ export type Database = {
           email_from_name?: string | null
           email_list_id?: string | null
           email_provider?: string | null
+          email_provider_confirmed?: boolean | null
           id?: string
           provider_data?: Json
           send_expiration_warnings?: boolean | null
@@ -421,6 +424,7 @@ export type Database = {
           sms_api_key?: string | null
           sms_from_number?: string | null
           sms_provider?: string | null
+          sms_provider_confirmed?: boolean | null
           updated_at?: string | null
           warning_days_before?: number | null
         }
@@ -432,6 +436,7 @@ export type Database = {
           email_from_name?: string | null
           email_list_id?: string | null
           email_provider?: string | null
+          email_provider_confirmed?: boolean | null
           id?: string
           provider_data?: Json
           send_expiration_warnings?: boolean | null
@@ -439,6 +444,7 @@ export type Database = {
           sms_api_key?: string | null
           sms_from_number?: string | null
           sms_provider?: string | null
+          sms_provider_confirmed?: boolean | null
           updated_at?: string | null
           warning_days_before?: number | null
         }

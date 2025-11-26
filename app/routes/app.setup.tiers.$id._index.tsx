@@ -12,6 +12,7 @@ import {
   InlineStack,
   Checkbox,
   Divider,
+  Box,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -248,14 +249,45 @@ export default function TierDetails() {
   }, [actionData]);
   
   return (
-    <Page
-      title={`Edit Tier: ${tierName}`}
-      backAction={{ 
-        content: 'Back to Tiers', 
-        onAction: () => navigate(addSessionToUrl('/app/setup/tiers', session.id)) 
-      }}
-    >
+    <Page title={`Edit Tier: ${tierName}`}>
       <BlockStack gap="500">
+        {/* Banners at Top */}
+        {actionData?.action === 'update_tier_details' && showFeedback && (
+          <div
+            style={{
+              animation: 'slideDown 0.3s ease-out',
+            }}
+          >
+            {actionData.success && (
+              <Banner tone="success" onDismiss={() => setShowFeedback(false)}>
+                {actionData.success}
+              </Banner>
+            )}
+            {actionData.error && (
+              <Banner tone="critical" onDismiss={() => setShowFeedback(false)}>
+                {actionData.error}
+              </Banner>
+            )}
+          </div>
+        )}
+
+        {/* Navigation Buttons at Top */}
+        <Box paddingBlockEnd="400">
+          <InlineStack align="space-between">
+            <Button
+              onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
+            >
+              ← Back to Tiers
+            </Button>
+            
+            <Button
+              variant="primary"
+              onClick={() => navigate(addSessionToUrl('/app/setup/review', session.id))}
+            >
+              Continue to Review →
+            </Button>
+          </InlineStack>
+        </Box>
               {/* Tier Basic Info */}
               <section>
                 <Card>
@@ -263,26 +295,6 @@ export default function TierDetails() {
                     <Text variant="headingMd" as="h3">
                       Tier Details
                     </Text>
-                    
-                    {/* In-form feedback for Save Details action */}
-                    {actionData?.action === 'update_tier_details' && showFeedback && (
-                      <div
-                        style={{
-                          animation: 'slideDown 0.3s ease-out',
-                        }}
-                      >
-                        {actionData.success && (
-                          <Banner tone="success" onDismiss={() => setShowFeedback(false)}>
-                            {actionData.success}
-                          </Banner>
-                        )}
-                        {actionData.error && (
-                          <Banner tone="critical" onDismiss={() => setShowFeedback(false)}>
-                            {actionData.error}
-                          </Banner>
-                        )}
-                      </div>
-                    )}
                     
                     <Form method="post">
                       <input type="hidden" name="action" value="update_tier_details" />
@@ -477,25 +489,6 @@ export default function TierDetails() {
                 </Form>
               </section>
               
-              {/* Navigation */}
-              <section>
-                <Card>
-                  <InlineStack align="space-between">
-                    <Button
-                      onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
-                    >
-                      ← Back to Tiers
-                    </Button>
-                    
-                    <Button
-                      variant="primary"
-                      onClick={() => navigate(addSessionToUrl('/app/setup/review', session.id))}
-                    >
-                      Continue to Review →
-                    </Button>
-                  </InlineStack>
-                </Card>
-              </section>
       </BlockStack>
     </Page>
   );

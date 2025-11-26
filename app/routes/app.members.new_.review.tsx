@@ -11,6 +11,7 @@ import {
   Banner,
   Divider,
   Badge,
+  Box,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -514,24 +515,25 @@ export default function ReviewAndEnroll() {
   const navigate = useNavigate();
   
   return (
-    <Page
-      title="Review & Complete Enrollment"
-      backAction={{
-        content: 'Back',
-        onAction: () => navigate(addSessionToUrl('/app/members/new/payment', session.id)),
-      }}
-    >
+    <Page title="Review & Complete Enrollment">
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
-      {/* Error Banner */}
-      {actionData && !actionData.success && (
-        <Banner tone="critical" title="Error">
-          {actionData.error}
-        </Banner>
-      )}
+            {/* Banners at Top */}
+            {actionData && !actionData.success && (
+              <Banner tone="critical" title="Error">
+                {actionData.error}
+              </Banner>
+            )}
+
+            {/* Navigation Button at Top */}
+            <Box paddingBlockEnd="400">
+              <Button onClick={() => navigate(addSessionToUrl('/app/members', session.id))}>
+                ← Back to Members
+              </Button>
+            </Box>
       
-      {/* Instructions */}
+            {/* Instructions */}
       <Card>
         <BlockStack gap="300">
           <Text variant="headingMd" as="h2">

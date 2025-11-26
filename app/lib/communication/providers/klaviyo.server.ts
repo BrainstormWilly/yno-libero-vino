@@ -42,7 +42,7 @@ const sleep = (ms: number) =>
 export class KlaviyoProvider implements CommunicationProvider {
   public readonly name = 'Klaviyo';
   public readonly supportsEmail = true;
-  public readonly supportsSMS = true; // Klaviyo supports SMS, but we stub implementation for now
+  public readonly supportsSMS = true;
 
   private readonly apiKey: string;
   private readonly defaultFromEmail?: string | null;
@@ -104,8 +104,37 @@ export class KlaviyoProvider implements CommunicationProvider {
     };
   }
 
-  async sendSMS(_params: SMSParams): Promise<SMSResult> {
-    throw new Error('Klaviyo SMS support is not implemented yet.');
+  async sendSMS(params: SMSParams): Promise<SMSResult> {
+    if (!params.to) {
+      throw new Error('Klaviyo sendSMS requires a phone number (to).');
+    }
+
+    // Klaviyo SMS is event-driven: track an event with phone number to trigger a flow
+    // The flow must have an SMS step configured. The message content can be passed
+    // in event properties for use in flow templates.
+    const eventParams: TrackEventParams = {
+      event: params.tags?.[0] || 'LiberoVino.SMS',
+      customer: {
+        phone: params.to,
+        properties: {
+          source: 'LiberoVino::send-sms',
+        },
+      },
+      properties: {
+        message: params.message,
+        channel: 'sms',
+        source: 'LiberoVino::send-sms',
+        ...(params.tags && params.tags.length > 0 ? { tags: params.tags } : {}),
+      },
+    };
+
+    const result = await this.trackEvent(eventParams);
+
+    return {
+      success: result.success,
+      messageId: result.response ? 'klaviyo-event' : undefined,
+      response: result.response,
+    };
   }
 
   async trackEvent(params: TrackEventParams): Promise<TrackEventResult> {
@@ -239,9 +268,30 @@ export class KlaviyoProvider implements CommunicationProvider {
     fromName?: string | null;
     isTransactional: boolean;
     metadata?: MetadataRecord;
+    includeSMS?: boolean;
   }): Promise<KlaviyoFlowSeedResult> {
+    console.log(`[ensureFlow] Checking flow: ${params.name}, includeSMS: ${params.includeSMS}`);
     const existing = await this.findFlowByName(params.name);
+    const shouldIncludeSMS = params.includeSMS ?? false;
+    
     if (existing) {
+      console.log(`[ensureFlow] Flow ${params.name} exists (ID: ${existing.id})`);
+      // Check if flow needs SMS steps added
+      const flowHasSMS = await this.flowHasSMSAction(existing.id);
+      console.log(`[ensureFlow] Flow ${params.name} has SMS: ${flowHasSMS}, shouldIncludeSMS: ${shouldIncludeSMS}`);
+      
+      if (shouldIncludeSMS && !flowHasSMS) {
+        console.log(`[ensureFlow] Flow ${params.name} needs SMS but Klaviyo API doesn't support updating flows.`);
+        console.log(`[ensureFlow] User must manually add SMS steps in Klaviyo UI for flow: ${params.name} (ID: ${existing.id})`);
+        // Note: Klaviyo API doesn't support updating flows via PATCH
+        // The user will need to manually add SMS steps in the Klaviyo UI
+        // We'll continue anyway - the test will work if they've added SMS manually
+      } else if (flowHasSMS) {
+        console.log(`[ensureFlow] Flow ${params.name} already has SMS, skipping update`);
+      } else {
+        console.log(`[ensureFlow] Flow ${params.name} doesn't need SMS (shouldIncludeSMS: ${shouldIncludeSMS})`);
+      }
+      
       return existing;
     }
 
@@ -254,7 +304,24 @@ export class KlaviyoProvider implements CommunicationProvider {
       fromName: params.fromName ?? undefined,
       isTransactional: params.isTransactional,
       metadata: params.metadata,
+      includeSMS: shouldIncludeSMS,
     });
+
+    // If this is the Test Flow, set it to Live so it can be tested immediately
+    if (params.name === 'LiberoVino – Test Flow') {
+      try {
+        await this.updateFlowStatus(flow.id, 'live');
+        console.log(`[ensureFlow] Test Flow set to Live status`);
+        // Update the returned flow status
+        return {
+          ...flow,
+          status: 'live',
+        };
+      } catch (error) {
+        console.warn(`[ensureFlow] Could not set Test Flow to Live:`, error);
+        // Continue anyway - flow is created but will be in draft
+      }
+    }
 
     return flow;
   }
@@ -374,7 +441,58 @@ export class KlaviyoProvider implements CommunicationProvider {
     fromName?: string;
     isTransactional: boolean;
     metadata?: MetadataRecord;
+    includeSMS?: boolean;
   }): Promise<KlaviyoFlowSeedResult> {
+    // Build actions array - always include email, conditionally include SMS
+    const actions: Array<Record<string, unknown>> = [
+      {
+        type: 'send-email',
+        temporary_id: 'send_email_action',
+        links: {
+          next: params.includeSMS ? 'send_sms_action' : null,
+        },
+        data: {
+          status: 'draft',
+          message: {
+            name: `${params.name} Email`,
+            from_email: params.fromEmail,
+            from_label: params.fromName ?? 'LiberoVino',
+            reply_to_email: params.fromEmail,
+            cc_email: null,
+            bcc_email: null,
+            subject_line: params.subject,
+            preview_text: params.metadata?.previewText ?? params.subject,
+            template_id: params.templateId,
+            smart_sending_enabled: params.metadata?.smartSendingEnabled ?? true,
+            transactional: params.isTransactional,
+            add_tracking_params: false,
+            custom_tracking_params: params.metadata?.customTrackingParams ?? [],
+          },
+        },
+      },
+    ];
+
+    // Add SMS action if SMS is enabled
+    if (params.includeSMS) {
+      actions.push({
+        type: 'send-sms',
+        temporary_id: 'send_sms_action',
+        links: {
+          next: null,
+        },
+        data: {
+          status: 'draft',
+          message: {
+            name: `${params.name} SMS`,
+            body: params.metadata?.smsBody ?? '{{ message }}',
+          },
+        },
+      });
+    }
+
+    console.log(`[createFlow] Creating flow "${params.name}" with metricId: ${params.metricId}, templateId: ${params.templateId}`);
+    console.log(`[createFlow] Actions count: ${actions.length}, includeSMS: ${params.includeSMS}`);
+    
     const response = await this.request('flows/', {
       method: 'POST',
       body: JSON.stringify({
@@ -390,33 +508,7 @@ export class KlaviyoProvider implements CommunicationProvider {
                   id: params.metricId,
                 },
               ],
-              actions: [
-                {
-                  type: 'send-email',
-                  temporary_id: 'send_email_action',
-                  links: {
-                    next: null,
-                  },
-                  data: {
-                    status: 'draft',
-                    message: {
-                      name: `${params.name} Email`,
-                      from_email: params.fromEmail,
-                      from_label: params.fromName ?? 'LiberoVino',
-                      reply_to_email: params.fromEmail,
-                      cc_email: null,
-                      bcc_email: null,
-                      subject_line: params.subject,
-                      preview_text: params.metadata?.previewText ?? params.subject,
-                      template_id: params.templateId,
-                      smart_sending_enabled: params.metadata?.smartSendingEnabled ?? true,
-                      transactional: params.isTransactional,
-                      add_tracking_params: false,
-                      custom_tracking_params: params.metadata?.customTrackingParams ?? [],
-                    },
-                  },
-                },
-              ],
+              actions,
               profile_filter: {
                 condition_groups: [],
               },
@@ -427,10 +519,15 @@ export class KlaviyoProvider implements CommunicationProvider {
     });
 
     const payload = await response.json();
+    console.log(`[createFlow] Klaviyo API response for "${params.name}":`, JSON.stringify(payload, null, 2));
+    
     const flowId = payload?.data?.id;
     if (!flowId) {
+      console.error(`[createFlow] Flow response missing id. Full response:`, JSON.stringify(payload, null, 2));
       throw new Error(`Klaviyo flow response missing id when creating "${params.name}"`);
     }
+    
+    console.log(`[createFlow] Successfully created flow "${params.name}" with ID: ${flowId}`);
 
     return {
       id: flowId,
@@ -444,6 +541,26 @@ export class KlaviyoProvider implements CommunicationProvider {
       updatedAt: payload?.data?.attributes?.updated ?? null,
       seededAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Update flow status (draft, live, manual)
+   */
+  private async updateFlowStatus(flowId: string, status: 'draft' | 'live' | 'manual'): Promise<void> {
+    console.log(`[updateFlowStatus] Setting flow ${flowId} to ${status}`);
+    await this.request(`flows/${flowId}/`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: {
+          type: 'flow',
+          id: flowId,
+          attributes: {
+            status,
+          },
+        },
+      }),
+    });
+    console.log(`[updateFlowStatus] Successfully set flow ${flowId} to ${status}`);
   }
 
   private async request(path: string, init: RequestInit): Promise<Response> {
@@ -503,5 +620,139 @@ export class KlaviyoProvider implements CommunicationProvider {
     }
 
     return null;
+  }
+
+  /**
+   * Check if a flow has an SMS action
+   */
+  private async flowHasSMSAction(flowId: string): Promise<boolean> {
+    try {
+      const response = await this.request(`flows/${flowId}/`, { method: 'GET' });
+      const payload = await response.json();
+      const definition = payload?.data?.attributes?.definition;
+      
+      if (!definition || !definition.actions) {
+        return false;
+      }
+      
+      // Check if any action is of type 'send-sms'
+      return definition.actions.some(
+        (action: Record<string, unknown>) => action.type === 'send-sms'
+      );
+    } catch (error) {
+      // If we can't check, assume it doesn't have SMS (safer to add than to skip)
+      console.warn(`Could not check if flow ${flowId} has SMS:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Update an existing flow to include SMS action
+   */
+  private async updateFlowToIncludeSMS(params: {
+    flowId: string;
+    flowName: string;
+    metadata?: MetadataRecord;
+  }): Promise<void> {
+    try {
+      // Get the current flow definition
+      const getResponse = await this.request(`flows/${params.flowId}/`, { method: 'GET' });
+      const getPayload = await getResponse.json();
+      console.log(`[updateFlowToIncludeSMS] Flow ${params.flowId} GET response:`, JSON.stringify(getPayload, null, 2));
+      
+      const flowAttributes = getPayload?.data?.attributes;
+      const definition = flowAttributes?.definition;
+      
+      console.log(`[updateFlowToIncludeSMS] Flow attributes:`, flowAttributes);
+      console.log(`[updateFlowToIncludeSMS] Flow definition:`, definition);
+      
+      if (!definition) {
+        console.error(`[updateFlowToIncludeSMS] Flow ${params.flowId} has no definition. Full response:`, JSON.stringify(getPayload, null, 2));
+        throw new Error(`Flow ${params.flowId} has no definition. The flow may need to be recreated or cloned.`);
+      }
+      
+      if (!definition.actions || !Array.isArray(definition.actions)) {
+        console.error(`[updateFlowToIncludeSMS] Flow ${params.flowId} has no actions array. Definition:`, JSON.stringify(definition, null, 2));
+        throw new Error(`Flow ${params.flowId} has no actions array. The flow may be in an invalid state.`);
+      }
+      
+      // Check flow status - might need to be in draft to update
+      const flowStatus = flowAttributes?.status;
+      console.log(`Updating flow ${params.flowId} (${params.flowName}), status: ${flowStatus}`);
+      
+      // Find the email action and update its next link
+      const emailAction = definition.actions.find(
+        (action: Record<string, unknown>) => action.type === 'send-email'
+      );
+      
+      if (!emailAction) {
+        throw new Error(`Flow ${params.flowId} has no email action`);
+      }
+      
+      // Check if SMS action already exists
+      const existingSMSAction = definition.actions.find(
+        (action: Record<string, unknown>) => action.type === 'send-sms'
+      );
+      
+      if (!existingSMSAction) {
+        // Generate a unique temporary ID for the new SMS action
+        const smsActionId = `send_sms_action_${Date.now()}`;
+        
+        // Update email action to link to SMS
+        if (!emailAction.links) {
+          emailAction.links = {};
+        }
+        emailAction.links.next = smsActionId;
+        
+        // Add SMS action
+        definition.actions.push({
+          type: 'send-sms',
+          temporary_id: smsActionId,
+          links: {
+            next: null,
+          },
+          data: {
+            status: 'draft',
+            message: {
+              name: `${params.flowName} SMS`,
+              body: params.metadata?.smsBody ?? '{{ message }}',
+              use_smart_sending: true,
+            },
+          },
+        });
+        console.log(`Adding SMS action (${smsActionId}) to flow ${params.flowId}`);
+      } else {
+        // SMS action already exists, just ensure email links to it
+        const smsActionId = existingSMSAction.temporary_id || existingSMSAction.id;
+        if (!emailAction.links) {
+          emailAction.links = {};
+        }
+        emailAction.links.next = smsActionId;
+        console.log(`Flow ${params.flowId} already has SMS action (${smsActionId}), updating email link`);
+      }
+      
+      // Update the flow with the modified definition
+      const patchResponse = await this.request(`flows/${params.flowId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          data: {
+            type: 'flow',
+            id: params.flowId,
+            attributes: {
+              definition,
+            },
+          },
+        }),
+      });
+      
+      const patchPayload = await patchResponse.json();
+      console.log(`Successfully updated flow ${params.flowId}:`, patchPayload?.data?.id);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to update flow ${params.flowId} (${params.flowName}):`, errorMessage);
+      throw new Error(
+        `Failed to update flow ${params.flowId} to include SMS: ${errorMessage}`
+      );
+    }
   }
 }

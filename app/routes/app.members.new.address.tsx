@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData } from 'react-router';
+import { useLoaderData, Form, useActionData, useNavigate } from 'react-router';
 import { useState } from 'react';
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   InlineStack,
   Banner,
   Divider,
+  Box,
 } from '@shopify/polaris';
 
 import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
@@ -197,8 +198,9 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function AddressVerification() {
-  const { draft, addresses } = useLoaderData<typeof loader>();
+  const { draft, addresses, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigate = useNavigate();
   
   const isNewCustomer = !draft.customer?.isExisting;
   const hasExistingAddresses = addresses.length > 0;
@@ -213,12 +215,19 @@ export default function AddressVerification() {
   
   return (
     <BlockStack gap="500">
-      {/* Error Banner */}
+      {/* Banners at Top */}
       {actionData && !actionData.success && (
         <Banner tone="critical" title="Error">
           {actionData.error}
         </Banner>
       )}
+
+      {/* Navigation Button at Top */}
+      <Box paddingBlockEnd="400">
+        <Button onClick={() => navigate(addSessionToUrl('/app/members', session.id))}>
+          ← Back to Members
+        </Button>
+      </Box>
       
       {/* Instructions */}
       <Card>
@@ -388,14 +397,16 @@ export default function AddressVerification() {
                 autoComplete="tel"
               />
               
-              <Button
-                variant="primary"
-                submit
-                disabled={!address1 || !city || !state || !zip}
-                size="large"
-              >
-                Continue to Payment →
-              </Button>
+              <Box paddingBlockStart="400">
+                <Button
+                  variant="primary"
+                  submit
+                  disabled={!address1 || !city || !state || !zip}
+                  size="large"
+                >
+                  Continue to Payment →
+                </Button>
+              </Box>
             </BlockStack>
           </Form>
         </Card>

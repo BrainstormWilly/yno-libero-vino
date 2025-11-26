@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData } from 'react-router';
+import { useLoaderData, Form, useActionData, useNavigate } from 'react-router';
 import { useState } from 'react';
 import {
   Card,
@@ -161,8 +161,9 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function PaymentVerification() {
-  const { draft, creditCards } = useLoaderData<typeof loader>();
+  const { draft, creditCards, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const navigate = useNavigate();
   
   const [showAddForm, setShowAddForm] = useState(creditCards.length === 0);
   const [cardholderName, setCardholderName] = useState('');
@@ -173,12 +174,19 @@ export default function PaymentVerification() {
   
   return (
     <BlockStack gap="500">
-      {/* Error Banner */}
+      {/* Banners at Top */}
       {actionData && !actionData.success && (
         <Banner tone="critical" title="Error">
           {actionData.error}
         </Banner>
       )}
+
+      {/* Navigation Button at Top */}
+      <Box paddingBlockEnd="400">
+        <Button onClick={() => navigate(addSessionToUrl('/app/members', session.id))}>
+          ← Back to Members
+        </Button>
+      </Box>
       
       {/* Instructions */}
       <Card>
@@ -310,14 +318,16 @@ export default function PaymentVerification() {
                 </div>
               </InlineStack>
               
-              <Button
-                variant="primary"
-                submit
-                disabled={!cardholderName || !cardNumber || !expiryMonth || !expiryYear || !cvv}
-                size="large"
-              >
-                Continue to Review →
-              </Button>
+              <Box paddingBlockStart="400">
+                <Button
+                  variant="primary"
+                  submit
+                  disabled={!cardholderName || !cardNumber || !expiryMonth || !expiryYear || !cvv}
+                  size="large"
+                >
+                  Continue to Review →
+                </Button>
+              </Box>
             </BlockStack>
           </Form>
         </Card>

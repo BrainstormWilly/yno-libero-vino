@@ -44,13 +44,7 @@ export default function MemberEnrollmentLayout() {
   const navigate = useNavigate();
   
   return (
-    <Page
-      title="Enroll New Member"
-      backAction={{
-        content: 'Members',
-        onAction: () => navigate(addSessionToUrl('/app/members', session.id)),
-      }}
-    >
+    <Page title="Enroll New Member">
       {/* Progress Bar */}
       <div style={{ marginBottom: '24px' }}>
         <EnrollmentProgressBar currentStep={currentStep} />

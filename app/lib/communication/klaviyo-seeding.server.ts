@@ -20,6 +20,7 @@ interface SeedKlaviyoOptions {
   fromEmail: string;
   fromName: string;
   includeMarketing?: boolean;
+  includeSMS?: boolean;
 }
 
 interface TemplateConfig {
@@ -152,12 +153,14 @@ export async function seedKlaviyoResources(
       fromEmail: options.fromEmail,
       fromName: options.fromName,
       isTransactional: TRANSACTIONAL_SET.has(metricKey),
+      includeSMS: options.includeSMS ?? false,
       metadata: {
         source: 'LiberoVino::auto-seed',
         metric_key: metricKey,
         template_key: templateKey,
         flow_key: flowKey,
         category: TRANSACTIONAL_SET.has(metricKey) ? 'transactional' : 'marketing',
+        smsBody: getSMSBody(templateKey),
       },
     });
 
@@ -307,4 +310,10 @@ function withSeedTimestamp<T extends { seededAt?: string }>(resource: T): T {
     ...resource,
     seededAt: resource.seededAt ?? new Date().toISOString(),
   };
+}
+
+function getSMSBody(templateKey: KlaviyoTemplateKey): string {
+  const config = TEMPLATE_CONFIG[templateKey];
+  // Create a concise SMS version of the message
+  return `${config.headline}. ${config.intro} ${config.cta}: {{ shop_url }}`;
 }

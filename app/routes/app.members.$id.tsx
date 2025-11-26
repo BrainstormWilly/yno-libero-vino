@@ -12,6 +12,7 @@ import {
   Badge,
   Divider,
   Banner,
+  Box,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -97,10 +98,6 @@ export default function MemberDetail() {
     <Page
       title={`${enrollment.customers.first_name} ${enrollment.customers.last_name}`}
       subtitle={enrollment.club_stages.name}
-      backAction={{
-        content: 'Members',
-        onAction: () => navigate(addSessionToUrl('/app/members', session.id)),
-      }}
       primaryAction={
         enrollment.c7_membership_id
           ? {
@@ -129,7 +126,7 @@ export default function MemberDetail() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
-            {/* Action Feedback */}
+            {/* Banners at Top */}
             {actionData && actionData.success && (
               <Banner tone="success" title="Success">
                 {actionData.message}
@@ -141,6 +138,13 @@ export default function MemberDetail() {
                 {actionData.error}
               </Banner>
             )}
+
+            {/* Navigation Button at Top */}
+            <Box paddingBlockEnd="400">
+              <Button onClick={() => navigate(addSessionToUrl('/app/members', session.id))}>
+                ← Back to Members
+              </Button>
+            </Box>
             
             {/* Membership Status */}
             <Card>

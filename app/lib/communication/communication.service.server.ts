@@ -1,5 +1,3 @@
-import invariant from 'tiny-invariant';
-
 import { getCommunicationConfig } from '~/lib/db/supabase.server';
 import type {
   EmailParams,
@@ -8,27 +6,13 @@ import type {
   TrackEventResult,
 } from '~/types/communication';
 
-import { createCommunicationManager, type CommunicationConfig } from './communication-manager.server';
+import { createCommunicationManager } from './communication-manager.server';
 import { KLAVIYO_METRICS } from './klaviyo.constants';
 import { MAILCHIMP_TAGS } from './mailchimp.constants';
+import { ensureConfigForEmail, ensureConfigForSMS } from './communication-helpers';
+import type { SMSParams, SMSResult } from '~/types/communication';
 
 const communicationManager = createCommunicationManager();
-
-function ensureConfigForEmail(config: CommunicationConfig | null | undefined) {
-  invariant(config, 'Communication settings are not configured for this client.');
-
-  if (!config.email_provider) {
-    throw new Error('Email provider is not configured.');
-  }
-
-  if (config.email_provider === 'klaviyo') {
-    if (!config.email_api_key || !config.email_from_address) {
-      throw new Error('Klaviyo provider requires API key and from email address.');
-    }
-  }
-
-  return config;
-}
 
 export async function getClientCommunicationConfig(clientId: string) {
   return getCommunicationConfig(clientId);
@@ -43,6 +27,39 @@ export async function sendClientEmail(clientId: string, params: EmailParams): Pr
   } satisfies EmailParams;
 
   return communicationManager.sendEmail(config, mergedParams);
+}
+
+/**
+ * Triggers a provider-specific SMS test.
+ * Uses Klaviyo if SMS provider is explicitly set to Klaviyo, or if email provider is Klaviyo (integrated).
+ * Otherwise uses Twilio (LiberoVino-managed).
+ * For Klaviyo, this publishes the TEST metric; clients wire the SMS step in their flow.
+ * For Twilio, this sends a direct SMS message.
+ */
+export async function sendClientTestSMS(clientId: string, toPhone: string): Promise<SMSResult> {
+  const config = await getCommunicationConfig(clientId);
+  const smsProvider = config?.sms_provider?.toLowerCase();
+  const emailProvider = config?.email_provider?.toLowerCase();
+
+  // If SMS provider is explicitly Klaviyo, or email provider is Klaviyo (integrated)
+  if (smsProvider === 'klaviyo' || emailProvider === 'klaviyo') {
+    // Use sendSMS with TEST metric tag for consistency
+    const smsConfig = ensureConfigForSMS(config);
+    const params: SMSParams = {
+      to: toPhone,
+      message: 'This is a test SMS from LiberoVino. If you received this, your SMS setup is working correctly.',
+      tags: [KLAVIYO_METRICS.TEST],
+    };
+    return communicationManager.sendSMS(smsConfig, params);
+  }
+
+  // Otherwise, use Twilio (automatic fallback)
+  const smsConfig = ensureConfigForSMS(config);
+  const params: SMSParams = {
+    to: toPhone,
+    message: 'This is a test SMS from LiberoVino. If you received this, your SMS setup is working correctly.',
+  };
+  return communicationManager.sendSMS(smsConfig, params);
 }
 
 export async function sendClientTestEmail(

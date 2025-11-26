@@ -28,4 +28,12 @@ A running list of follow-up items to complete before launch, spanning communicat
 - [ ] Produce step-by-step guides or short screencasts for onboarding (seeding, activating flows, testing).
 - [ ] Track open questions or dependencies (e.g., Mailchimp API readiness, SMS provider selection).
 
+## Architecture & Code Quality
+
+- [ ] Review all nested routes to ensure they follow the parent/child pattern with proper structure:
+  - Parent routes should have loaders and render `<Outlet />` with shared Page/Layout
+  - Child routes (including `_index.tsx`) should have their own loaders
+  - Actions should use `redirect()` from React Router instead of client-side navigation workarounds and `redirectWithSessionUrl()`
+  - Verify redirects work correctly with nested route structure
+
 _Keep this backlog updated as additional APIs land or new pre-release polish items surface._

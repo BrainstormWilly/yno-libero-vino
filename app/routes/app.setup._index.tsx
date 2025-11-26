@@ -84,13 +84,13 @@ export default function SetupIndex() {
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   
-  const [clubName, setClubName] = useState(
-    existingProgram?.name || `${client.org_name} Wine Club`
-  );
-  const [clubDescription, setClubDescription] = useState(
-    existingProgram?.description || 
-    'Liberate your wine buying experience. Enjoy member pricing on your schedule - no forced shipments, no surprises.'
-  );
+  // Compute initial values deterministically to avoid hydration mismatch
+  const initialClubName = existingProgram?.name || (client.org_name ? `${client.org_name} Wine Club` : 'Wine Club');
+  const initialClubDescription = existingProgram?.description || 
+    'Liberate your wine buying experience. Enjoy member pricing on your schedule - no forced shipments, no surprises.';
+  
+  const [clubName, setClubName] = useState(initialClubName);
+  const [clubDescription, setClubDescription] = useState(initialClubDescription);
   
   useEffect(() => {
     setupAutoResize();

@@ -1,7 +1,7 @@
 import { type ActionFunctionArgs } from 'react-router';
 import { useActionData, useNavigate, useRouteLoaderData } from 'react-router';
 import { useEffect } from 'react';
-import { Page } from '@shopify/polaris';
+import { Page, BlockStack, Box, Button } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
@@ -118,19 +118,24 @@ export default function NewPromotion() {
   }, [actionData, navigate]);
   
   return (
-    <Page
-      title="New Promotion"
-      backAction={{ 
-        content: 'Back to Tier', 
-        onAction: () => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id)) 
-      }}
-    >
-      <PromotionForm
-        mode="create"
-        session={session}
-        onCancel={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
-        actionData={actionData}
-      />
+    <Page title="New Promotion">
+      <BlockStack gap="400">
+        {/* Navigation Button at Top */}
+        <Box paddingBlockEnd="400">
+          <Button
+            onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+          >
+            ← Back to Tier
+          </Button>
+        </Box>
+
+        <PromotionForm
+          mode="create"
+          session={session}
+          onCancel={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+          actionData={actionData}
+        />
+      </BlockStack>
     </Page>
   );
 }

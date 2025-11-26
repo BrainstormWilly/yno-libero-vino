@@ -1,7 +1,7 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { useLoaderData, Form, useActionData, useNavigate, useRouteLoaderData } from 'react-router';
 import { useEffect } from 'react';
-import { Page } from '@shopify/polaris';
+import { Page, BlockStack, Box, Button, Banner } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
@@ -184,27 +184,41 @@ export default function EditPromotion() {
   };
   
   return (
-    <Page
-      title="Edit Promotion"
-      backAction={{ 
-        content: 'Back to Tier', 
-        onAction: () => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id)) 
-      }}
-    >
-      {discount ? (
-        <PromotionForm
-          mode="edit"
-          initialDiscount={discount}
-          session={session}
-          onCancel={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
-          onDelete={handleDelete}
-          actionData={actionData}
-        />
-      ) : (
-                      <Form method="post">
-                        <input type="hidden" name="action" value="delete_promotion" />
-                      </Form>
-      )}
+    <Page title="Edit Promotion">
+      <BlockStack gap="400">
+        {/* Navigation Button at Top */}
+        <Box paddingBlockEnd="400">
+          <Button
+            onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+          >
+            ← Back to Tier
+          </Button>
+        </Box>
+
+        {/* Banners at Top */}
+        {actionData && !actionData.success && (
+          <Banner tone="critical" title={actionData.message} />
+        )}
+
+        {actionData && actionData.success && actionData.message && (
+          <Banner tone="success" title={actionData.message} />
+        )}
+
+        {discount ? (
+          <PromotionForm
+            mode="edit"
+            initialDiscount={discount}
+            session={session}
+            onCancel={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+            onDelete={handleDelete}
+            actionData={actionData}
+          />
+        ) : (
+          <Form method="post">
+            <input type="hidden" name="action" value="delete_promotion" />
+          </Form>
+        )}
+      </BlockStack>
     </Page>
   );
 }

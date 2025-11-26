@@ -108,22 +108,23 @@ export default function Settings() {
     <div className="container mx-auto px-4">
       <Page title="Settings" narrowWidth>
         <Layout>
-          {/* Show welcome banner for first-time installs */}
-          {isFirstVisit && (
-            <Layout.Section>
-              <WelcomeBanner orgName={client.org_name} crmName={crmName} />
-            </Layout.Section>
-          )}
+          {/* Banners at Top */}
+          <Layout.Section>
+            <BlockStack gap="400">
+              {/* Show welcome banner for first-time installs */}
+              {isFirstVisit && (
+                <WelcomeBanner orgName={client.org_name} crmName={crmName} />
+              )}
 
-          {/* Success/Error Messages */}
-          {actionData && (
-            <Layout.Section>
-              <Banner 
-                tone={actionData.success ? 'success' : 'critical'} 
-                title={actionData.message}
-              />
-            </Layout.Section>
-          )}
+              {/* Success/Error Messages */}
+              {actionData && (
+                <Banner 
+                  tone={actionData.success ? 'success' : 'critical'} 
+                  title={actionData.message}
+                />
+              )}
+            </BlockStack>
+          </Layout.Section>
 
           {/* Club Setup Link */}
           <Layout.Section>

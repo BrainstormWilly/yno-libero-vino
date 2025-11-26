@@ -1,5 +1,8 @@
 export type CommunicationChannel = 'email' | 'sms';
 
+export type EmailProvider = 'klaviyo' | 'mailchimp' | 'sendgrid';
+export type SMSProvider = 'klaviyo' | 'mailchimp' | 'redchirp' | 'twilio';
+
 export interface EmailParams {
   to: string;
   toName?: string;

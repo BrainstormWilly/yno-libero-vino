@@ -509,93 +509,130 @@ npm run klaviyo:seed <client-id> [--marketing]
   - `--marketing` reseeds the optional marketing flows.
   - Safe to re-run; templates update in place, flows are idempotent.
 
+## Mailchimp Automation Seeding
+
+- When a client selects Mailchimp during setup, we automatically:
+  - Create or find the Mailchimp audience (list) named "LiberoVino Members" (or custom name if provided).
+  - Seed email templates for every transactional trigger (`CLUB_SIGNUP`, `MONTHLY_STATUS`, `EXPIRATION_WARNING`, `EXPIRATION_NOTICE`).
+  - Optionally seed marketing templates (`MONTHLY_STATUS_PROMO`, `ANNUAL_RESIGN`, `SALES_BLAST`) when marketing is enabled.
+  - Create date merge fields for tracking when each event was last triggered (e.g., `LVMONTH`, `LVWARN`). Note: Mailchimp limits merge field tags to 10 characters, so names are shortened. All fields are prefixed with "LV" to avoid conflicts.
+  - Templates use Mailchimp merge tag syntax (`*|FNAME|*`, `*|LNAME|*`, etc.) and follow the LiberoVino liberated tone.
+- Mailchimp resource identifiers are persisted in `communication_configs.provider_data`:
+
+```json
+{
+  "seededAt": "2025-11-12T19:42:00.000Z",
+  "includeMarketing": true,
+  "serverPrefix": "us21",
+  "marketingAccessToken": "...",
+  "audienceId": "abc123def456",
+  "audienceName": "LiberoVino Members",
+  "templates": {
+    "MONTHLY_STATUS": { "id": "template_789", "name": "LiberoVino – Monthly Status" }
+  }
+}
+```
+
+- **Important**: Mailchimp flows must be created and activated manually in the Mailchimp UI. LiberoVino only:
+  - Creates templates (which can be used in flows)
+  - Applies tags to trigger flows (e.g., `LiberoVino::MonthlyStatus`)
+  - Updates merge fields with dates (for date-based flow triggers)
+- Flow setup in Mailchimp:
+  - Create a flow with trigger "Tag added" or "Tag is" matching the tag name (e.g., `LiberoVino::MonthlyStatus`).
+  - For recurring events, configure flows to trigger on merge field date updates or use date-based conditions.
+  - Use the seeded templates in your flow email steps.
+  - Ensure the flow is published/active to receive triggers.
+
 ## Provider Implementations
 
 ### Mailchimp Provider
+
+Mailchimp uses a tag-based and merge field-based approach rather than direct email sending:
 
 ```typescript
 export class MailchimpProvider implements CommunicationProvider {
   name = 'Mailchimp';
   type = 'email' as const;
   
+  // Mailchimp does not support direct email sends
+    // Instead, we apply tags and update merge fields to trigger flows
   async sendEmail(params: EmailParams): Promise<EmailResult> {
-    const config = params.config;  // From communication_configs
-    
-    // Send campaign via Mailchimp API
-    const response = await fetch('https://api.mailchimp.com/3.0/campaigns', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.email_api_key}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        type: 'regular',
-        recipients: {
-          list_id: config.email_list_id,
-          segment_opts: {
-            match: 'all',
-            conditions: [{
-              field: 'EMAIL',
-              op: 'is',
-              value: params.to
-            }]
-          }
-        },
-        settings: {
-          subject_line: params.subject,
-          from_name: config.email_from_name,
-          reply_to: config.email_from_address,
-          template_id: params.templateId
-        }
-      })
-    });
-    
-    const campaign = await response.json();
-    
-    // Send the campaign
-    await fetch(`https://api.mailchimp.com/3.0/campaigns/${campaign.id}/actions/send`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${config.email_api_key}`
-      }
-    });
-    
-    return {
-      success: true,
-      messageId: campaign.id,
-      provider: 'mailchimp'
-    };
+    throw new Error(
+      'Mailchimp direct sends are not supported. Configure flows to deliver email automations.'
+    );
   }
   
-  async addToList(listId: string, contact: Contact): Promise<void> {
-    // Add/update subscriber in Mailchimp list
-    const response = await fetch(
-      `https://api.mailchimp.com/3.0/lists/${listId}/members`,
+  async trackEvent(params: TrackEventParams): Promise<TrackEventResult> {
+    // 1. Create or update member in audience
+    const emailHash = this.hashEmail(params.customer.email);
+    await this.requestMarketing(
+      `/lists/${this.audienceId}/members/${emailHash}`,
       {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        },
+        method: 'PUT',
         body: JSON.stringify({
-          email_address: contact.email,
+          email_address: params.customer.email,
           status: 'subscribed',
-          merge_fields: {
-            FNAME: contact.firstName,
-            LNAME: contact.lastName,
-            PHONE: contact.phone
-          },
-          tags: ['libero-vino', 'wine-club']
-        })
+          status_if_new: 'subscribed',
+          merge_fields: this.buildMergeFields(params.customer.properties),
+        }),
       }
     );
     
-    if (!response.ok) {
-      throw new Error(`Mailchimp API error: ${response.statusText}`);
+    // 2. Apply tag to trigger flow (if event tag provided)
+    if (params.event) {
+      await this.applyTag(params.customer.email, params.event);
     }
+    
+    // 3. Update merge field with current date (for recurring events)
+    if (params.event) {
+      await this.updateEventMergeField(params.customer.email, params.event);
+    }
+    
+    return { success: true };
+  }
+  
+  private async applyTag(email: string, tag: string): Promise<void> {
+    // Apply tag to member (triggers "Tag added" flow events)
+    const emailHash = this.hashEmail(email);
+    await this.requestMarketing(
+      `/lists/${this.audienceId}/members/${emailHash}/tags`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          tags: [{ name: tag, status: 'active' }],
+        }),
+      }
+    );
+  }
+  
+  private async updateEventMergeField(email: string, eventTag: string): Promise<void> {
+    // Update merge field with today's date (YYYY-MM-DD format)
+    // This enables date-based flow triggers for recurring events
+    const mergeFieldName = this.getMergeFieldForEvent(eventTag);
+    const today = new Date();
+    const dateValue = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    
+    const emailHash = this.hashEmail(email);
+    await this.requestMarketing(
+      `/lists/${this.audienceId}/members/${emailHash}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          merge_fields: {
+            [mergeFieldName]: dateValue,
+          },
+        }),
+      }
+    );
   }
 }
 ```
+
+**Key Points:**
+- **Tags**: Applied to members to trigger "Tag added" flow events. One-time events (like `CLUB_SIGNUP`) work well with tag triggers.
+- **Merge Fields**: Date fields (e.g., `LVMONTH`, `LVTEST`) are updated with the current date (YYYY-MM-DD format) when events occur. These are used for tracking purposes. Note: Mailchimp limits merge field tags to 10 characters, so names are shortened. All fields are prefixed with "LV" to avoid conflicts.
+- **Flows**: Must be configured in Mailchimp UI to trigger on tags or merge field updates. LiberoVino only provides the data triggers.
+- **Templates**: Created via API during seeding and can be used in flow email steps.
 
 ### Klaviyo Provider
 
@@ -1057,7 +1094,7 @@ Configure per winery:
 ### Phase 1: Foundation
 - [ ] Create database tables
 - [ ] Build provider abstraction
-- [ ] Implement Mailchimp provider
+- [x] Implement Mailchimp provider (tag-based triggers with merge fields for recurring events)
 - [ ] Basic template system
 - [ ] Monthly cron job
 

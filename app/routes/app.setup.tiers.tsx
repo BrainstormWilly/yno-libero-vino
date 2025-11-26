@@ -135,26 +135,40 @@ export default function SetupTiers() {
   const canContinue = tiers.length > 0 && tiers.every((t: any) => t.promotionCount > 0);
   
   return (
-    <Page
-      title="Membership Tiers"
-      backAction={{ 
-        content: 'Back to Club Info', 
-        onAction: () => navigate(addSessionToUrl('/app/setup', session.id)) 
-      }}
-    >
+    <Page title="Membership Tiers">
       <Layout>
-        {/* Success/Error Messages */}
-        {actionData && !actionData.success && (
-          <Layout.Section>
-            <Banner tone="critical" title={actionData.message} />
-          </Layout.Section>
-        )}
-        
-        {actionData && actionData.success && actionData.message && (
-          <Layout.Section>
-            <Banner tone="success" title={actionData.message} />
-          </Layout.Section>
-        )}
+        {/* Banners and Navigation at Top */}
+        <Layout.Section>
+          <BlockStack gap="400">
+            {/* Success/Error Messages */}
+            {actionData && !actionData.success && (
+              <Banner tone="critical" title={actionData.message} />
+            )}
+            
+            {actionData && actionData.success && actionData.message && (
+              <Banner tone="success" title={actionData.message} />
+            )}
+
+            {/* Navigation Buttons at Top */}
+            <Box paddingBlockEnd="400">
+              <InlineStack align="space-between">
+                <Button
+                  onClick={() => navigate(addSessionToUrl('/app/setup', session.id))}
+                >
+                  ← Back to Club Info
+                </Button>
+                
+                <Button
+                  variant="primary"
+                  onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
+                  disabled={!canContinue}
+                >
+                  Continue to Communication →
+                </Button>
+              </InlineStack>
+            </Box>
+          </BlockStack>
+        </Layout.Section>
         
         {/* Instructions */}
         <Layout.Section>
@@ -247,26 +261,6 @@ export default function SetupTiers() {
           </BlockStack>
         </Layout.Section>
         
-        {/* Navigation */}
-        <Layout.Section>
-          <Card>
-            <InlineStack align="space-between">
-              <Button
-                onClick={() => navigate(addSessionToUrl('/app/setup', session.id))}
-              >
-                ← Back
-              </Button>
-              
-              <Button
-                variant="primary"
-                onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
-                disabled={!canContinue}
-              >
-                Continue to Communication →
-              </Button>
-            </InlineStack>
-          </Card>
-        </Layout.Section>
       </Layout>
     </Page>
   );
