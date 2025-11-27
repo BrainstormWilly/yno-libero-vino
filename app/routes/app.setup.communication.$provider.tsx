@@ -84,6 +84,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         sendExpirationWarnings?: boolean;
         warningDaysBefore?: number;
         providerData?: ProviderDataJson | null;
+        emailProviderConfirmed?: boolean;
       }> = {};
       
       // Read config from form data
@@ -94,8 +95,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       
       if (emailProvider) configData.emailProvider = emailProvider;
 
-      // If switching providers, clear provider-specific data
+      // If switching providers, clear provider-specific data and reset confirmed flags
       if (isProviderChanging) {
+        // Reset confirmed flags when switching providers
+        configData.emailProviderConfirmed = false;
+        
         // Clear Mailchimp-specific fields when switching away
         if (previousProvider === 'mailchimp') {
           configData.emailListId = null;

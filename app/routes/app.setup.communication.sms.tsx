@@ -66,11 +66,21 @@ export async function action({ request }: ActionFunctionArgs) {
         emailFromAddress?: string | null;
         emailFromName?: string | null;
         providerData?: ProviderDataJson | null;
+        smsProviderConfirmed?: boolean;
       }> = {};
       
       // Read SMS config from form data
       const smsProvider = formData.get('sms_provider') as string | null;
+      const previousSmsProvider = existingConfig?.sms_provider?.toLowerCase();
+      const newSmsProvider = smsProvider?.toLowerCase();
+      const isSmsProviderChanging = existingConfig && previousSmsProvider !== newSmsProvider;
+      
       if (smsProvider) configData.smsProvider = smsProvider;
+      
+      // Reset confirmed flag when SMS provider changes
+      if (isSmsProviderChanging) {
+        configData.smsProviderConfirmed = false;
+      }
       
       const smsApiKey = formData.get('sms_api_key') as string | null;
       if (smsApiKey !== null) configData.smsApiKey = smsApiKey || null;

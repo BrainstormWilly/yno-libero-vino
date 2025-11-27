@@ -63,6 +63,7 @@ export async function action({ request }: ActionFunctionArgs) {
     try {
       const existingConfig = await db.getCommunicationConfig(session.clientId);
       const previousEmailProvider = existingConfig?.email_provider?.toLowerCase();
+      const previousSmsProvider = existingConfig?.sms_provider?.toLowerCase();
       const newEmailProvider = emailProvider?.toLowerCase();
       const isSwitchingFromSendGrid = previousEmailProvider === 'sendgrid' && newEmailProvider !== 'sendgrid';
       
@@ -75,11 +76,17 @@ export async function action({ request }: ActionFunctionArgs) {
         finalSmsProvider = null;
       }
 
+      // Reset confirmed flags when providers change
+      const emailProviderChanged = previousEmailProvider !== newEmailProvider;
+      const smsProviderChanged = previousSmsProvider !== finalSmsProvider?.toLowerCase();
+
       if (existingConfig) {
         // Update existing config
         await db.updateCommunicationConfig(session.clientId, {
           emailProvider,
           smsProvider: finalSmsProvider,
+          emailProviderConfirmed: emailProviderChanged ? false : undefined,
+          smsProviderConfirmed: smsProviderChanged ? false : undefined,
         });
       } else {
         // Create new config
