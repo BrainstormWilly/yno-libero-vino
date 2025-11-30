@@ -239,14 +239,21 @@ export class ShopifyProvider implements CrmProvider {
   }
 
   // Customer-specific discount management
-  async addCustomerToDiscount(discountId: string, customerId: string): Promise<void> {
-    // TODO: Implement Shopify customer-specific discount assignment
-    throw new Error('addCustomerToDiscount not implemented yet for Shopify');
+  async addTierMembership(stageId: string, clubId: string | null, customerId: string): Promise<void> {
+    // TODO: Implement Shopify tier membership assignment
+    // Shopify doesn't have clubs - add customer to all promotions linked to this stage
+    // Look up promotions from club_stage_promotions table using stageId
+    // Then add customer to each promotion's eligibility list
+    throw new Error('addTierMembership not implemented yet for Shopify');
   }
 
-  async removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void> {
-    // TODO: Implement Shopify customer-specific discount removal
-    throw new Error('removeCustomerFromDiscount not implemented yet for Shopify');
+  async cancelTierMembership(stageId: string, clubId: string | null, customerId: string, membershipId?: string | null): Promise<void> {
+    // TODO: Implement Shopify tier membership cancellation
+    // Shopify doesn't have clubs - remove customer from all promotions linked to this stage
+    // Look up promotions from club_stage_promotions table using stageId
+    // Then remove customer from each promotion's eligibility list
+    // membershipId is ignored for Shopify (not applicable)
+    throw new Error('cancelTierMembership not implemented yet for Shopify');
   }
 
   async getCouponCustomers(couponId: string): Promise<string[]> {

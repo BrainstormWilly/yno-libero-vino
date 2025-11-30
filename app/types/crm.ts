@@ -160,9 +160,13 @@ export interface CrmProvider {
   listWebhooks(): Promise<WebhookRegistration[]>;
   deleteWebhook(id: string): Promise<boolean>;
   
-  // Customer-specific coupon management (for club stages)
-  addCustomerToDiscount(discountId: string, customerId: string): Promise<void>;
-  removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void>;
+  // Tier membership management (for club stages)
+  // stageId: LV stage ID for looking up promotions (Shopify) or context (Commerce7)
+  // clubId: Commerce7 club ID (nullable for Shopify)
+  // customerId: CRM customer ID
+  // membershipId: Commerce7 membership ID (optional, for cancellations)
+  addTierMembership(stageId: string, clubId: string | null, customerId: string): Promise<void>;
+  cancelTierMembership(stageId: string, clubId: string | null, customerId: string, membershipId?: string | null): Promise<void>;
   getCouponCustomers(couponId: string): Promise<string[]>;
   
   // Club/Tier operations (idempotent)

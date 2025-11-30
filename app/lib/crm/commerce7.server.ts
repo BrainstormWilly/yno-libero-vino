@@ -964,16 +964,62 @@ export class Commerce7Provider implements CrmProvider {
     return true;
   }
 
-  // Customer-specific discount management
-  async addCustomerToDiscount(discountId: string, customerId: string): Promise<void> {
-    // TODO: Implement Commerce7 customer-specific discount assignment
-    // This might be done through coupon customer restrictions
-    throw new Error("addCustomerToDiscount not implemented yet for Commerce7");
+  // Tier membership management
+  async addTierMembership(stageId: string, clubId: string | null, customerId: string): Promise<void> {
+    // TODO: Implement Commerce7 tier membership assignment
+    // This adds a customer to a Commerce7 club (membership is created via createClubMembership in enrollment flow)
+    // For sync queue retries, we may need to recreate membership if it was lost
+    if (!clubId) {
+      throw new Error("Commerce7 clubId is required for addTierMembership");
+    }
+    throw new Error("addTierMembership not implemented yet for Commerce7");
   }
 
-  async removeCustomerFromDiscount(discountId: string, customerId: string): Promise<void> {
-    // TODO: Implement Commerce7 customer-specific discount removal
-    throw new Error("removeCustomerFromDiscount not implemented yet for Commerce7");
+  async cancelTierMembership(stageId: string, clubId: string | null, customerId: string, membershipId?: string | null): Promise<void> {
+    // Cancel Commerce7 club membership by setting cancelDate
+    // This sets the membership status to 'Cancelled' and disables promotions
+    
+    let targetMembershipId: string;
+    
+    // If membershipId is provided, use it directly
+    if (membershipId) {
+      targetMembershipId = membershipId;
+    } else if (clubId) {
+      // Look up membership by customer and club
+      const memberships = await this.getCustomerClubMemberships(customerId);
+      const membership = memberships.find((m: any) => m.clubId === clubId);
+      
+      if (!membership || !membership.id) {
+        throw new Error(`No active membership found for customer ${customerId} in club ${clubId}`);
+      }
+      
+      targetMembershipId = membership.id;
+    } else {
+      throw new Error("Commerce7 clubId or membershipId is required for cancelTierMembership");
+    }
+    
+    // Update membership to set cancelDate (cancels membership)
+    const response = await fetch(`${API_URL}/club-membership/${targetMembershipId}`, {
+      method: 'PUT',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify({
+        cancelDate: new Date().toISOString(),
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      handleC7ApiError(errorData, 'Cancel Club Membership');
+      throw new Error(`Failed to cancel membership: ${response.statusText}`);
+    }
+    
+    // Membership cancelled successfully
+    // Status will be set to 'Cancelled' and promotions will be disabled automatically
   }
 
   async getCouponCustomers(couponId: string): Promise<string[]> {
@@ -2184,21 +2230,4 @@ export class Commerce7Provider implements CrmProvider {
     return data.members || [];
   }
 
-  /**
-   * Remove a customer from a club
-   */
-  async removeClubMember(clubId: string, customerId: string): Promise<void> {
-    const response = await fetch(`${API_URL}/club/${clubId}/member/${customerId}`, {
-      method: 'DELETE',
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: getApiAuth(),
-        tenant: this.tenantId,
-      },
-    });
-
-    const data = await response.json();
-    handleC7ApiError(data, 'Remove Club Member');
-  }
 }

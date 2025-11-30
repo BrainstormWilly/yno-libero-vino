@@ -11,6 +11,7 @@ interface TierFormDataSerialized {
   durationMonths: string;
   minPurchaseAmount: string;
   description?: string;
+  upgradable?: boolean;
   
   // New: Array of promotions (can have multiple per tier)
   promotions?: Array<{
@@ -107,6 +108,7 @@ export async function createClubTiers(
     durationMonths: parseInt(tier.durationMonths),
     minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
     stageOrder: index + 1,
+    upgradable: tier.upgradable ?? true,
   }));
   
   return db.createClubStages(clubProgramId, stages);
@@ -253,6 +255,7 @@ export async function updateExistingTier(
     durationMonths: parseInt(tier.durationMonths),
     minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
     stageOrder,
+    upgradable: tier.upgradable,
   });
 }
 

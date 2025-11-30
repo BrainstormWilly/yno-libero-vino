@@ -15,7 +15,7 @@ Authorization: Bearer {access_token}
 
 ## 1. Club (Tier) API
 
-**Endpoint**: `POST/GET/PATCH/DELETE /v1/club`
+**Endpoint**: `POST/GET/PUT/DELETE /v1/club`
 
 ### Create Club (Tier)
 
@@ -68,7 +68,7 @@ adminStatus: "Available" | "Not Available" // Always use "Not Available"
 
 ## 2. Club Membership API
 
-**Endpoint**: `POST/GET/PATCH/DELETE /v1/club-membership`
+**Endpoint**: `POST/GET/PUT/DELETE /v1/club-membership`
 
 ### Create Club Membership
 
@@ -236,7 +236,7 @@ Response: Array of address objects
 
 ## 4. Credit Card API
 
-**Endpoint**: `POST/GET/PATCH/DELETE /v1/customer/{customerId}/credit-card`
+**Endpoint**: `POST/GET/PUT/DELETE /v1/customer/{customerId}/credit-card`
 
 ### Add Credit Card
 
@@ -292,7 +292,7 @@ gateway:
 
 ## 5. Promotion API
 
-**Endpoint**: `POST/GET/PATCH/DELETE /v1/promotion`
+**Endpoint**: `POST/GET/PUT/DELETE /v1/promotion`
 
 ### Create Promotion
 
@@ -368,7 +368,7 @@ usageLimitType:
 
 ## 6. Loyalty Tier API
 
-**Endpoint**: `POST/GET/PATCH/DELETE /v2/loyalty-tier` ⚠️ **v2 API!**
+**Endpoint**: `POST/GET/PUT/DELETE /v2/loyalty-tier` ⚠️ **v2 API!**
 
 ### Create Loyalty Tier
 
@@ -570,7 +570,7 @@ const defaultCard = cards.find(c => c.isDefault === true);
 
 // Step 3: Cancel old membership
 await fetch(`/v1/club-membership/${oldMembershipId}`, {
-  method: 'PATCH',
+  method: 'PUT',
   body: JSON.stringify({
     status: "Cancelled",
     cancelDate: new Date().toISOString(),

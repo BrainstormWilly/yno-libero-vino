@@ -223,6 +223,7 @@ export async function createClubStages(
     durationMonths: number;
     minPurchaseAmount: number;
     stageOrder: number;
+    upgradable?: boolean;
   }>
 ): Promise<ClubStage[]> {
   const supabase = getSupabaseClient();
@@ -234,6 +235,7 @@ export async function createClubStages(
     min_purchase_amount: stage.minPurchaseAmount,
     stage_order: stage.stageOrder,
     is_active: true,
+    upgradable: stage.upgradable ?? true,
   }));
   
   const { data, error } = await supabase
@@ -257,6 +259,7 @@ export async function updateClubStage(
     minLtvAmount?: number;
     stageOrder?: number;
     c7ClubId?: string;
+    upgradable?: boolean;
   }
 ) {
   const supabase = getSupabaseClient();
@@ -271,6 +274,7 @@ export async function updateClubStage(
   if (data.minLtvAmount !== undefined) updateData.min_ltv_amount = data.minLtvAmount;
   if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder;
   if (data.c7ClubId) updateData.c7_club_id = data.c7ClubId;
+  if (data.upgradable !== undefined) updateData.upgradable = data.upgradable;
   
   const { error } = await supabase
     .from('club_stages')
@@ -628,6 +632,17 @@ export async function createClubEnrollment(data: {
     throw new Error(`Failed to create enrollment: ${error?.message}`);
   }
   
+  // Update customer flag if enrollment is active
+  if (data.status === 'active') {
+    await supabase
+      .from('customers')
+      .update({ 
+        is_club_member: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', data.customerId);
+  }
+  
   return enrollment;
 }
 
@@ -786,6 +801,48 @@ export async function updateEnrollmentStatus(
   if (error) {
     throw new Error(`Failed to update enrollment status: ${error.message}`);
   }
+}
+
+// ============================================
+// CRM SYNC QUEUE OPERATIONS
+// ============================================
+
+/**
+ * Queue a CRM sync operation for retry
+ * Used when direct CRM sync fails or needs to be deferred
+ */
+export async function queueCrmSync(data: {
+  clientId: string;
+  enrollmentId?: string | null;
+  actionType: 'add_membership' | 'cancel_membership' | 'upgrade_membership';
+  stageId: string;
+  oldStageId?: string | null;
+  customerCrmId: string;
+}) {
+  const supabase = getSupabaseClient();
+  
+  const { data: queueItem, error } = await supabase
+    .from('crm_sync_queue')
+    .insert({
+      client_id: data.clientId,
+      enrollment_id: data.enrollmentId || null,
+      action_type: data.actionType,
+      stage_id: data.stageId,
+      old_stage_id: data.oldStageId || null,
+      customer_crm_id: data.customerCrmId,
+      status: 'pending',
+      attempts: 0,
+      max_attempts: 5,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Failed to queue CRM sync:', error);
+    throw new Error(`Failed to queue CRM sync: ${error.message}`);
+  }
+  
+  return queueItem;
 }
 
 // ============================================

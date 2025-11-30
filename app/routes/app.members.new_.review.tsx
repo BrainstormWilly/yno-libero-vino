@@ -69,36 +69,35 @@ export async function action({ request }: ActionFunctionArgs) {
     
     // Get tier details
     const tier = await db.getClubStageWithDetails(draft.tier.id);
-    if (!tier || !tier.c7_club_id) {
+    if (!tier) {
       return {
         success: false,
-        error: 'Invalid tier or tier not synced with CRM',
+        error: 'Invalid tier',
       };
     }
     
-    // Validate we have all required IDs
-    if (!draft.customer.billingAddressId || !draft.customer.shippingAddressId || !draft.customer.paymentMethodId) {
+    // For Commerce7, validate club is synced
+    if (session.crmType === 'commerce7' && !tier.c7_club_id) {
+      return {
+        success: false,
+        error: 'Tier not synced with CRM',
+      };
+    }
+    
+    // Validate we have all required IDs for Commerce7
+    if (session.crmType === 'commerce7' && (!draft.customer.billingAddressId || !draft.customer.shippingAddressId || !draft.customer.paymentMethodId)) {
       return {
         success: false,
         error: 'Missing required address or payment information',
       };
     }
     
-    // Create membership in CRM
+    // Calculate enrollment dates
     const enrollmentDate = new Date();
     const expirationDate = new Date(enrollmentDate);
     expirationDate.setMonth(expirationDate.getMonth() + tier.duration_months);
     
-    const crmMembership = await provider.createClubMembership({
-      customerId: draft.customer.crmId,
-      clubId: tier.c7_club_id,
-      billingAddressId: draft.customer.billingAddressId,
-      shippingAddressId: draft.customer.shippingAddressId,
-      paymentMethodId: draft.customer.paymentMethodId,
-      startDate: enrollmentDate.toISOString(),
-    });
-    
-    // Create/update customer in LV database
+    // Create/update customer in LV database first
     let lvCustomer = await db.getCustomerByCrmId(session.clientId, draft.customer.crmId);
     const preferences = draft.preferences ?? db.getDefaultCommunicationPreferences();
     
@@ -114,14 +113,36 @@ export async function action({ request }: ActionFunctionArgs) {
     
     await db.upsertCommunicationPreferences(lvCustomer.id, preferences);
     
-    // Create enrollment record
-    await db.createClubEnrollment({
+    // Sync to CRM FIRST - MUST succeed before creating enrollment
+    // If CRM sync fails, enrollment fails (customer won't get discount otherwise)
+    let crmMembershipId: string | null = null;
+    
+    if (session.crmType === 'commerce7' && tier.c7_club_id) {
+      // Commerce7: Create club membership (must succeed)
+      const crmMembership = await provider.createClubMembership({
+        customerId: draft.customer.crmId,
+        clubId: tier.c7_club_id,
+        billingAddressId: draft.customer.billingAddressId!,
+        shippingAddressId: draft.customer.shippingAddressId!,
+        paymentMethodId: draft.customer.paymentMethodId!,
+        startDate: enrollmentDate.toISOString(),
+      });
+      
+      crmMembershipId = crmMembership.id || null;
+    } else if (session.crmType === 'shopify') {
+      // Shopify: Add customer to promotions (must succeed)
+      // TODO: Implement Shopify promotion assignment
+      throw new Error('Shopify enrollment not yet implemented');
+    }
+    
+    // Create enrollment record in our DB after CRM sync succeeds
+    const enrollment = await db.createClubEnrollment({
       customerId: lvCustomer.id,
       clubStageId: draft.tier.id,
       status: 'active',
       enrolledAt: enrollmentDate.toISOString(),
       expiresAt: expirationDate.toISOString(),
-      crmMembershipId: crmMembership.id || null,
+      crmMembershipId: crmMembershipId,
     });
     
     // Award welcome bonus points if applicable
@@ -162,7 +183,7 @@ export async function action({ request }: ActionFunctionArgs) {
             crmId: draft.customer.crmId,
           },
           lvCustomerId: lvCustomer.id,
-          crmMembershipId: crmMembership.id || null,
+          crmMembershipId: crmMembershipId,
           tier: {
             id: draft.tier.id,
             name: draft.tier.name,
@@ -186,7 +207,7 @@ export async function action({ request }: ActionFunctionArgs) {
             crmId: draft.customer.crmId,
           },
           lvCustomerId: lvCustomer.id,
-          crmMembershipId: crmMembership.id || null,
+          crmMembershipId: crmMembershipId,
           tier: {
             id: draft.tier.id,
             name: draft.tier.name,

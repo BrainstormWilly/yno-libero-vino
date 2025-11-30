@@ -4,6 +4,7 @@ export const KLAVIYO_METRICS = {
   MONTHLY_STATUS_PROMO: 'LiberoVino.MonthlyStatusPromo',
   EXPIRATION_WARNING: 'LiberoVino.ExpirationWarning',
   EXPIRATION_NOTICE: 'LiberoVino.ExpirationNotice',
+  TIER_UPGRADE: 'LiberoVino.TierUpgrade',
   ANNUAL_RESIGN: 'LiberoVino.AnnualResign',
   SALES_BLAST: 'LiberoVino.SalesBlast',
   TEST: 'LiberoVino.TestMetric',
@@ -16,6 +17,7 @@ export const TRANSACTIONAL_METRICS: KlaviyoMetricKey[] = [
   'MONTHLY_STATUS',
   'EXPIRATION_WARNING',
   'EXPIRATION_NOTICE',
+  'TIER_UPGRADE',
 ];
 
 export const MARKETING_METRICS: KlaviyoMetricKey[] = [
@@ -30,6 +32,7 @@ export const KLAVIYO_TEMPLATES = {
   MONTHLY_STATUS_PROMO: 'LiberoVino – Monthly Status Promo',
   EXPIRATION_WARNING: 'LiberoVino – Expiration Warning',
   EXPIRATION_NOTICE: 'LiberoVino – Expiration Notice',
+  TIER_UPGRADE: 'LiberoVino – Tier Upgrade',
   ANNUAL_RESIGN: 'LiberoVino – Annual Re-Sign',
   SALES_BLAST: 'LiberoVino – Sales Spotlight',
   TEST: 'LiberoVino – Test Message',
@@ -43,6 +46,7 @@ export const KLAVIYO_FLOWS = {
   MONTHLY_STATUS_PROMO: 'LiberoVino – Monthly Status Promo',
   EXPIRATION_WARNING: 'LiberoVino – Expiration Warning',
   EXPIRATION_NOTICE: 'LiberoVino – Expiration Notice',
+  TIER_UPGRADE: 'LiberoVino – Tier Upgrade',
   ANNUAL_RESIGN: 'LiberoVino – Annual Re-Sign Opportunity',
   SALES_BLAST: 'LiberoVino – Sales Spotlight',
   TEST: 'LiberoVino – Test Flow',

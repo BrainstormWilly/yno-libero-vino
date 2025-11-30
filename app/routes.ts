@@ -43,4 +43,9 @@ export default [
   route("api/collections", "routes/api.collections.ts"),
   route("api/customers", "routes/api.customers.ts"),
   route("api/members", "routes/api.members.ts"),
+  route("api/cron", "routes/api.cron.ts"),
+  route("api/cron/sync", "routes/api.cron.sync.ts"),
+  route("api/cron/monthly-status", "routes/api.cron.monthly-status.ts"),
+  route("api/cron/monthly-status/queue", "routes/api.cron.monthly-status.queue.ts"),
+  route("api/cron/expiration-warning/queue", "routes/api.cron.expiration-warning.queue.ts"),
 ] satisfies RouteConfig;

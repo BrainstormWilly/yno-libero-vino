@@ -25,6 +25,7 @@ export const MAILCHIMP_TAGS: Record<MailchimpSequenceKey, string> = {
   MONTHLY_STATUS_PROMO: 'LiberoVino::MonthlyStatusPromo',
   EXPIRATION_WARNING: 'LiberoVino::ExpirationWarning',
   EXPIRATION_NOTICE: 'LiberoVino::ExpirationNotice',
+  TIER_UPGRADE: 'LiberoVino::TierUpgrade',
   ANNUAL_RESIGN: 'LiberoVino::AnnualResign',
   SALES_BLAST: 'LiberoVino::SalesBlast',
   TEST: 'LiberoVino::Test',
@@ -42,6 +43,7 @@ export const MAILCHIMP_MERGE_FIELDS: Record<MailchimpSequenceKey, string> = {
   MONTHLY_STATUS_PROMO: 'LVMONPRO', // 8 chars
   EXPIRATION_WARNING: 'LVWARN', // 6 chars
   EXPIRATION_NOTICE: 'LVNOTICE', // 8 chars
+  TIER_UPGRADE: 'LVUPGRAD', // 8 chars
   ANNUAL_RESIGN: 'LVRESIGN', // 8 chars
   SALES_BLAST: 'LVBLAST', // 7 chars
   TEST: 'LVTEST', // 6 chars

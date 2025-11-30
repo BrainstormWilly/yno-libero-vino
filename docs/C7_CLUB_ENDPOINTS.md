@@ -128,7 +128,7 @@ Retrieves a club by ID.
 
 Updates an existing club.
 
-**Endpoint**: `PATCH /club/:id`
+**Endpoint**: `PUT /club/:id`
 
 **Request Body**:
 ```json
@@ -266,7 +266,7 @@ Retrieves a specific membership.
 
 Updates membership details (e.g., extend duration, change tier).
 
-**Endpoint**: `PATCH /club/:clubId/membership/:membershipId`
+**Endpoint**: `PUT /club/:clubId/membership/:membershipId`
 
 **Request Body**:
 ```json
@@ -403,7 +403,7 @@ Creates a promotional discount that can be assigned to a club.
 
 ### Update Promotion
 
-**Endpoint**: `PATCH /promotion/:id`
+**Endpoint**: `PUT /promotion/:id`
 
 **Request Body**: Same fields as Create (all optional)
 
@@ -518,7 +518,7 @@ Creates a loyalty earning configuration for a club.
 
 ### Update Loyalty Tier
 
-**Endpoint**: `PATCH /loyalty/tier/:id`
+**Endpoint**: `PUT /loyalty/tier/:id`
 
 ---
 

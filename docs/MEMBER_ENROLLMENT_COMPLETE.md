@@ -29,7 +29,7 @@ The member enrollment system has been implemented following the flow from `Membe
 - `app/lib/crm/commerce7.server.ts` - Added:
   - Customer address management (`getCustomerAddresses`, `createCustomerAddress`)
   - Credit card management (`getCustomerCreditCards`, `createCustomerCreditCard`)
-  - Club membership management (`createClubMembership`, `getCustomerClubMemberships`, `getClubMembers`, `removeClubMember`)
+  - Club membership management (`createClubMembership`, `getCustomerClubMemberships`, `getClubMembers`, `cancelTierMembership`)
 
 ### API Routes
 - `app/routes/api.customers.search.ts` - Search customers in CRM

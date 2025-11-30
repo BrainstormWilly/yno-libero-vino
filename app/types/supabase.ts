@@ -345,6 +345,7 @@ export type Database = {
           platform_discount_id: string | null
           platform_tag_id: string | null
           stage_order: number
+          upgradable: boolean
           updated_at: string | null
         }
         Insert: {
@@ -360,6 +361,7 @@ export type Database = {
           platform_discount_id?: string | null
           platform_tag_id?: string | null
           stage_order: number
+          upgradable?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -375,6 +377,7 @@ export type Database = {
           platform_discount_id?: string | null
           platform_tag_id?: string | null
           stage_order?: number
+          upgradable?: boolean
           updated_at?: string | null
         }
         Relationships: [

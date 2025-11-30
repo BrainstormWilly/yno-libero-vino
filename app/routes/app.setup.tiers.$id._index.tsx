@@ -71,6 +71,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const durationMonths = parseInt(formData.get('duration_months') as string);
       const minPurchaseAmount = parseFloat(formData.get('min_purchase_amount') as string);
       const minLtvAmount = parseFloat(formData.get('min_ltv_amount') as string) || 0;
+      const upgradable = formData.get('upgradable') === 'true';
       
       // Update tier details in DB
       await db.updateClubStage(tierId, {
@@ -78,6 +79,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         durationMonths,
         minPurchaseAmount,
         minLtvAmount,
+        upgradable,
       });
       
       // Sync with CRM
@@ -200,6 +202,7 @@ export default function TierDetails() {
   const [durationMonths, setDurationMonths] = useState(tier.duration_months.toString());
   const [minPurchaseAmount, setMinPurchaseAmount] = useState(tier.min_purchase_amount.toString());
   const [minLtvAmount, setMinLtvAmount] = useState(tier.min_ltv_amount?.toString() || '0');
+  const [upgradable, setUpgradable] = useState(tier.upgradable ?? true);
   
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(!!loyalty);
   const [earnRate, setEarnRate] = useState(
@@ -227,7 +230,8 @@ export default function TierDetails() {
     tierName !== tier.name ||
     durationMonths !== tier.duration_months.toString() ||
     minPurchaseAmount !== tier.min_purchase_amount.toString() ||
-    minLtvAmount !== (tier.min_ltv_amount?.toString() || '0');
+    minLtvAmount !== (tier.min_ltv_amount?.toString() || '0') ||
+    upgradable !== (tier.upgradable ?? true);
   
   // Track if loyalty settings have been modified
   const loyaltyChanged = 
@@ -342,6 +346,15 @@ export default function TierDetails() {
                             />
                           </div>
                         </InlineStack>
+                        
+                        <Checkbox
+                          label="Members can upgrade to this tier"
+                          checked={upgradable}
+                          onChange={setUpgradable}
+                          helpText="If unchecked, this tier can only be assigned manually (e.g., for high-value customers). Automatic tier progression will skip non-upgradable tiers."
+                        />
+                        
+                        <input type="hidden" name="upgradable" value={upgradable.toString()} />
                         
                         <InlineStack align="end">
                           <Button 
