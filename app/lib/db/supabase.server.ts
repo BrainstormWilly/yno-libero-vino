@@ -662,6 +662,64 @@ export async function getActiveEnrollment(customerId: string, clubStageId: strin
   return enrollment;
 }
 
+/**
+ * Get the current active enrollment for a customer (any tier)
+ */
+export async function getCurrentActiveEnrollment(customerId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data: enrollment, error } = await supabase
+    .from('club_enrollments')
+    .select(`
+      *,
+      club_stages!inner (
+        id,
+        name,
+        stage_order,
+        min_purchase_amount,
+        min_ltv_amount,
+        c7_club_id,
+        club_program_id
+      )
+    `)
+    .eq('customer_id', customerId)
+    .eq('status', 'active')
+    .order('enrolled_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  
+  if (error) return null;
+  
+  return enrollment;
+}
+
+/**
+ * Get the next tier in progression (higher stage_order) for a client's club program
+ */
+export async function getNextTier(clientId: string, currentStageOrder: number) {
+  const supabase = getSupabaseClient();
+  
+  const { data: nextStage, error } = await supabase
+    .from('club_stages')
+    .select(`
+      *,
+      club_programs!inner (
+        id,
+        client_id
+      )
+    `)
+    .eq('club_programs.client_id', clientId)
+    .gt('stage_order', currentStageOrder)
+    .eq('is_active', true)
+    .order('stage_order', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  
+  if (error) return null;
+  
+  return nextStage;
+}
+
 export async function getEnrollmentsByStage(clubStageId: string) {
   const supabase = getSupabaseClient();
   

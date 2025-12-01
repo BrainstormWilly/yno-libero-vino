@@ -13,12 +13,10 @@ export function getAvailableWebhookTopics(): WebhookTopic[] {
     'customers/create',
     'customers/update',
     'customers/delete',
-    'orders/create',
-    'orders/update',
-    'orders/cancelled',
-    'products/create',
-    'products/update',
-    'products/delete'
+    'club/update',
+    'club/delete',
+    'club-membership/update',
+    'club-membership/delete'
   ];
 }
 
@@ -48,12 +46,9 @@ function capitalize(str: string): string {
  */
 export function getRecommendedWebhooks(): WebhookTopic[] {
   return [
-    'customers/create',
     'customers/update',
-    'orders/create',
-    'orders/update',
-    'products/create',
-    'products/update'
+    'club-membership/update',
+    'club-membership/delete'
   ];
 }
 

@@ -85,12 +85,10 @@ export type WebhookTopic =
   | 'customers/create'
   | 'customers/update'
   | 'customers/delete'
-  | 'orders/create'
-  | 'orders/update'
-  | 'orders/cancelled'
-  | 'products/create'
-  | 'products/update'
-  | 'products/delete';
+  | 'club/update'
+  | 'club/delete'
+  | 'club-membership/update'
+  | 'club-membership/delete';
 
 export interface WebhookPayload {
   topic: WebhookTopic;
@@ -154,7 +152,7 @@ export interface CrmProvider {
   deleteCoupon(id: string): Promise<boolean>;
   
   // Webhook operations
-  validateWebhook(request: Request): Promise<boolean>;
+  validateWebhook(request: Request, bodyText?: string): Promise<boolean>;
   processWebhook(payload: WebhookPayload): Promise<void>;
   registerWebhook(topic: WebhookTopic, address: string): Promise<WebhookRegistration>;
   listWebhooks(): Promise<WebhookRegistration[]>;

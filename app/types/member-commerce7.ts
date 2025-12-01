@@ -33,8 +33,50 @@ export type C7ClubMembershipResponse = {
   currentNumberOfShipments: number;
   createdAt: string;
   updatedAt: string;
-  customer?: any;
-  club?: any;
+  customer?: {
+    id: string;
+    avatar?: string;
+    firstName: string;
+    lastName: string;
+    birthDate?: string | null;
+    city?: string;
+    stateCode?: string;
+    countryCode?: string;
+    acceptsMarketing?: boolean;
+    lastActivityDate?: string;
+    facebookId?: string | null;
+    metaData?: Record<string, any>;
+    createdAt: string;
+    updatedAt: string;
+    orderInformation?: {
+      lastOrderId?: string | null;
+      lastOrderDate?: string | null;
+      orderCount?: number;
+      lifetimeValue: number; // in cents
+      currentClubTitle?: string;
+      daysInCurrentClub?: number;
+    };
+    clubs?: Array<{
+      clubId: string;
+      clubTitle: string;
+      cancelDate: string | null;
+      signupDate: string;
+      clubMembershipId: string;
+    }>;
+  };
+  club?: {
+    id: string;
+    title: string;
+    content?: string | null;
+    publishDate?: string;
+    slug: string;
+    createdAt: string;
+    updatedAt: string;
+    seo?: {
+      title?: string;
+      description?: string | null;
+    };
+  };
   onHolds?: any[];
 };
 

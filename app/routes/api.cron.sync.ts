@@ -120,7 +120,7 @@ export async function action({ request }: ActionFunctionArgs) {
           // For now, this will need to be implemented
           await provider.addTierMembership(stageId, clubId, customerCrmId);
           
-          // Send upgrade notification after successful upgrade
+          // Send upgrade notification after successful CRM sync (consistent with cancellation flow)
           await sendUpgradeNotification(clientId, customerCrmId, oldStageId, stageId);
           break;
 

@@ -11,6 +11,9 @@ import { sendClientEmail, trackClientEvent } from './communication.service.serve
 import { KlaviyoProvider } from './providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from './preferences';
+import { crmManager } from '~/lib/crm';
+import { c7CentsToDollars } from '~/types/customer-commerce7';
+import type { C7ClubMembershipResponse } from '~/types/member-commerce7';
 
 type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
 
@@ -740,7 +743,7 @@ export async function sendMonthlyStatusNotification(
       return;
     }
 
-    // Get active enrollment
+    // Get active enrollment (including c7_membership_id for upgrade check)
     const { data: enrollmentData, error: enrollmentError } = await supabase
       .from('club_enrollments')
       .select(`
@@ -774,13 +777,38 @@ export async function sendMonthlyStatusNotification(
       return;
     }
 
+    // Get client info (including CRM type and tenant/shop for tier upgrade check)
+    const client = await db.getClient(clientId);
+    if (!client) {
+      console.warn(`Client not found: ${clientId}, skipping monthly status notification`);
+      return;
+    }
+
+    // Check for tier upgrade eligibility FIRST - if upgrade is detected, queue it and skip monthly status
+    // Upgrade notification will be sent after CRM sync completes (consistent with cancellation flow)
+    if (enrollment.c7_membership_id && customer.crm_id && client.crm_type && client.tenant_shop && client.crm_type === 'commerce7') {
+      const upgradeStatus = await checkAndQueueTierUpgradeFromCRM(
+        clientId,
+        enrollment.id,
+        enrollment.c7_membership_id,
+        customer.crm_id,
+        client.crm_type,
+        client.tenant_shop
+      );
+
+      // If upgrade was detected and queued, skip monthly status
+      // Upgrade notification will be sent after CRM sync completes in the queue processor
+      if (upgradeStatus.upgraded) {
+        console.info(`Upgrade queued for customer ${customer.crm_id}, skipping monthly status notification`);
+        return;
+      }
+    }
+
+    // No upgrade detected - send regular monthly status notification
     // Calculate days remaining
     const expiresAt = new Date(enrollment.expires_at);
     const now = new Date();
     const daysRemaining = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-    // Get client info
-    const client = await db.getClient(clientId);
 
     // Get next tier (if upgradable)
     let nextTier = null;
@@ -1929,6 +1957,107 @@ ${clientName}`;
     });
   } catch (error) {
     console.warn('SendGrid expiration warning failed:', error);
+  }
+}
+
+/**
+ * Check for tier upgrade eligibility using CRM club membership LTV and queue upgrade if qualified
+ * Called during monthly status notifications to check if member qualifies for tier upgrade
+ * Returns upgrade status information if upgrade was detected and queued
+ */
+async function checkAndQueueTierUpgradeFromCRM(
+  clientId: string,
+  enrollmentId: string,
+  c7MembershipId: string,
+  customerCrmId: string,
+  crmType: string,
+  tenantShop: string
+): Promise<{ upgraded: boolean; nextTier?: any; oldTier?: any }> {
+  try {
+    // Get current enrollment with tier info
+    const enrollment = await db.getEnrollmentById(enrollmentId);
+    if (!enrollment) {
+      return { upgraded: false };
+    }
+
+    const currentStage = enrollment.club_stages as any;
+    if (!currentStage || !currentStage.stage_order) {
+      return { upgraded: false };
+    }
+
+    // Get CRM provider and fetch club membership with customer and orderInformation
+    const crmProvider = crmManager.getProvider(crmType, tenantShop);
+    if (crmType !== 'commerce7') {
+      // Only Commerce7 is supported for now
+      return { upgraded: false };
+    }
+
+    let membership: C7ClubMembershipResponse;
+    try {
+      membership = await (crmProvider as any).getClubMembership(c7MembershipId);
+    } catch (error) {
+      console.error(`Failed to fetch club membership ${c7MembershipId} from CRM:`, error);
+      return { upgraded: false };
+    }
+
+    // Extract LTV from membership response
+    if (!membership.customer?.orderInformation?.lifetimeValue) {
+      console.warn(`No orderInformation.lifetimeValue found for membership ${c7MembershipId}`);
+      return { upgraded: false };
+    }
+
+    const ltvInCents = membership.customer.orderInformation.lifetimeValue;
+    const ltvInDollars = c7CentsToDollars(ltvInCents);
+
+    // Calculate annualized LTV using customer's createdAt from membership
+    if (!membership.customer.createdAt) {
+      console.warn(`No customer.createdAt found for membership ${c7MembershipId}`);
+      return { upgraded: false };
+    }
+
+    const createdDate = new Date(membership.customer.createdAt);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const yearsAsCustomer = diffDays / 365.25; // Account for leap years
+    const effectiveYears = Math.max(1, yearsAsCustomer);
+    const annualizedLTV = ltvInDollars / effectiveYears;
+
+    // Get next tier in progression
+    const nextTier = await db.getNextTier(clientId, currentStage.stage_order);
+    if (!nextTier) {
+      // No next tier available
+      return { upgraded: false };
+    }
+
+    // Check if customer qualifies for upgrade based on LTV
+    const qualifiesByLTV = annualizedLTV >= (nextTier.min_ltv_amount || 0);
+
+    if (qualifiesByLTV) {
+      // Queue upgrade
+      await db.queueCrmSync({
+        clientId,
+        enrollmentId: enrollment.id,
+        actionType: 'upgrade_membership',
+        stageId: nextTier.id,
+        oldStageId: currentStage.id,
+        customerCrmId: customerCrmId,
+      });
+
+      console.log(`Queued tier upgrade for enrollment ${enrollmentId}: ${currentStage.name} -> ${nextTier.name} (LTV: $${ltvInDollars.toFixed(2)}, Annualized: $${annualizedLTV.toFixed(2)})`);
+
+      return {
+        upgraded: true,
+        nextTier,
+        oldTier: currentStage,
+      };
+    }
+
+    return { upgraded: false };
+  } catch (error) {
+    console.error('Error checking tier upgrade from CRM:', error);
+    // Don't throw - tier upgrade check failures shouldn't break monthly status notifications
+    return { upgraded: false };
   }
 }
 

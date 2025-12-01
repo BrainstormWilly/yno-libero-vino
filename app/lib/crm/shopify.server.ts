@@ -177,26 +177,6 @@ export class ShopifyProvider implements CrmProvider {
         // TODO: Update customer in Supabase
         break;
       
-      case 'orders/create':
-        console.log('New order created:', payload.data.id);
-        // TODO: Store order in Supabase
-        break;
-      
-      case 'orders/update':
-        console.log('Order updated:', payload.data.id);
-        // TODO: Update order in Supabase
-        break;
-      
-      case 'products/create':
-        console.log('New product created:', payload.data.id);
-        // TODO: Store product in Supabase
-        break;
-      
-      case 'products/update':
-        console.log('Product updated:', payload.data.id);
-        // TODO: Update product in Supabase
-        break;
-      
       default:
         console.log('Unhandled webhook topic:', payload.topic);
     }

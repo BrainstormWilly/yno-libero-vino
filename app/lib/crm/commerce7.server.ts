@@ -39,6 +39,9 @@ import {
 } from "~/types/customer-commerce7";
 import { toC7ClubMembership } from "~/types/member-commerce7";
 import type { Customer, CustomerAddress, CustomerPayment } from "~/types/customer";
+import * as db from "~/lib/db/supabase.server";
+import type { C7ClubMembershipResponse } from "~/types/member-commerce7";
+import { sendExpirationNotification } from "~/lib/communication/membership-communications.server";
 
 const API_URL = "https://api.commerce7.com/v1";
 const APP_NAME = "yno-liberovino-wine-club-and-loyalty";
@@ -225,6 +228,29 @@ export class Commerce7Provider implements CrmProvider {
     } catch {
       return { ...customer, ltv: 0 };
     }
+  }
+
+  /**
+   * Calculate annualized LTV (LTV per year as customer)
+   * Used for tier qualification checks where min_ltv_amount is involved
+   * @param ltv - Total lifetime value in dollars
+   * @param customerCreatedAt - Customer creation date (from CRM)
+   * @returns Annualized LTV (LTV / years_as_customer, minimum 1 year)
+   */
+  calculateAnnualizedLTV(ltv: number, customerCreatedAt: Date | string): number {
+    const createdDate = typeof customerCreatedAt === 'string' 
+      ? new Date(customerCreatedAt) 
+      : customerCreatedAt;
+    
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    const yearsAsCustomer = diffDays / 365.25; // Account for leap years
+    
+    // Use minimum of 1 year to avoid division by very small numbers
+    const effectiveYears = Math.max(1, yearsAsCustomer);
+    
+    return ltv / effectiveYears;
   }
 
   async getCustomer(id: string): Promise<CrmCustomer> {
@@ -802,79 +828,414 @@ export class Commerce7Provider implements CrmProvider {
   }
 
   // Webhook operations
-  async validateWebhook(request: Request): Promise<boolean> {
+  async validateWebhook(request: Request, bodyText?: string): Promise<boolean> {
     // Commerce7 webhook validation
-    // Check if request is from Commerce7 using signature or IP whitelist
-    const signature = request.headers.get("x-commerce7-signature");
-    const tenantId = request.headers.get("x-commerce7-tenant");
-
-    if (!signature || !tenantId) {
-      console.warn("Commerce7 webhook missing required headers");
-      return false;
-    }
-
-    // TODO: Implement signature validation if Commerce7 provides one
-    // For now, we'll validate the basic headers are present
-
+    // Basic Auth is already validated in the webhook endpoint
+    // Signature validation can be added here if Commerce7 provides one
+    
+    // TODO: Implement signature validation if Commerce7 provides documentation
+    // For now, Basic Auth provides sufficient security
+    
+    // If a secret is configured and Commerce7 provides signature headers, validate here
     const secret = process.env.COMMERCE7_WEBHOOK_SECRET;
-    if (secret) {
+    if (secret && bodyText) {
+      // TODO: Check Commerce7 docs for signature header name and validation method
+      // This is a placeholder for when we know how Commerce7 signs webhooks
       try {
-        const body = await request.text();
-        const expectedSignature = crypto
-          .createHmac("sha256", secret)
-          .update(body, "utf8")
-          .digest("hex");
-
-        return signature === expectedSignature;
+        // Example signature validation (update when we know Commerce7's method):
+        // const signature = request.headers.get("x-commerce7-signature");
+        // if (signature) {
+        //   const expectedSignature = crypto
+        //     .createHmac("sha256", secret)
+        //     .update(bodyText, "utf8")
+        //     .digest("hex");
+        //   return signature === expectedSignature;
+        // }
       } catch (error) {
         console.error("Commerce7 webhook validation error:", error);
         return false;
       }
     }
 
-    // If no secret is configured, just validate headers are present
+    // Basic Auth is sufficient for now
     return true;
   }
 
   async processWebhook(payload: WebhookPayload): Promise<void> {
     console.log(`Processing Commerce7 webhook: ${payload.topic}`, payload.data);
 
-    // TODO: Implement webhook processing logic based on topic
-    // This is where you would sync data to your database
+    if (!payload.tenant) {
+      console.error('Missing tenant in webhook payload');
+      throw new Error('Missing tenant information');
+    }
 
-    switch (payload.topic) {
-      case "customers/create":
-        console.log("New customer created:", payload.data.id);
-        // TODO: Store customer in Supabase
-        break;
+    // Get client by tenant identifier
+    const client = await db.getClientbyCrmIdentifier('commerce7', payload.tenant);
+    if (!client) {
+      console.error(`Client not found for tenant: ${payload.tenant}`);
+      throw new Error(`Client not found for tenant: ${payload.tenant}`);
+    }
 
-      case "customers/update":
-        console.log("Customer updated:", payload.data.id);
-        // TODO: Update customer in Supabase
-        break;
+    try {
+      switch (payload.topic) {
+        case "customers/update":
+          await this.handleCustomerUpdate(payload.data, client.id);
+          break;
 
-      case "orders/create":
-        console.log("New order created:", payload.data.id);
-        // TODO: Store order in Supabase
-        break;
+        case "club/update":
+          await this.handleClubUpdate(payload.data, client.id);
+          break;
 
-      case "orders/update":
-        console.log("Order updated:", payload.data.id);
-        // TODO: Update order in Supabase
-        break;
+        case "club/delete":
+          await this.handleClubDelete(payload.data, client.id);
+          break;
 
-      case "products/create":
-        console.log("New product created:", payload.data.id);
-        // TODO: Store product in Supabase
-        break;
+        case "club-membership/update":
+          await this.handleClubMembershipUpdate(payload.data, client.id);
+          break;
 
-      case "products/update":
-        console.log("Product updated:", payload.data.id);
-        // TODO: Update product in Supabase
-        break;
+        case "club-membership/delete":
+          await this.handleClubMembershipDelete(payload.data, client.id);
+          break;
 
-      default:
-        console.log("Unhandled webhook topic:", payload.topic);
+        default:
+          console.log("Unhandled webhook topic:", payload.topic);
+      }
+    } catch (error) {
+      console.error(`Error processing webhook ${payload.topic}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle customer/update webhook
+   * - Update customer record
+   */
+  private async handleCustomerUpdate(customerData: any, clientId: string): Promise<void> {
+    try {
+      const crmCustomerId = customerData.id;
+      if (!crmCustomerId) {
+        console.error('Missing customer ID in customer/update webhook');
+        return;
+      }
+
+      // Find customer
+      const customer = await db.getCustomerByCrmId(clientId, crmCustomerId);
+      if (!customer) {
+        console.log(`Customer ${crmCustomerId} not found, skipping update`);
+        return;
+      }
+
+      // Update customer using C7 customer conversion
+      const c7Customer = fromC7Customer(customerData);
+      const supabase = db.getSupabaseClient();
+      
+      await supabase
+        .from('customers')
+        .update({
+          email: c7Customer.email,
+          first_name: c7Customer.firstName || null,
+          last_name: c7Customer.lastName || null,
+          phone: c7Customer.phone || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', customer.id);
+
+      // Update communication preferences if email changed
+      if (c7Customer.email !== customer.email) {
+        // Email changed - update preferences if needed
+        // This is handled automatically by communication system
+      }
+
+      console.log(`Customer ${crmCustomerId} updated successfully`);
+    } catch (error) {
+      console.error('Error handling customer/update webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle club/update webhook
+   * - Update club_stage record (sync tier config changes from C7)
+   */
+  private async handleClubUpdate(clubData: any, clientId: string): Promise<void> {
+    try {
+      const c7ClubId = clubData.id;
+      if (!c7ClubId) {
+        console.error('Missing club ID in club/update webhook');
+        return;
+      }
+
+      // Find club_stage by c7_club_id
+      const supabase = db.getSupabaseClient();
+      const { data: stage } = await supabase
+        .from('club_stages')
+        .select('*')
+        .eq('c7_club_id', c7ClubId)
+        .single();
+
+      if (!stage) {
+        console.log(`Club stage not found for C7 club ${c7ClubId}, skipping update`);
+        return;
+      }
+
+      // Update club_stage with changes from C7
+      // Note: Only sync name changes, other config is managed in LV
+      await supabase
+        .from('club_stages')
+        .update({
+          name: clubData.name || stage.name,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', stage.id);
+
+      console.log(`Club ${c7ClubId} updated successfully`);
+    } catch (error) {
+      console.error('Error handling club/update webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle club/delete webhook
+   * - Mark tier as inactive
+   * - Cancel all active enrollments for this club
+   * - Update customer flags for affected customers
+   */
+  private async handleClubDelete(clubData: any, clientId: string): Promise<void> {
+    try {
+      const c7ClubId = clubData.id;
+      if (!c7ClubId) {
+        console.error('Missing club ID in club/delete webhook');
+        return;
+      }
+
+      const supabase = db.getSupabaseClient();
+
+      // Find the club_stage(s) for this C7 club ID
+      const { data: clubStages, error: stagesError } = await supabase
+        .from('club_stages')
+        .select('id')
+        .eq('c7_club_id', c7ClubId);
+
+      if (stagesError || !clubStages || clubStages.length === 0) {
+        console.log(`No club_stages found for C7 club ${c7ClubId}, skipping delete`);
+        return;
+      }
+
+      const stageIds = clubStages.map(stage => stage.id);
+
+      // Find all active enrollments for these club stages
+      const { data: activeEnrollments, error: enrollmentsError } = await supabase
+        .from('club_enrollments')
+        .select('id, customer_id')
+        .in('club_stage_id', stageIds)
+        .eq('status', 'active');
+
+      if (enrollmentsError) {
+        console.error('Error fetching enrollments for club delete:', enrollmentsError);
+      }
+
+      // Cancel all active enrollments for this club
+      if (activeEnrollments && activeEnrollments.length > 0) {
+        const enrollmentIds = activeEnrollments.map(e => e.id);
+        const uniqueCustomerIds = [...new Set(activeEnrollments.map(e => e.customer_id))];
+
+        // Mark all enrollments as expired
+        await supabase
+          .from('club_enrollments')
+          .update({
+            status: 'expired',
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', enrollmentIds);
+
+        // Update customer flags (1 customer/1 tier policy - no other enrollments to check)
+        await supabase
+          .from('customers')
+          .update({
+            is_club_member: false,
+            current_club_stage_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in('id', uniqueCustomerIds);
+
+        console.log(`Cancelled ${activeEnrollments.length} active enrollments for club ${c7ClubId}`);
+      }
+
+      // Mark club_stage(s) as inactive
+      await supabase
+        .from('club_stages')
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('c7_club_id', c7ClubId);
+
+      console.log(`Club ${c7ClubId} marked as inactive`);
+    } catch (error) {
+      console.error('Error handling club/delete webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle club-membership/update webhook
+   * - Update enrollment record
+   * - Sync status, tier, and cancel_date changes
+   */
+  private async handleClubMembershipUpdate(membershipData: C7ClubMembershipResponse, clientId: string): Promise<void> {
+    try {
+      const c7MembershipId = membershipData.id;
+      if (!c7MembershipId) {
+        console.error('Missing membership ID in club-membership/update webhook');
+        return;
+      }
+
+      // Find enrollment by c7_membership_id
+      const supabase = db.getSupabaseClient();
+      const { data: enrollment } = await supabase
+        .from('club_enrollments')
+        .select('*')
+        .eq('c7_membership_id', c7MembershipId)
+        .single();
+
+      if (!enrollment) {
+        console.log(`Enrollment not found for C7 membership ${c7MembershipId}, skipping update`);
+        return;
+      }
+
+      // Map C7 status to LV status
+      // Database allows: 'active', 'expired', 'upgraded', 'cancelled'
+      type EnrollmentStatus = 'active' | 'expired' | 'upgraded' | 'cancelled';
+      let status: EnrollmentStatus = (enrollment.status || 'active') as EnrollmentStatus;
+      if (membershipData.status === 'Cancelled') {
+        status = 'expired';
+      } else if (membershipData.status === 'Active') {
+        status = 'active';
+      }
+
+      // Handle cancelDate - if set, update expires_at to that date
+      let expiresAt = enrollment.expires_at;
+      if (membershipData.cancelDate) {
+        expiresAt = membershipData.cancelDate;
+        // If cancelDate is set, membership is effectively expired
+        if (status === 'active') {
+          status = 'expired';
+        }
+      }
+
+      // Check if club/tier changed
+      let clubStageId = enrollment.club_stage_id;
+      if (membershipData.clubId) {
+        // Find club_stage by c7_club_id
+        const { data: newStage } = await supabase
+          .from('club_stages')
+          .select('id')
+          .eq('c7_club_id', membershipData.clubId)
+          .single();
+
+        if (newStage && newStage.id !== enrollment.club_stage_id) {
+          clubStageId = newStage.id;
+        }
+      }
+
+      // Track if this is a cancellation (status changed to Cancelled)
+      const wasActive = enrollment.status === 'active';
+      const isNowCancelled = membershipData.status === 'Cancelled';
+      const justCancelled = wasActive && isNowCancelled;
+
+      // Update enrollment
+      const updateData: any = {
+        status,
+        club_stage_id: clubStageId,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Only update expires_at if cancelDate was provided
+      if (membershipData.cancelDate && expiresAt !== enrollment.expires_at) {
+        updateData.expires_at = expiresAt;
+      }
+
+      await supabase
+        .from('club_enrollments')
+        .update(updateData)
+        .eq('id', enrollment.id);
+
+      // Update customer current_club_stage_id if tier changed
+      if (clubStageId !== enrollment.club_stage_id && status === 'active') {
+        await supabase
+          .from('customers')
+          .update({
+            current_club_stage_id: clubStageId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', enrollment.customer_id);
+      }
+
+      // Send expiration notification if membership was just cancelled
+      if (justCancelled) {
+        try {
+          // Use the enrollment's original club_stage_id for the notification
+          await sendExpirationNotification(clientId, membershipData.customerId, enrollment.club_stage_id);
+        } catch (error) {
+          console.error(`Failed to send expiration notification for cancelled membership ${c7MembershipId}:`, error);
+          // Don't throw - notification failure shouldn't break webhook processing
+        }
+      }
+
+      console.log(`Club membership ${c7MembershipId} updated successfully`);
+    } catch (error) {
+      console.error('Error handling club-membership/update webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle club-membership/delete webhook
+   * - Delete enrollment record (mirror C7 deletion)
+   */
+  private async handleClubMembershipDelete(membershipData: C7ClubMembershipResponse, clientId: string): Promise<void> {
+    try {
+      const c7MembershipId = membershipData.id;
+      if (!c7MembershipId) {
+        console.error('Missing membership ID in club-membership/delete webhook');
+        return;
+      }
+
+      // Find enrollment by c7_membership_id
+      const supabase = db.getSupabaseClient();
+      const { data: enrollment } = await supabase
+        .from('club_enrollments')
+        .select('id, customer_id')
+        .eq('c7_membership_id', c7MembershipId)
+        .single();
+
+      if (!enrollment) {
+        console.log(`Enrollment not found for C7 membership ${c7MembershipId}, skipping delete`);
+        return;
+      }
+
+      // Delete the enrollment record (C7 deleted it, so we delete it too)
+      await supabase
+        .from('club_enrollments')
+        .delete()
+        .eq('id', enrollment.id);
+
+      // Update customer flags (1 customer/1 tier policy - no other enrollments to check)
+      await supabase
+        .from('customers')
+        .update({
+          is_club_member: false,
+          current_club_stage_id: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', enrollment.customer_id);
+
+      console.log(`Club membership ${c7MembershipId} deleted successfully`);
+    } catch (error) {
+      console.error('Error handling club-membership/delete webhook:', error);
+      throw error;
     }
   }
 
@@ -2188,6 +2549,27 @@ export class Commerce7Provider implements CrmProvider {
       id: responseData.id,
       status: responseData.status,
     };
+  }
+
+  /**
+   * Get a specific club membership by ID
+   * Returns full membership object with nested customer and orderInformation
+   */
+  async getClubMembership(membershipId: string): Promise<C7ClubMembershipResponse> {
+    const response = await fetch(`${API_URL}/club-membership/${membershipId}`, {
+      method: 'GET',
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+    });
+
+    const data = await response.json();
+    handleC7ApiError(data, 'Get Club Membership');
+    
+    return data;
   }
 
   /**
