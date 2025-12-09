@@ -376,7 +376,7 @@ export type Database = {
           name?: string
           platform_discount_id?: string | null
           platform_tag_id?: string | null
-          stage_order?: number
+          stage_order?: number | null // Nullable for inactive tiers (migration 046)
           upgradable?: boolean
           updated_at?: string | null
         }

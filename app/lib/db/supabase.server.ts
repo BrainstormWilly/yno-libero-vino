@@ -257,9 +257,10 @@ export async function updateClubStage(
     durationMonths?: number;
     minPurchaseAmount?: number;
     minLtvAmount?: number;
-    stageOrder?: number;
+    stageOrder?: number | null; // Allow null for inactive tiers
     c7ClubId?: string;
     upgradable?: boolean;
+    isActive?: boolean;
   }
 ) {
   const supabase = getSupabaseClient();
@@ -272,9 +273,16 @@ export async function updateClubStage(
   if (data.durationMonths) updateData.duration_months = data.durationMonths;
   if (data.minPurchaseAmount) updateData.min_purchase_amount = data.minPurchaseAmount;
   if (data.minLtvAmount !== undefined) updateData.min_ltv_amount = data.minLtvAmount;
-  if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder;
+  if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder; // Can be null
   if (data.c7ClubId) updateData.c7_club_id = data.c7ClubId;
   if (data.upgradable !== undefined) updateData.upgradable = data.upgradable;
+  if (data.isActive !== undefined) {
+    updateData.is_active = data.isActive;
+    // When marking as inactive, also set stage_order to NULL to free it up
+    if (data.isActive === false && data.stageOrder === undefined) {
+      updateData.stage_order = null;
+    }
+  }
   
   const { error } = await supabase
     .from('club_stages')

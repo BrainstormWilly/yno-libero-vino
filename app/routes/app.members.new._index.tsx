@@ -34,9 +34,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Response('No club program found', { status: 404 });
   }
   
+  // Filter active tiers and sort by stage_order (ascending - highest is last)
+  const activeTiers = clubProgram.club_stages
+    .filter((t: any) => t.is_active)
+    .sort((a: any, b: any) => (a.stage_order || 0) - (b.stage_order || 0));
+  
   return {
     session,
-    tiers: clubProgram.club_stages.filter((t: any) => t.is_active), // Only show active tiers
+    tiers: activeTiers,
   };
 }
 
@@ -161,6 +166,20 @@ export default function QualifyTier() {
   
   // Calculate purchase amount to use for qualification
   const purchaseAmountForQualification = selectedCustomer?.ltv || parseFloat(manualPurchaseAmount || '0');
+  
+  // Find the highest available tier (highest stage_order that customer qualifies for)
+  const recommendedTierId = purchaseAmountForQualification > 0
+    ? tiers
+        .filter((tier: any) => purchaseAmountForQualification >= tier.min_purchase_amount)
+        .sort((a: any, b: any) => (b.stage_order || 0) - (a.stage_order || 0))[0]?.id
+    : null;
+  
+  // Auto-select recommended tier if available and no tier is selected yet
+  useEffect(() => {
+    if (recommendedTierId && !selectedTierId && purchaseAmountForQualification > 0) {
+      setSelectedTierId(recommendedTierId);
+    }
+  }, [recommendedTierId, purchaseAmountForQualification]);
   
   // Search for customers when debounced query changes
   useEffect(() => {
@@ -310,6 +329,7 @@ export default function QualifyTier() {
               {tiers.map((tier) => {
                 const qualified = purchaseAmountForQualification >= tier.min_purchase_amount;
                 const isSelected = selectedTierId === tier.id;
+                const isRecommended = tier.id === recommendedTierId;
                 
                 return (
                   <div
@@ -325,9 +345,14 @@ export default function QualifyTier() {
                   >
                     <InlineStack align="space-between" blockAlign="start">
                       <BlockStack gap="200">
-                        <Text variant="headingSm" as="h4">
-                          {tier.name}
-                        </Text>
+                        <InlineStack gap="200" blockAlign="center">
+                          <Text variant="headingSm" as="h4">
+                            {tier.name}
+                          </Text>
+                          {isRecommended && (
+                            <Badge tone="success">Recommended</Badge>
+                          )}
+                        </InlineStack>
                         <Text variant="bodySm" as="p">
                           {tier.duration_months} months · Requires ${tier.min_purchase_amount}
                         </Text>
@@ -338,7 +363,7 @@ export default function QualifyTier() {
                           </Text>
                         )}
                       </BlockStack>
-                      {purchaseAmountForQualification > 0 && (
+                      {purchaseAmountForQualification > 0 && !isRecommended && (
                         <Badge tone={qualified ? 'success' : 'attention'}>
                           {qualified ? 'Qualified' : 'Not Qualified'}
                         </Badge>

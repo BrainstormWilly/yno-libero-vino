@@ -71,7 +71,7 @@ export default function TierSummary({ tier, promotions, loyalty }: TierSummaryPr
                 Promotions
               </Text>
               <Badge tone={promotions.length > 0 ? 'success' : 'attention'}>
-                {promotions.length}
+                {promotions.length.toString()}
               </Badge>
             </InlineGrid>
           </Box>
@@ -141,21 +141,17 @@ export default function TierSummary({ tier, promotions, loyalty }: TierSummaryPr
           
           {loyalty && (
             <dl className="onIndent">
-              <dt className="srOnly">Earn Rate</dt>
               <dd>
                 <Text as="span" variant="bodyMd">
                   <strong>Earn Rate:</strong> {(loyalty.earn_rate * 100).toFixed(0)}% per dollar
                 </Text>
               </dd>
               {loyalty.initial_points_bonus > 0 && (
-                <>
-                  <dt className="srOnly">Welcome Bonus</dt>
-                  <dd>
-                    <Text as="span" variant="bodyMd">
-                      <strong>Welcome Bonus:</strong> {loyalty.initial_points_bonus} points
-                    </Text>
-                  </dd>
-                </>
+                <dd>
+                  <Text as="span" variant="bodyMd">
+                    <strong>Welcome Bonus:</strong> {loyalty.initial_points_bonus} points
+                  </Text>
+                </dd>
               )}
             </dl>
           )}

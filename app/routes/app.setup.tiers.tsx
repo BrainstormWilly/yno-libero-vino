@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useNavigate, Form, useActionData } from 'react-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Page, 
   Layout, 
@@ -13,6 +13,7 @@ import {
   Badge,
   Box,
   Divider,
+  ButtonGroup,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -34,9 +35,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Response('Club program not found', { status: 404 });
   }
   
-  // Fetch promotions and loyalty for each tier
+  // Fetch promotions and loyalty for each tier, sorted by stage_order
+  // Active tiers first (by stage_order), then inactive tiers (null stage_order) at the end
+  const sortedStages = (existingProgram.club_stages || []).sort((a: any, b: any) => {
+    // Active tiers come first
+    if (a.is_active && !b.is_active) return -1;
+    if (!a.is_active && b.is_active) return 1;
+    // Within active tiers, sort by stage_order
+    if (a.is_active && b.is_active) {
+      return (a.stage_order || 0) - (b.stage_order || 0);
+    }
+    // Inactive tiers stay in their original order
+    return 0;
+  });
+  
   const tiersWithData = await Promise.all(
-    (existingProgram.club_stages || []).map(async (stage: any) => {
+    sortedStages.map(async (stage: any) => {
       const promotions = await db.getStagePromotions(stage.id);
       const loyalty = await db.getTierLoyaltyConfig(stage.id);
       
@@ -113,6 +127,85 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
   
+  if (actionType === 'reorder_tier') {
+    const tierId = formData.get('tier_id') as string;
+    const direction = formData.get('direction') as 'up' | 'down';
+    
+    try {
+      const existingProgram = await db.getClubProgram(session.clientId);
+      if (!existingProgram || !existingProgram.club_stages) {
+        return {
+          success: false,
+          message: 'Club program not found',
+        };
+      }
+      
+      // Find the tier to move
+      const tierToMove = existingProgram.club_stages.find((s: any) => s.id === tierId);
+      if (!tierToMove) {
+        return {
+          success: false,
+          message: 'Tier not found',
+        };
+      }
+      
+      // Only consider active tiers for reordering (inactive tiers have NULL stage_order)
+      const activeTiers = existingProgram.club_stages.filter((s: any) => s.is_active);
+      
+      // Sort active tiers by stage_order
+      const sortedTiers = [...activeTiers].sort((a: any, b: any) => 
+        (a.stage_order || 0) - (b.stage_order || 0)
+      );
+      
+      // Find current index
+      const currentIndex = sortedTiers.findIndex((t: any) => t.id === tierId);
+      if (currentIndex === -1) {
+        return {
+          success: false,
+          message: 'Tier not found in sorted list',
+        };
+      }
+      
+      // Calculate target index
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      
+      // Validate bounds
+      if (targetIndex < 0 || targetIndex >= sortedTiers.length) {
+        return {
+          success: false,
+          message: `Cannot move tier ${direction === 'up' ? 'up' : 'down'}`,
+        };
+      }
+      
+      // Get the tier to swap with
+      const targetTier = sortedTiers[targetIndex];
+      
+      // Swap stage_order values using NULL as temporary value to avoid unique constraint violation
+      // The partial unique index only applies to non-null values, so NULL is safe as a temporary value
+      const tempOrder = tierToMove.stage_order;
+      const targetOrder = targetTier.stage_order;
+      
+      // Step 1: Set first tier to NULL temporarily (won't violate unique constraint)
+      await db.updateClubStage(tierId, { stageOrder: null });
+      
+      // Step 2: Set second tier to first tier's original value
+      await db.updateClubStage(targetTier.id, { stageOrder: tempOrder });
+      
+      // Step 3: Set first tier to second tier's original value
+      await db.updateClubStage(tierId, { stageOrder: targetOrder });
+      
+      return {
+        success: true,
+        message: `Tier moved ${direction === 'up' ? 'up' : 'down'} successfully`,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to reorder tier',
+      };
+    }
+  }
+  
   return { success: false, message: 'Invalid action' };
 }
 
@@ -120,6 +213,7 @@ export default function SetupTiers() {
   const { clubProgram, tiers, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
+  const [viewMode, setViewMode] = useState<'active' | 'inactive'>('active');
   
   useEffect(() => {
     setupAutoResize();
@@ -133,6 +227,16 @@ export default function SetupTiers() {
   }, [actionData, navigate]);
   
   const canContinue = tiers.length > 0 && tiers.every((t: any) => t.promotionCount > 0);
+  
+  // Filter tiers based on view mode
+  const activeTiers = tiers.filter((t: any) => t.is_active);
+  const inactiveTiers = tiers.filter((t: any) => !t.is_active);
+  const displayedTiers = viewMode === 'active' ? activeTiers : inactiveTiers;
+  
+  // Sort active tiers by stage_order, inactive tiers by name
+  const sortedDisplayedTiers = viewMode === 'active'
+    ? [...displayedTiers].sort((a: any, b: any) => (a.stage_order || 0) - (b.stage_order || 0))
+    : [...displayedTiers].sort((a: any, b: any) => a.name.localeCompare(b.name));
   
   return (
     <Page title="Membership Tiers">
@@ -197,126 +301,155 @@ export default function SetupTiers() {
         
         {/* Tier Summary Cards */}
         <Layout.Section>
-          <BlockStack gap="400">
-            {tiers.filter((t: any) => t.is_active).map((tier: any, index: number) => (
-              <Card key={tier.id}>
-                <BlockStack gap="300">
-                  <InlineStack align="space-between" blockAlign="start">
-                    <BlockStack gap="200">
-                      <Text variant="headingMd" as="h3">
-                        {tier.name}
-                      </Text>
-                      <BlockStack gap="100">
-                        <Text variant="bodyMd" as="p" tone="subdued">
-                          Duration: {tier.duration_months} months · Min Purchase: ${tier.min_purchase_amount} · Min LTV: ${tier.min_ltv_amount || 0}
-                        </Text>
-                        <InlineStack gap="200">
-                          <Badge tone={tier.promotionCount > 0 ? 'success' : 'attention'}>
-                            {`${tier.promotionCount} ${tier.promotionCount === 1 ? 'Promotion' : 'Promotions'}`}
-                          </Badge>
-                          {tier.hasLoyalty && (
-                            <Badge tone="info">
-                              {`Loyalty: ${(tier.loyaltyEarnRate * 100).toFixed(0)}% earn${tier.loyaltyBonus > 0 ? ` + ${tier.loyaltyBonus} bonus pts` : ''}`}
-                            </Badge>
-                          )}
-                        </InlineStack>
-                      </BlockStack>
-                    </BlockStack>
+          <Card>
+            <BlockStack gap="400">
+              {/* Header with Toggle */}
+              <InlineStack align="space-between" blockAlign="center">
+                <Text variant="headingMd" as="h2">
+                  {viewMode === 'active' ? 'Current club tiers in upgrade order' : 'Inactive tiers (Historical)'}
+                </Text>
+                <ButtonGroup>
+                  <Button
+                    pressed={viewMode === 'active'}
+                    onClick={() => setViewMode('active')}
+                  >
+                    Active ({activeTiers.length})
+                  </Button>
+                  <Button
+                    pressed={viewMode === 'inactive'}
+                    onClick={() => setViewMode('inactive')}
+                    disabled={inactiveTiers.length === 0}
+                  >
+                    Inactive ({inactiveTiers.length})
+                  </Button>
+                </ButtonGroup>
+              </InlineStack>
+              
+              {viewMode === 'inactive' && (
+                <Banner tone="info">
+                  These tiers were deleted in Commerce7 and cannot be edited or reactivated. They are shown for historical reference only.
+                </Banner>
+              )}
+              
+              {/* Tier Cards */}
+              {sortedDisplayedTiers.length === 0 ? (
+                <Banner tone="info">
+                  {viewMode === 'active' 
+                    ? 'No active tiers yet. Create your first tier to get started.'
+                    : 'No inactive tiers.'}
+                </Banner>
+              ) : (
+                <BlockStack gap="400">
+                  {sortedDisplayedTiers.map((tier: any) => {
+                    // For active tiers, calculate reorder buttons
+                    let canMoveUp = false;
+                    let canMoveDown = false;
                     
-                    <InlineStack gap="200">
-                      <Button
-                        onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
-                      >
-                        Edit
-                      </Button>
-                      <Form method="post">
-                        <input type="hidden" name="action" value="delete_tier" />
-                        <input type="hidden" name="tier_id" value={tier.id} />
-                        <Button
-                          tone="critical"
-                          submit
-                        >
-                          Delete
-                        </Button>
-                      </Form>
-                    </InlineStack>
-                  </InlineStack>
-                  
-                  {tier.promotionCount === 0 && (
-                    <Banner tone="warning">
-                      This tier has no promotions. Add at least one promotion to make it functional.
-                    </Banner>
-                  )}
-                </BlockStack>
-              </Card>
-            ))}
-            
-            {/* Inactive Tiers Section */}
-            {tiers.filter((t: any) => !t.is_active).length > 0 && (
-              <>
-                <Divider />
-                <BlockStack gap="300">
-                  <Text variant="headingMd" as="h3" tone="subdued">
-                    Inactive Tiers (Historical)
-                  </Text>
-                  <Text variant="bodyMd" as="p" tone="subdued">
-                    These tiers were deleted in Commerce7 and cannot be edited or reactivated.
-                  </Text>
-                </BlockStack>
-                
-                {tiers.filter((t: any) => !t.is_active).map((tier: any) => (
-                  <Card key={tier.id}>
-                    <BlockStack gap="300">
-                      <Banner tone="info">
-                        This tier was deleted in Commerce7 and is shown for historical reference only.
-                      </Banner>
-                      
-                      <InlineStack align="space-between" blockAlign="start">
-                        <BlockStack gap="200">
-                          <InlineStack gap="200" blockAlign="center">
-                            <Text variant="headingMd" as="h3" tone="subdued">
-                              {tier.name}
-                            </Text>
-                            <Badge tone="critical">INACTIVE</Badge>
-                          </InlineStack>
-                          
-                          <BlockStack gap="100">
-                            <Text variant="bodyMd" as="p" tone="subdued">
-                              Duration: {tier.duration_months} months · Min Purchase: ${tier.min_purchase_amount} · Min LTV: ${tier.min_ltv_amount || 0}
-                            </Text>
+                    if (viewMode === 'active') {
+                      const currentIndex = sortedDisplayedTiers.findIndex((t: any) => t.id === tier.id);
+                      canMoveUp = currentIndex > 0;
+                      canMoveDown = currentIndex < sortedDisplayedTiers.length - 1;
+                    }
+                    
+                    return (
+                      <Card key={tier.id}>
+                        <BlockStack gap="300">
+                          <InlineStack align="space-between" blockAlign="start">
+                            <BlockStack gap="200">
+                              {viewMode === 'inactive' && (
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Text variant="headingMd" as="h3" tone="subdued">
+                                    {tier.name}
+                                  </Text>
+                                  <Badge tone="critical">INACTIVE</Badge>
+                                </InlineStack>
+                              )}
+                              {viewMode === 'active' && (
+                                <Text variant="headingMd" as="h3">
+                                  {tier.name}
+                                </Text>
+                              )}
+                              <BlockStack gap="100">
+                                <Text variant="bodyMd" as="p" tone={viewMode === 'inactive' ? 'subdued' : undefined}>
+                                  Duration: {tier.duration_months} months · Min Purchase: ${tier.min_purchase_amount} · Min LTV: ${tier.min_ltv_amount || 0}
+                                </Text>
+                                <InlineStack gap="200">
+                                  <Badge tone={tier.promotionCount > 0 ? 'success' : 'attention'}>
+                                    {`${tier.promotionCount} ${tier.promotionCount === 1 ? 'Promotion' : 'Promotions'}`}
+                                  </Badge>
+                                  {tier.hasLoyalty && (
+                                    <Badge tone="info">
+                                      {`Loyalty: ${(tier.loyaltyEarnRate * 100).toFixed(0)}% earn${tier.loyaltyBonus > 0 ? ` + ${tier.loyaltyBonus} bonus pts` : ''}`}
+                                    </Badge>
+                                  )}
+                                </InlineStack>
+                              </BlockStack>
+                            </BlockStack>
+                            
                             <InlineStack gap="200">
-                              <Badge tone="info">
-                                {`${tier.promotionCount} ${tier.promotionCount === 1 ? 'Promotion' : 'Promotions'}`}
-                              </Badge>
-                              {tier.hasLoyalty && (
-                                <Badge tone="info">
-                                  {`Loyalty: ${(tier.loyaltyEarnRate * 100).toFixed(0)}% earn${tier.loyaltyBonus > 0 ? ` + ${tier.loyaltyBonus} bonus pts` : ''}`}
-                                </Badge>
+                              {viewMode === 'active' && canMoveUp && (
+                                <Form method="post">
+                                  <input type="hidden" name="action" value="reorder_tier" />
+                                  <input type="hidden" name="tier_id" value={tier.id} />
+                                  <input type="hidden" name="direction" value="up" />
+                                  <Button size="slim" submit>
+                                    ↑ Downgrade
+                                  </Button>
+                                </Form>
+                              )}
+                              {viewMode === 'active' && canMoveDown && (
+                                <Form method="post">
+                                  <input type="hidden" name="action" value="reorder_tier" />
+                                  <input type="hidden" name="tier_id" value={tier.id} />
+                                  <input type="hidden" name="direction" value="down" />
+                                  <Button size="slim" submit>
+                                    ↓ Upgrade
+                                  </Button>
+                                </Form>
+                              )}
+                              <Button
+                                onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+                              >
+                                {viewMode === 'active' ? 'Edit' : 'View Details'}
+                              </Button>
+                              {viewMode === 'active' && (
+                                <Form method="post">
+                                  <input type="hidden" name="action" value="delete_tier" />
+                                  <input type="hidden" name="tier_id" value={tier.id} />
+                                  <Button
+                                    tone="critical"
+                                    submit
+                                  >
+                                    Delete
+                                  </Button>
+                                </Form>
                               )}
                             </InlineStack>
-                          </BlockStack>
+                          </InlineStack>
+                          
+                          {viewMode === 'active' && tier.promotionCount === 0 && (
+                            <Banner tone="warning">
+                              This tier has no promotions. Add at least one promotion to make it functional.
+                            </Banner>
+                          )}
                         </BlockStack>
-                        
-                        <Button
-                          onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
-                        >
-                          View Details
-                        </Button>
-                      </InlineStack>
-                    </BlockStack>
-                  </Card>
-                ))}
-              </>
-            )}
-            
-            {/* Add Tier Button */}
-            <Form method="post">
-              <input type="hidden" name="action" value="create_tier" />
-              <Button submit size="large">
-                + Add Tier
-              </Button>
-            </Form>
-          </BlockStack>
+                      </Card>
+                    );
+                  })}
+                </BlockStack>
+              )}
+              
+              {/* Add Tier Button (only show for active view) */}
+              {viewMode === 'active' && (
+                <Form method="post">
+                  <input type="hidden" name="action" value="create_tier" />
+                  <Button submit size="large">
+                    + Add Tier
+                  </Button>
+                </Form>
+              )}
+            </BlockStack>
+          </Card>
         </Layout.Section>
         
       </Layout>

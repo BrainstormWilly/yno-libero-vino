@@ -1098,11 +1098,12 @@ export class Commerce7Provider implements CrmProvider {
         console.log(`Cancelled ${activeEnrollments.length} active enrollments for club ${c7ClubId}`);
       }
 
-      // Mark club_stage(s) as inactive
+      // Mark club_stage(s) as inactive and free up stage_order
       await supabase
         .from('club_stages')
         .update({
           is_active: false,
+          stage_order: null, // Free up the stage_order value for active tiers (nullable after migration 046)
           updated_at: new Date().toISOString(),
         })
         .eq('c7_club_id', c7ClubId);
