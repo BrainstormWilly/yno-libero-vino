@@ -39,6 +39,7 @@ export interface CrmCustomer {
   createdAt: string;
   updatedAt: string;
   ltv?: number; // Lifetime value in currency (not cents)
+  emailMarketingStatus?: 'Subscribed' | 'Unsubscribed' | null; // Commerce7-specific marketing preference
 }
 
 export interface CrmProduct {
@@ -87,6 +88,7 @@ export type WebhookTopic =
   | 'customers/delete'
   | 'club/update'
   | 'club/delete'
+  | 'club-membership/create'
   | 'club-membership/update'
   | 'club-membership/delete';
 

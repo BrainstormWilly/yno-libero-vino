@@ -632,12 +632,13 @@ export async function createClubEnrollment(data: {
     throw new Error(`Failed to create enrollment: ${error?.message}`);
   }
   
-  // Update customer flag if enrollment is active
+  // Update customer flags if enrollment is active
   if (data.status === 'active') {
     await supabase
       .from('customers')
       .update({ 
         is_club_member: true,
+        current_club_stage_id: data.clubStageId,
         updated_at: new Date().toISOString()
       })
       .eq('id', data.customerId);
@@ -747,6 +748,7 @@ export async function getEnrollmentsByClientId(
   options?: {
     search?: string;
     tierFilter?: string;
+    statusFilter?: string;
   }
 ) {
   const supabase = getSupabaseClient();
@@ -786,9 +788,66 @@ export async function getEnrollmentsByClientId(
     query = query.eq('club_stage_id', options.tierFilter);
   }
   
+  // Apply status filter if provided (default to 'active' only)
+  if (options?.statusFilter && options.statusFilter !== 'all') {
+    query = query.eq('status', options.statusFilter);
+  } else if (!options?.statusFilter) {
+    // Default: show only active enrollments
+    query = query.eq('status', 'active');
+  }
+  // If statusFilter === 'all', don't add any status filter
+  
   const { data: enrollments } = await query.order('enrolled_at', { ascending: false });
   
   return enrollments || [];
+}
+
+/**
+ * Get customers with their most recent enrollment data (customer-centric view)
+ * Shows loyalty points, cumulative days, and current/last tier information
+ * This is the preferred method for displaying member lists as it groups by customer
+ */
+export async function getCustomersWithEnrollmentSummary(
+  clientId: string,
+  options?: {
+    search?: string;
+    tierFilter?: string;
+    statusFilter?: string;
+  }
+) {
+  const supabase = getSupabaseClient();
+  
+  let query = supabase
+    .from('customer_enrollment_summary')
+    .select('*')
+    .eq('client_id', clientId);
+  
+  // Apply search filter
+  if (options?.search) {
+    const searchTerm = `%${options.search}%`;
+    query = query.or(`first_name.ilike.${searchTerm},last_name.ilike.${searchTerm},email.ilike.${searchTerm}`);
+  }
+  
+  // Apply tier filter
+  if (options?.tierFilter) {
+    query = query.eq('club_stage_id', options.tierFilter);
+  }
+  
+  // Apply status filter (default to 'active' only)
+  if (options?.statusFilter === 'all') {
+    // Show all customers, regardless of enrollment status
+    // Don't add any status filter
+  } else if (options?.statusFilter) {
+    // Show customers with specific enrollment status
+    query = query.eq('enrollment_status', options.statusFilter);
+  } else {
+    // Default: only show customers with active enrollments
+    query = query.eq('enrollment_status', 'active');
+  }
+  
+  const { data: customers } = await query.order('customer_created_at', { ascending: false });
+  
+  return customers || [];
 }
 
 export async function getEnrollmentById(enrollmentId: string) {
@@ -810,6 +869,7 @@ export async function getEnrollmentById(enrollmentId: string) {
       club_stages!inner (
         id,
         name,
+        stage_order,
         duration_months,
         min_purchase_amount,
         min_ltv_amount,

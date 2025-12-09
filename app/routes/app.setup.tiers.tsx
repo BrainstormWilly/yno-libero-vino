@@ -198,7 +198,7 @@ export default function SetupTiers() {
         {/* Tier Summary Cards */}
         <Layout.Section>
           <BlockStack gap="400">
-            {tiers.map((tier: any, index: number) => (
+            {tiers.filter((t: any) => t.is_active).map((tier: any, index: number) => (
               <Card key={tier.id}>
                 <BlockStack gap="300">
                   <InlineStack align="space-between" blockAlign="start">
@@ -250,6 +250,64 @@ export default function SetupTiers() {
                 </BlockStack>
               </Card>
             ))}
+            
+            {/* Inactive Tiers Section */}
+            {tiers.filter((t: any) => !t.is_active).length > 0 && (
+              <>
+                <Divider />
+                <BlockStack gap="300">
+                  <Text variant="headingMd" as="h3" tone="subdued">
+                    Inactive Tiers (Historical)
+                  </Text>
+                  <Text variant="bodyMd" as="p" tone="subdued">
+                    These tiers were deleted in Commerce7 and cannot be edited or reactivated.
+                  </Text>
+                </BlockStack>
+                
+                {tiers.filter((t: any) => !t.is_active).map((tier: any) => (
+                  <Card key={tier.id}>
+                    <BlockStack gap="300">
+                      <Banner tone="info">
+                        This tier was deleted in Commerce7 and is shown for historical reference only.
+                      </Banner>
+                      
+                      <InlineStack align="space-between" blockAlign="start">
+                        <BlockStack gap="200">
+                          <InlineStack gap="200" blockAlign="center">
+                            <Text variant="headingMd" as="h3" tone="subdued">
+                              {tier.name}
+                            </Text>
+                            <Badge tone="critical">INACTIVE</Badge>
+                          </InlineStack>
+                          
+                          <BlockStack gap="100">
+                            <Text variant="bodyMd" as="p" tone="subdued">
+                              Duration: {tier.duration_months} months · Min Purchase: ${tier.min_purchase_amount} · Min LTV: ${tier.min_ltv_amount || 0}
+                            </Text>
+                            <InlineStack gap="200">
+                              <Badge tone="info">
+                                {`${tier.promotionCount} ${tier.promotionCount === 1 ? 'Promotion' : 'Promotions'}`}
+                              </Badge>
+                              {tier.hasLoyalty && (
+                                <Badge tone="info">
+                                  {`Loyalty: ${(tier.loyaltyEarnRate * 100).toFixed(0)}% earn${tier.loyaltyBonus > 0 ? ` + ${tier.loyaltyBonus} bonus pts` : ''}`}
+                                </Badge>
+                              )}
+                            </InlineStack>
+                          </BlockStack>
+                        </BlockStack>
+                        
+                        <Button
+                          onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+                        >
+                          View Details
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
+                  </Card>
+                ))}
+              </>
+            )}
             
             {/* Add Tier Button */}
             <Form method="post">

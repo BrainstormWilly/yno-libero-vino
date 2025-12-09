@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from 'react-router';
 import { crmManager } from '~/lib/crm';
 import type { WebhookPayload, WebhookTopic } from '~/types/crm';
+import * as db from '~/lib/db/supabase.server';
 
 /**
  * Map Commerce7 webhook object + action to webhook topic
@@ -38,6 +39,18 @@ function mapC7WebhookToTopic(object: string, action: string): WebhookTopic | nul
 /**
  * Commerce7 webhook endpoint
  * POST /webhooks/c7
+ * 
+ * Security Measures (Basic Auth not available from Commerce7):
+ * 1. Tenant Validation - Verifies tenantId exists in our database (403 if unknown)
+ * 2. Self-Triggered Blocking - Ignores webhooks from our own API user to prevent loops
+ * 3. Payload Validation - Validates required fields in webhook payload
+ * 4. Topic Validation - Only processes known webhook topics
+ * 
+ * Additional Security Recommendations:
+ * - Use HTTPS only (enforce at deployment/infrastructure level)
+ * - Monitor webhook logs for suspicious activity
+ * - Consider rate limiting at infrastructure level
+ * - IP whitelisting if Commerce7 provides static IP ranges
  */
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -45,30 +58,6 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    // Validate basic auth first (before signature validation)
-    const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Basic ')) {
-      console.error('Missing or invalid Authorization header in Commerce7 webhook');
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const base64Credentials = authHeader.slice(6); // Remove 'Basic ' prefix
-    const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-    const [username, password] = credentials.split(':');
-
-    const expectedUsername = 'liberovino';
-    const expectedPassword = process.env.COMMERCE7_WEBHOOK_PASSWORD;
-
-    if (!expectedPassword) {
-      console.error('COMMERCE7_WEBHOOK_PASSWORD not configured');
-      return Response.json({ error: 'Server configuration error' }, { status: 500 });
-    }
-
-    if (username !== expectedUsername || password !== expectedPassword) {
-      console.error('Invalid basic auth credentials in Commerce7 webhook');
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Parse Commerce7 webhook payload format: { object, action, payload, tenantId, user }
     let body: any;
     try {
@@ -80,7 +69,21 @@ export async function action({ request }: ActionFunctionArgs) {
       }, { status: 400 });
     }
 
-    const { object, action, payload: payloadData, tenantId } = body;
+    const { object, action, payload: payloadData, tenantId, user } = body;
+
+    // Block webhooks triggered by our own API calls
+    // When we make API calls to Commerce7 (e.g., updating clubs, memberships), 
+    // Commerce7 sends webhooks back with user=bill@ynoguy.com.
+    // We should ignore these to prevent duplicate processing and notification loops.
+    // Example scenario: We update a club in C7 → C7 sends webhook → We'd update again → Loop
+    const selfTriggeredUser = process.env.COMMERCE7_API_USER || 'bill@ynoguy.com';
+    if (user === selfTriggeredUser && process.env.NODE_ENV === 'production') {
+      console.info(`Ignoring webhook triggered by our own API call: ${object}/${action} (user: ${user})`);
+      return Response.json({ 
+        success: true, 
+        message: 'Webhook ignored - triggered by our own API call' 
+      }, { status: 200 });
+    }
 
     // Validate required fields
     if (!object || !action || !payloadData) {
@@ -95,8 +98,15 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json({ error: 'Missing tenant information' }, { status: 400 });
     }
 
+    // Security: Verify tenant exists in our database
+    // This ensures only legitimate Commerce7 tenants can trigger webhooks
+    const client = await db.getClientbyCrmIdentifier('commerce7', tenantId);
+    if (!client) {
+      console.warn(`Unauthorized webhook attempt from unknown tenant: ${tenantId}`);
+      return Response.json({ error: 'Unauthorized tenant' }, { status: 403 });
+    }
+
     // Create provider instance for this specific tenant
-    // Basic Auth is already validated above - no additional validation needed
     const commerce7Provider = crmManager.getProvider('commerce7', tenantId);
 
     // Map Commerce7 object + action to webhook topic

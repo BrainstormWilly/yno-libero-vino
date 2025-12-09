@@ -55,7 +55,7 @@ export type C7CreditCardResponse = {
 // Conversion Functions: FROM Commerce7
 // ============================================
 
-export const fromC7Customer = (c7Customer: C7CustomerResponse): Customer => ({
+export const fromC7Customer = (c7Customer: C7CustomerResponse): CrmCustomer => ({
   id: c7Customer.id,
   email: c7Customer.emails[0].email,
   firstName: c7Customer.firstName,
@@ -63,6 +63,7 @@ export const fromC7Customer = (c7Customer: C7CustomerResponse): Customer => ({
   phone: c7Customer.phones?.[0]?.phone,
   createdAt: c7Customer.createdAt,
   updatedAt: c7Customer.updatedAt,
+  emailMarketingStatus: c7Customer.emailMarketingStatus,
 });
 
 export const fromC7Address = (c7Address: C7AddressResponse): CustomerAddress => ({

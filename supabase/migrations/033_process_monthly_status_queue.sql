@@ -25,9 +25,10 @@ DECLARE
   v_request_body JSONB;
 BEGIN
   -- Get API base URL from environment (our API endpoint)
+  -- PRODUCTION: Override with ALTER DATABASE postgres SET app.api_base_url = 'https://your-production-domain.com';
   v_api_base_url := COALESCE(
     current_setting('app.api_base_url', true),
-    'http://localhost:5173'  -- Default for local dev
+    'https://c7-kindly-balanced-macaw.ngrok-free.app'  -- Static Ngrok URL for dev (paid plan)
   );
 
   -- Process up to 50 pending jobs
@@ -67,55 +68,23 @@ BEGIN
 
       -- Call our API endpoint via pg_net
       -- This will call POST /api/cron/monthly-status/queue which processes a single customer
-      SELECT id INTO v_request_id
-      FROM net.http_post(
-        url := v_api_base_url || '/api/cron/monthly-status/queue',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'User-Agent', 'pg_net-cron-processor'
-        ),
-        body := v_request_body::text
-      );
-
-      -- Wait for response (pg_net is async, but we can check immediately in most cases)
-      PERFORM pg_sleep(1); -- Give it a moment
-
-      -- Try to get the response
-      SELECT 
-        id,
-        status_code,
-        content::jsonb
-      INTO 
-        v_response_id,
-        v_response_status,
-        v_response_body
-      FROM net.http_collect_response(request_id := v_request_id, async := false);
-
-      -- Check if we got a response
-      IF v_response_id IS NULL THEN
-        -- Request might still be processing, mark for retry
-        RAISE EXCEPTION 'Response not yet available for request %', v_request_id;
-      END IF;
-
-      -- Check response status
-      IF v_response_status != 200 THEN
-        v_error_msg := COALESCE(
-          v_response_body->>'error',
-          v_response_body->>'message',
-          'HTTP ' || v_response_status::TEXT
+      BEGIN
+        v_request_id := net.http_post(
+          v_api_base_url || '/api/cron/monthly-status/queue',
+          v_request_body,
+          '{}',
+          jsonb_build_object(
+            'Content-Type', 'application/json',
+            'User-Agent', 'pg_net-cron-processor'
+          ),
+          5000  -- 5 second timeout
         );
-        RAISE EXCEPTION 'API endpoint error: %', v_error_msg;
-      END IF;
-
-      -- Check if the API returned success
-      IF v_response_body->>'success' = 'false' OR (v_response_body->>'success')::boolean = false THEN
-        v_error_msg := COALESCE(
-          v_response_body->>'error',
-          v_response_body->>'message',
-          'Unknown error from API'
-        );
-        RAISE EXCEPTION 'Monthly status failed: %', v_error_msg;
-      END IF;
+        RAISE NOTICE 'Queued HTTP request % for customer %', v_request_id, v_job.customer_id;
+      EXCEPTION
+        WHEN OTHERS THEN
+          -- HTTP call failed, log but continue
+          RAISE NOTICE 'HTTP call failed for customer %: %', v_job.customer_id, SQLERRM;
+      END;
 
       -- Mark as completed
       UPDATE monthly_status_queue

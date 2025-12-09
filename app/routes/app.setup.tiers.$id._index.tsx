@@ -253,8 +253,18 @@ export default function TierDetails() {
   }, [actionData]);
   
   return (
-    <Page title={`Edit Tier: ${tierName}`}>
+    <Page title={`${tier.is_active ? 'Edit' : 'View'} Tier: ${tierName}`}>
       <BlockStack gap="500">
+        {/* Inactive Tier Warning */}
+        {!tier.is_active && (
+          <Banner tone="critical" title="Tier Inactive">
+            <p>
+              This tier was deleted in Commerce7 and cannot be edited or reactivated. 
+              All form fields are read-only. Historical enrollment data is preserved.
+            </p>
+          </Banner>
+        )}
+        
         {/* Banners at Top */}
         {actionData?.action === 'update_tier_details' && showFeedback && (
           <div
@@ -310,6 +320,7 @@ export default function TierDetails() {
                           name="tier_name"
                           autoComplete="off"
                           helpText="e.g., 'Bronze', 'Silver', 'Gold'"
+                          disabled={!tier.is_active}
                         />
                         
                         <InlineStack gap="400">
@@ -321,6 +332,7 @@ export default function TierDetails() {
                               name="duration_months"
                               type="number"
                               autoComplete="off"
+                              disabled={!tier.is_active}
                             />
                           </div>
                           
@@ -332,6 +344,7 @@ export default function TierDetails() {
                               name="min_purchase_amount"
                               type="number"
                               autoComplete="off"
+                              disabled={!tier.is_active}
                             />
                           </div>
                           
@@ -343,6 +356,7 @@ export default function TierDetails() {
                               name="min_ltv_amount"
                               type="number"
                               autoComplete="off"
+                              disabled={!tier.is_active}
                             />
                           </div>
                         </InlineStack>
@@ -352,23 +366,26 @@ export default function TierDetails() {
                           checked={upgradable}
                           onChange={setUpgradable}
                           helpText="If unchecked, this tier can only be assigned manually (e.g., for high-value customers). Automatic tier progression will skip non-upgradable tiers."
+                          disabled={!tier.is_active}
                         />
                         
                         <input type="hidden" name="upgradable" value={upgradable.toString()} />
                         
-                        <InlineStack align="end">
-                          <Button 
-                            submit 
-                            variant="primary"
-                            disabled={!tierDetailsChanged}
-                          >
-                            Save Details
-                          </Button>
-                        </InlineStack>
+                        {tier.is_active && (
+                          <InlineStack align="end">
+                            <Button 
+                              submit 
+                              variant="primary"
+                              disabled={!tierDetailsChanged}
+                            >
+                              Save Details
+                            </Button>
+                          </InlineStack>
+                        )}
                       </BlockStack>
                     </Form>
                     
-                    {!isNewTier && (
+                    {!isNewTier && tier.is_active && (
                       <>
                         <Divider />
                         <Form method="post">
@@ -394,11 +411,13 @@ export default function TierDetails() {
                       <Text variant="headingMd" as="h3">
                         Promotions ({promotions.length})
                       </Text>
-                      <Button
-                        onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}/promotions/new`, session.id))}
-                      >
-                        + Add Promotion
-                      </Button>
+                      {tier.is_active && (
+                        <Button
+                          onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}/promotions/new`, session.id))}
+                        >
+                          + Add Promotion
+                        </Button>
+                      )}
                     </InlineStack>
                     
                     {promotions.length === 0 && (
@@ -428,8 +447,9 @@ export default function TierDetails() {
                               </BlockStack>
                               <Button
                                 onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}/promotions/${promo.id}`, session.id))}
+                                disabled={!tier.is_active}
                               >
-                                Edit
+                                {tier.is_active ? 'Edit' : 'View'}
                               </Button>
                             </InlineStack>
                           </Card>
@@ -459,6 +479,7 @@ export default function TierDetails() {
                         checked={loyaltyEnabled}
                         onChange={setLoyaltyEnabled}
                         helpText="Members automatically earn points on all purchases"
+                        disabled={!tier.is_active}
                       />
                       
                       {loyaltyEnabled && (
@@ -475,6 +496,7 @@ export default function TierDetails() {
                             suffix="%"
                             autoComplete="off"
                             helpText="Percentage of purchase amount earned as points (e.g., 2% means $100 purchase = 2 points)"
+                            disabled={!tier.is_active}
                           />
                           
                           <TextField
@@ -484,17 +506,20 @@ export default function TierDetails() {
                             type="number"
                             autoComplete="off"
                             helpText="Bonus points awarded when member joins this tier (optional)"
+                            disabled={!tier.is_active}
                           />
                           
-                          <InlineStack align="end">
-                            <Button 
-                              submit 
-                              variant="primary"
-                              disabled={!loyaltyChanged}
-                            >
-                              Save Loyalty Config
-                            </Button>
-                          </InlineStack>
+                          {tier.is_active && (
+                            <InlineStack align="end">
+                              <Button 
+                                submit 
+                                variant="primary"
+                                disabled={!loyaltyChanged}
+                              >
+                                Save Loyalty Config
+                              </Button>
+                            </InlineStack>
+                          )}
                         </BlockStack>
                       )}
                     </BlockStack>

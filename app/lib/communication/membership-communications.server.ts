@@ -784,10 +784,10 @@ export async function sendMonthlyStatusNotification(
       return;
     }
 
-    // Check for tier upgrade eligibility FIRST - if upgrade is detected, queue it and skip monthly status
-    // Upgrade notification will be sent after CRM sync completes (consistent with cancellation flow)
+    // Check for tier upgrade eligibility FIRST - if upgrade is detected, perform it immediately and skip monthly status
+    // The upgrade notification IS the monthly status when an upgrade occurs
     if (enrollment.c7_membership_id && customer.crm_id && client.crm_type && client.tenant_shop && client.crm_type === 'commerce7') {
-      const upgradeStatus = await checkAndQueueTierUpgradeFromCRM(
+      const upgradeStatus = await checkAndPerformTierUpgrade(
         clientId,
         enrollment.id,
         enrollment.c7_membership_id,
@@ -796,10 +796,10 @@ export async function sendMonthlyStatusNotification(
         client.tenant_shop
       );
 
-      // If upgrade was detected and queued, skip monthly status
-      // Upgrade notification will be sent after CRM sync completes in the queue processor
+      // If upgrade was performed, skip monthly status notification
+      // The upgrade notification already serves as the monthly communication
       if (upgradeStatus.upgraded) {
-        console.info(`Upgrade queued for customer ${customer.crm_id}, skipping monthly status notification`);
+        console.info(`Tier upgrade performed for customer ${customer.crm_id}, upgrade notification sent (skipping monthly status)`);
         return;
       }
     }
@@ -1965,7 +1965,7 @@ ${clientName}`;
  * Called during monthly status notifications to check if member qualifies for tier upgrade
  * Returns upgrade status information if upgrade was detected and queued
  */
-async function checkAndQueueTierUpgradeFromCRM(
+async function checkAndPerformTierUpgrade(
   clientId: string,
   enrollmentId: string,
   c7MembershipId: string,
@@ -1981,7 +1981,7 @@ async function checkAndQueueTierUpgradeFromCRM(
     }
 
     const currentStage = enrollment.club_stages as any;
-    if (!currentStage || !currentStage.stage_order) {
+    if (!currentStage || !currentStage.stage_order || !currentStage.c7_club_id) {
       return { upgraded: false };
     }
 
@@ -2025,8 +2025,8 @@ async function checkAndQueueTierUpgradeFromCRM(
 
     // Get next tier in progression
     const nextTier = await db.getNextTier(clientId, currentStage.stage_order);
-    if (!nextTier) {
-      // No next tier available
+    if (!nextTier || !nextTier.c7_club_id) {
+      // No next tier available or tier doesn't have C7 club ID
       return { upgraded: false };
     }
 
@@ -2034,17 +2034,81 @@ async function checkAndQueueTierUpgradeFromCRM(
     const qualifiesByLTV = annualizedLTV >= (nextTier.min_ltv_amount || 0);
 
     if (qualifiesByLTV) {
-      // Queue upgrade
-      await db.queueCrmSync({
-        clientId,
-        enrollmentId: enrollment.id,
-        actionType: 'upgrade_membership',
-        stageId: nextTier.id,
-        oldStageId: currentStage.id,
-        customerCrmId: customerCrmId,
-      });
+      console.log(`🎉 Customer ${customerCrmId} qualifies for tier upgrade: ${currentStage.name} -> ${nextTier.name} (LTV: $${ltvInDollars.toFixed(2)}, Annualized: $${annualizedLTV.toFixed(2)})`);
 
-      console.log(`Queued tier upgrade for enrollment ${enrollmentId}: ${currentStage.name} -> ${nextTier.name} (LTV: $${ltvInDollars.toFixed(2)}, Annualized: $${annualizedLTV.toFixed(2)})`);
+      // Get customer record
+      const customer = await db.getCustomerByCrmId(clientId, customerCrmId);
+      if (!customer) {
+        console.error(`Customer not found for CRM ID ${customerCrmId}`);
+        return { upgraded: false };
+      }
+
+      // STEP 1: Cancel old membership in Commerce7
+      try {
+        await crmProvider.cancelTierMembership(
+          currentStage.id,
+          currentStage.c7_club_id,
+          customerCrmId,
+          c7MembershipId
+        );
+      } catch (error) {
+        console.error(`Failed to cancel old membership in Commerce7:`, error);
+        return { upgraded: false };
+      }
+
+      // STEP 2: Create new membership in Commerce7 with next tier's club
+      let newMembershipId: string;
+      try {
+        // Use existing billing/shipping/payment info from old membership
+        const newMembershipResult = await (crmProvider as any).createClubMembership({
+          customerId: customerCrmId,
+          clubId: nextTier.c7_club_id,
+          billingAddressId: membership.billToCustomerAddressId,
+          shippingAddressId: membership.shipToCustomerAddressId,
+          paymentMethodId: membership.customerCreditCardId,
+          startDate: new Date().toISOString(),
+        });
+        newMembershipId = newMembershipResult.id;
+      } catch (error) {
+        console.error(`Failed to create new membership in Commerce7:`, error);
+        return { upgraded: false };
+      }
+
+      // STEP 3: Update database - mark old enrollment as 'upgraded' and create new enrollment
+      try {
+        // Mark old enrollment as upgraded
+        await db.updateEnrollmentStatus(enrollment.id, 'cancelled'); // Using 'cancelled' as proxy for 'upgraded'
+        
+        // Calculate new expiration date (preserve original enrollment date, extend by new tier duration)
+        const originalEnrolledAt = new Date(enrollment.enrolled_at);
+        const newExpiresAt = new Date(originalEnrolledAt);
+        newExpiresAt.setMonth(newExpiresAt.getMonth() + nextTier.duration_months);
+
+        // Create new enrollment
+        await db.createClubEnrollment({
+          customerId: customer.id,
+          clubStageId: nextTier.id,
+          status: 'active',
+          enrolledAt: enrollment.enrolled_at, // Preserve original enrollment date
+          expiresAt: newExpiresAt.toISOString(),
+          crmMembershipId: newMembershipId, // Fixed: was c7MembershipId, should be crmMembershipId
+        });
+      } catch (error) {
+        console.error(`Failed to update database:`, error);
+        // Note: At this point, C7 is updated but our DB is not - this creates inconsistency
+        // A production system would need a better error recovery strategy
+        return { upgraded: false };
+      }
+
+      // STEP 4: Send upgrade notification to customer
+      try {
+        await sendUpgradeNotification(clientId, customerCrmId, currentStage.id, nextTier.id);
+      } catch (error) {
+        console.error(`Failed to send upgrade notification:`, error);
+        // Don't fail the upgrade if notification fails - the upgrade itself succeeded
+      }
+
+      console.log(`🎉 Tier upgrade completed: ${currentStage.name} -> ${nextTier.name} for customer ${customer.email}`);
 
       return {
         upgraded: true,
@@ -2055,8 +2119,8 @@ async function checkAndQueueTierUpgradeFromCRM(
 
     return { upgraded: false };
   } catch (error) {
-    console.error('Error checking tier upgrade from CRM:', error);
-    // Don't throw - tier upgrade check failures shouldn't break monthly status notifications
+    console.error('Error performing tier upgrade:', error);
+    // Don't throw - tier upgrade failures shouldn't break monthly status notifications
     return { upgraded: false };
   }
 }

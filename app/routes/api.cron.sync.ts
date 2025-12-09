@@ -34,10 +34,29 @@ export async function action({ request }: ActionFunctionArgs) {
       oldClubId?: string | null;
     };
 
+    // DEBUG: Log incoming request
+    console.log('🔍 CRM Sync Request Body:', JSON.stringify(body, null, 2));
+    console.log('🔍 Field Check:', {
+      queueId: !!body.queueId,
+      clientId: !!body.clientId,
+      actionType: !!body.actionType,
+      crmType: !!body.crmType,
+      tenantShop: !!body.tenantShop,
+      customerCrmId: !!body.customerCrmId,
+    });
+
     const { queueId, clientId, actionType, crmType, tenantShop, stageId, clubId, membershipId, customerCrmId, oldStageId, oldClubId } = body;
 
     // Validate required fields
     if (!queueId || !clientId || !actionType || !crmType || !tenantShop || !customerCrmId) {
+      console.error('❌ Missing required fields:', {
+        queueId: !!queueId,
+        clientId: !!clientId,
+        actionType: !!actionType,
+        crmType: !!crmType,
+        tenantShop: !!tenantShop,
+        customerCrmId: !!customerCrmId,
+      });
       return {
         success: false,
         error: 'Missing required fields',

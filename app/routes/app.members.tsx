@@ -34,34 +34,38 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const search = url.searchParams.get('search') || undefined;
   const tierFilter = url.searchParams.get('tier') || undefined;
+  const statusFilter = url.searchParams.get('status') || undefined;
 
-  // Get all enrollments with filters
-  const enrollments = await db.getEnrollmentsByClientId(session.clientId, {
+  // Get all customers with their enrollment summary (customer-centric view)
+  const customers = await db.getCustomersWithEnrollmentSummary(session.clientId, {
     search,
     tierFilter,
+    statusFilter,
   });
 
-  // Get all tiers for filter dropdown
+  // Get all tiers for filter dropdown (include inactive for filtering existing enrollments)
   const clubProgram = await db.getClubProgram(session.clientId);
   const tiers = clubProgram?.club_stages || [];
 
   return {
     session,
     client,
-    enrollments,
+    customers,
     tiers,
     search: search || '',
     tierFilter: tierFilter || '',
+    statusFilter: statusFilter || '',
   };
 }
 
 export default function MembersPage() {
-  const { session, enrollments, tiers, search: initialSearch, tierFilter: initialTierFilter } = useLoaderData<typeof loader>();
+  const { session, customers, tiers, search: initialSearch, tierFilter: initialTierFilter, statusFilter: initialStatusFilter } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const submit = useSubmit();
 
   const [searchValue, setSearchValue] = useState(initialSearch);
   const [tierFilterValue, setTierFilterValue] = useState(initialTierFilter);
+  const [statusFilterValue, setStatusFilterValue] = useState(initialStatusFilter);
 
   useEffect(() => {
     setupAutoResize();
@@ -77,10 +81,11 @@ export default function MembersPage() {
     const params = new URLSearchParams();
     if (searchValue) params.set('search', searchValue);
     if (tierFilterValue) params.set('tier', tierFilterValue);
+    if (statusFilterValue) params.set('status', statusFilterValue);
     params.set('session', session.id);
     
     navigate(`/app/members?${params.toString()}`);
-  }, [searchValue, tierFilterValue, session.id, navigate]);
+  }, [searchValue, tierFilterValue, statusFilterValue, session.id, navigate]);
 
   // Handle tier filter change
   const handleTierFilterChange = useCallback((value: string) => {
@@ -88,27 +93,44 @@ export default function MembersPage() {
     const params = new URLSearchParams();
     if (searchValue) params.set('search', searchValue);
     if (value) params.set('tier', value);
+    if (statusFilterValue) params.set('status', statusFilterValue);
     params.set('session', session.id);
     
     navigate(`/app/members?${params.toString()}`);
-  }, [searchValue, session.id, navigate]);
+  }, [searchValue, statusFilterValue, session.id, navigate]);
+
+  // Handle status filter change
+  const handleStatusFilterChange = useCallback((value: string) => {
+    setStatusFilterValue(value);
+    const params = new URLSearchParams();
+    if (searchValue) params.set('search', searchValue);
+    if (tierFilterValue) params.set('tier', tierFilterValue);
+    if (value) params.set('status', value);
+    params.set('session', session.id);
+    
+    navigate(`/app/members?${params.toString()}`);
+  }, [searchValue, tierFilterValue, session.id, navigate]);
 
   // Clear filters
   const handleClearFilters = useCallback(() => {
     setSearchValue('');
     setTierFilterValue('');
+    setStatusFilterValue('');
     navigate(addSessionToUrl('/app/members', session.id));
   }, [session.id, navigate]);
 
   // Prepare table data with click handlers
-  const tableRows = enrollments.map((enrollment: any) => {
+  const tableRows = customers.map((customer: any) => {
     const handleRowClick = () => {
-      navigate(addSessionToUrl(`/app/members/${enrollment.id}`, session.id));
+      // Navigate to customer detail view (enrollment_id is still used for the URL for now)
+      if (customer.enrollment_id) {
+        navigate(addSessionToUrl(`/app/members/${customer.enrollment_id}`, session.id));
+      }
     };
     
     return [
       <button
-        key={`name-${enrollment.id}`}
+        key={`name-${customer.customer_id}`}
         onClick={handleRowClick}
         style={{
           background: 'none',
@@ -120,10 +142,10 @@ export default function MembersPage() {
           width: '100%',
         }}
       >
-        {enrollment.customers.first_name} {enrollment.customers.last_name}
+        {customer.first_name} {customer.last_name}
       </button>,
       <button
-        key={`email-${enrollment.id}`}
+        key={`email-${customer.customer_id}`}
         onClick={handleRowClick}
         style={{
           background: 'none',
@@ -135,10 +157,10 @@ export default function MembersPage() {
           width: '100%',
         }}
       >
-        {enrollment.customers.email}
+        {customer.email}
       </button>,
       <button
-        key={`tier-${enrollment.id}`}
+        key={`tier-${customer.customer_id}`}
         onClick={handleRowClick}
         style={{
           background: 'none',
@@ -150,10 +172,10 @@ export default function MembersPage() {
           width: '100%',
         }}
       >
-        {enrollment.club_stages.name}
+        {customer.tier_name || 'N/A'}
       </button>,
       <button
-        key={`enrolled-${enrollment.id}`}
+        key={`points-${customer.customer_id}`}
         onClick={handleRowClick}
         style={{
           background: 'none',
@@ -165,10 +187,10 @@ export default function MembersPage() {
           width: '100%',
         }}
       >
-        {new Date(enrollment.enrolled_at).toLocaleDateString()}
+        {customer.loyalty_points_balance.toLocaleString()}
       </button>,
       <button
-        key={`expires-${enrollment.id}`}
+        key={`enrolled-${customer.customer_id}`}
         onClick={handleRowClick}
         style={{
           background: 'none',
@@ -180,12 +202,12 @@ export default function MembersPage() {
           width: '100%',
         }}
       >
-        {enrollment.expires_at
-          ? new Date(enrollment.expires_at).toLocaleDateString()
-          : 'No expiration'}
+        {customer.enrolled_at
+          ? new Date(customer.enrolled_at).toLocaleDateString()
+          : 'N/A'}
       </button>,
       <button
-        key={`status-${enrollment.id}`}
+        key={`expires-${customer.customer_id}`}
         onClick={handleRowClick}
         style={{
           background: 'none',
@@ -197,9 +219,30 @@ export default function MembersPage() {
           width: '100%',
         }}
       >
-        <Badge tone={enrollment.status === 'active' ? 'success' : 'warning'}>
-          {enrollment.status}
-        </Badge>
+        {customer.expires_at
+          ? new Date(customer.expires_at).toLocaleDateString()
+          : 'N/A'}
+      </button>,
+      <button
+        key={`status-${customer.customer_id}`}
+        onClick={handleRowClick}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          font: 'inherit',
+          cursor: 'pointer',
+          textAlign: 'left',
+          width: '100%',
+        }}
+      >
+        {customer.enrollment_status ? (
+          <Badge tone={customer.enrollment_status === 'active' ? 'success' : 'warning'}>
+            {customer.enrollment_status}
+          </Badge>
+        ) : (
+          'No enrollment'
+        )}
       </button>,
     ];
   });
@@ -211,6 +254,14 @@ export default function MembersPage() {
       label: tier.name,
       value: tier.id,
     })),
+  ];
+
+  // Status filter options
+  const statusOptions = [
+    { label: 'Active Only', value: '' },
+    { label: 'All Statuses', value: 'all' },
+    { label: 'Expired', value: 'expired' },
+    { label: 'Cancelled', value: 'cancelled' },
   ];
 
   return (
@@ -240,17 +291,27 @@ export default function MembersPage() {
                     setSearchValue('');
                     const params = new URLSearchParams();
                     if (tierFilterValue) params.set('tier', tierFilterValue);
+                    if (statusFilterValue) params.set('status', statusFilterValue);
                     params.set('session', session.id);
                     navigate(`/app/members?${params.toString()}`);
                   }}
                 />
               </div>
-              <div style={{ width: '200px' }}>
+              <div style={{ width: '180px' }}>
                 <Select
                   label="Filter by tier"
                   options={tierOptions}
                   value={tierFilterValue}
                   onChange={handleTierFilterChange}
+                  labelHidden
+                />
+              </div>
+              <div style={{ width: '180px' }}>
+                <Select
+                  label="Filter by status"
+                  options={statusOptions}
+                  value={statusFilterValue}
+                  onChange={handleStatusFilterChange}
                   labelHidden
                 />
               </div>
@@ -263,12 +324,12 @@ export default function MembersPage() {
           <Card>
             <BlockStack gap="400">
               {/* Table or Empty State */}
-              {enrollments.length === 0 ? (
+              {customers.length === 0 ? (
                 <EmptyState
-                  heading={searchValue || tierFilterValue ? "No members found" : "No members yet"}
+                  heading={searchValue || tierFilterValue || statusFilterValue ? "No members found" : "No members yet"}
                   image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
                   action={
-                    searchValue || tierFilterValue
+                    searchValue || tierFilterValue || statusFilterValue
                       ? {
                           content: 'Clear filters',
                           onAction: handleClearFilters,
@@ -277,15 +338,15 @@ export default function MembersPage() {
                   }
                 >
                   <p>
-                    {searchValue || tierFilterValue
+                    {searchValue || tierFilterValue || statusFilterValue
                       ? 'Try adjusting your search or filters.'
                       : 'Start building your club by adding your first member.'}
                   </p>
                 </EmptyState>
               ) : (
                 <DataTable
-                  columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text']}
-                  headings={['Name', 'Email', 'Tier', 'Enrolled', 'Expires', 'Status']}
+                  columnContentTypes={['text', 'text', 'text', 'numeric', 'text', 'text', 'text']}
+                  headings={['Name', 'Email', 'Tier', 'Loyalty Points', 'Enrolled', 'Expires', 'Status']}
                   rows={tableRows}
                   hoverable
                 />

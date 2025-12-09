@@ -86,9 +86,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
   
-  // Fetch promotions and loyalty for each tier
+  // Fetch promotions and loyalty for each tier (only active tiers)
+  const activeTiers = (clubProgram.club_stages || []).filter((stage: any) => stage.is_active);
   const tiersWithData = await Promise.all(
-    (clubProgram.club_stages || []).map(async (stage: any) => {
+    activeTiers.map(async (stage: any) => {
       const promotions = await db.getStagePromotions(stage.id);
       const loyalty = await db.getTierLoyaltyConfig(stage.id);
       
@@ -355,7 +356,9 @@ export default function SetupReview() {
     }
   }, [actionData]);
   
-  const allTiersConfigured = (clubProgram.club_stages || []).every(
+  // Only check active tiers for configuration completeness
+  const activeTiers = (clubProgram.club_stages || []).filter((tier: any) => tier.is_active);
+  const allTiersConfigured = activeTiers.every(
     (tier: any) => tier.promotions?.length > 0
   );
   
@@ -467,7 +470,7 @@ export default function SetupReview() {
             <BlockStack gap="400">
               <InlineStack align="space-between">
                 <Text variant="headingMd" as="h3">
-                  Membership Tiers ({clubProgram.club_stages?.length || 0})
+                  Membership Tiers ({tiersWithData.length})
                 </Text>
                 <Button
                   variant="plain"
@@ -480,12 +483,15 @@ export default function SetupReview() {
               <Divider />
               
               <BlockStack gap="500">
-                {(clubProgram.club_stages || []).map((tier: any, index: number) => (
+                {tiersWithData.map((tier: any, index: number) => (
                   <BlockStack key={tier.id} gap="300">
+                    
                     <InlineStack align="space-between" blockAlign="start">
-                      <Text variant="headingSm" as="h4" fontWeight="semibold">
-                        {tier.name}
-                      </Text>
+                      <InlineStack gap="200" blockAlign="center">
+                        <Text variant="headingSm" as="h4" fontWeight="semibold">
+                          {tier.name}
+                        </Text>
+                      </InlineStack>
                       <InlineStack gap="200">
                         <Badge tone={tier.promotions?.length > 0 ? 'success' : 'critical'}>
                           {`${tier.promotions?.length || 0} Promotions`}
@@ -498,9 +504,25 @@ export default function SetupReview() {
                       </InlineStack>
                     </InlineStack>
                     
-                    <Text variant="bodyMd" as="p" tone="subdued">
-                      {tier.duration_months} months · ${tier.min_purchase_amount} minimum
-                    </Text>
+                    {/* Tier Details */}
+                    <BlockStack gap="100">
+                      <Text variant="bodySm" as="p" fontWeight="semibold">
+                        Tier Requirements:
+                      </Text>
+                      <List type="bullet">
+                        <List.Item>
+                          Duration: {tier.duration_months} {tier.duration_months === 1 ? 'month' : 'months'}
+                        </List.Item>
+                        <List.Item>
+                          Purchase Minimum: ${tier.min_purchase_amount}
+                        </List.Item>
+                        {tier.min_ltv_amount > 0 && (
+                          <List.Item>
+                            Annual LTV Minimum: ${tier.min_ltv_amount}
+                          </List.Item>
+                        )}
+                      </List>
+                    </BlockStack>
                     
                     {/* Promotions List */}
                     {tier.promotions?.length > 0 && (
@@ -509,33 +531,96 @@ export default function SetupReview() {
                           Promotions:
                         </Text>
                         <List type="bullet">
-                          {tier.promotions.map((promo: any) => (
-                            <List.Item key={promo.id}>
-                              {promo.title || promo.c7Data?.title || 'Untitled Promotion'}
-                            </List.Item>
-                          ))}
+                          {tier.promotions.map((promo: any) => {
+                            const c7Data = promo.c7Data;
+                            let discountValue = '';
+                            let appliesToInfo = '';
+                            
+                            if (c7Data) {
+                              // Format discount value
+                              if (c7Data.discountType === 'Percentage Off' && c7Data.discount != null) {
+                                // C7 stores percentage as basis points (e.g., 1500 = 15%)
+                                const percentage = c7Data.discount / 100;
+                                discountValue = `${percentage}% off`;
+                              } else if (c7Data.discountType === 'Dollar Off' && c7Data.discount != null) {
+                                // C7 stores dollar amounts in dollars
+                                discountValue = `$${c7Data.discount.toFixed(2)} off`;
+                              } else if (c7Data.discountType) {
+                                discountValue = 'Discount';
+                              }
+                              
+                              // Format applies to
+                              if (c7Data.appliesTo === 'Store') {
+                                appliesToInfo = 'Store-wide';
+                              } else if (c7Data.appliesTo === 'Collection') {
+                                const collectionCount = c7Data.appliesToObjectIds?.length || 0;
+                                appliesToInfo = collectionCount > 0 
+                                  ? `${collectionCount} ${collectionCount === 1 ? 'collection' : 'collections'}`
+                                  : 'Collections';
+                              } else if (c7Data.appliesTo === 'Product') {
+                                const productCount = c7Data.appliesToObjectIds?.length || 0;
+                                appliesToInfo = productCount > 0
+                                  ? `${productCount} ${productCount === 1 ? 'product' : 'products'}`
+                                  : 'Products';
+                              } else {
+                                appliesToInfo = c7Data.appliesTo || 'N/A';
+                              }
+                            }
+                            
+                            const promoTitle = promo.title || c7Data?.title || 'Untitled Promotion';
+                            
+                            return (
+                              <List.Item key={promo.id}>
+                                <Text variant="bodySm" as="span" fontWeight="semibold">
+                                  {promoTitle}
+                                </Text>
+                                {discountValue && (
+                                  <>
+                                    {' · '}
+                                    <Text variant="bodySm" as="span">
+                                      {discountValue}
+                                    </Text>
+                                  </>
+                                )}
+                                {appliesToInfo && (
+                                  <>
+                                    {' · '}
+                                    <Text variant="bodySm" as="span" tone="subdued">
+                                      {appliesToInfo}
+                                    </Text>
+                                  </>
+                                )}
+                              </List.Item>
+                            );
+                          })}
                         </List>
                       </BlockStack>
                     )}
                     
-                    {/* Loyalty Info */}
-                    {tier.loyalty && (
-                      <BlockStack gap="100">
-                        <Text variant="bodySm" as="p" fontWeight="semibold">
-                          Loyalty:
-                        </Text>
-                        <Text variant="bodySm" as="p">
-                          • Earn {(tier.loyalty.earn_rate * 100).toFixed(0)}% points per dollar
-                        </Text>
-                        {tier.loyalty.initial_points_bonus > 0 && (
+                    {/* Loyalty Info - Always show */}
+                    <BlockStack gap="100">
+                      <Text variant="bodySm" as="p" fontWeight="semibold">
+                        Loyalty:
+                      </Text>
+                      {tier.loyalty ? (
+                        <>
                           <Text variant="bodySm" as="p">
-                            • {tier.loyalty.initial_points_bonus} welcome bonus points
+                            • Earn {(tier.loyalty.earn_rate * 100).toFixed(0)}% points per dollar
                           </Text>
-                        )}
-                      </BlockStack>
-                    )}
+                          {tier.loyalty.initial_points_bonus > 0 && (
+                            <Text variant="bodySm" as="p">
+                              • {tier.loyalty.initial_points_bonus} welcome bonus points
+                            </Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text variant="bodySm" as="p" tone="subdued">
+                          Not configured
+                        </Text>
+                      )}
+                    </BlockStack>
                     
-                    {index < (clubProgram.club_stages?.length || 0) - 1 && <Divider />}
+                    {index < tiersWithData.length - 1 && <Divider />}
                   </BlockStack>
                 ))}
               </BlockStack>

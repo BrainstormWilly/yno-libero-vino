@@ -8,6 +8,7 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
 import { crmManager } from '~/lib/crm';
+import * as db from '~/lib/db/supabase.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -38,7 +39,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // Each provider handles its own currency conversion internally
       const customers = await provider.getCustomersWithLTV({ q });
       
-      return { customers };
+      // Check which customers already exist in LiberoVino database
+      const customersWithStatus = await Promise.all(
+        customers.map(async (customer) => {
+          const lvCustomer = await db.getCustomerByCrmId(session.clientId, customer.id);
+          return {
+            ...customer,
+            inSystem: !!lvCustomer, // true if customer exists in LV database
+          };
+        })
+      );
+      
+      return { customers: customersWithStatus };
     }
 
     // Get single customer by ID

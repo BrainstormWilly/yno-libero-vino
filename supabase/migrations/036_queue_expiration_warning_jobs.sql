@@ -24,8 +24,7 @@ BEGIN
     SELECT c.id, c.org_name, cc.send_expiration_warnings, COALESCE(cc.warning_days_before, 7) as warning_days
     FROM clients c
     INNER JOIN communication_configs cc ON cc.client_id = c.id
-    WHERE c.is_active = true
-      AND cc.send_expiration_warnings = true
+    WHERE cc.send_expiration_warnings = true
   LOOP
     BEGIN
       v_warning_days := client_record.warning_days;

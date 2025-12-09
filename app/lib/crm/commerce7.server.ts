@@ -41,7 +41,7 @@ import { toC7ClubMembership } from "~/types/member-commerce7";
 import type { Customer, CustomerAddress, CustomerPayment } from "~/types/customer";
 import * as db from "~/lib/db/supabase.server";
 import type { C7ClubMembershipResponse } from "~/types/member-commerce7";
-import { sendExpirationNotification } from "~/lib/communication/membership-communications.server";
+import { sendExpirationNotification, sendUpgradeNotification } from "~/lib/communication/membership-communications.server";
 
 const API_URL = "https://api.commerce7.com/v1";
 const APP_NAME = "yno-liberovino-wine-club-and-loyalty";
@@ -830,12 +830,13 @@ export class Commerce7Provider implements CrmProvider {
   // Webhook operations
   async validateWebhook(request: Request, bodyText?: string): Promise<boolean> {
     // Commerce7 webhook validation
-    // Basic Auth is already validated in the webhook endpoint
-    // Signature validation can be added here if Commerce7 provides one
+    // Note: Basic Auth is not available from Commerce7 webhooks
+    // Security is handled in the webhook endpoint via:
+    // - Tenant validation (verifies tenant exists in database)
+    // - Self-triggered blocking (prevents loops)
+    // - Payload/topic validation
     
     // TODO: Implement signature validation if Commerce7 provides documentation
-    // For now, Basic Auth provides sufficient security
-    
     // If a secret is configured and Commerce7 provides signature headers, validate here
     const secret = process.env.COMMERCE7_WEBHOOK_SECRET;
     if (secret && bodyText) {
@@ -857,7 +858,7 @@ export class Commerce7Provider implements CrmProvider {
       }
     }
 
-    // Basic Auth is sufficient for now
+    // Validation is handled in webhook endpoint
     return true;
   }
 
@@ -890,6 +891,10 @@ export class Commerce7Provider implements CrmProvider {
           await this.handleClubDelete(payload.data, client.id);
           break;
 
+        case "club-membership/create":
+          await this.handleClubMembershipCreate(payload.data, client.id);
+          break;
+
         case "club-membership/update":
           await this.handleClubMembershipUpdate(payload.data, client.id);
           break;
@@ -910,6 +915,9 @@ export class Commerce7Provider implements CrmProvider {
   /**
    * Handle customer/update webhook
    * - Update customer record
+   * - Note: Commerce7 sends customer/update webhooks when club membership changes,
+   *   but we already handle those in club-membership webhooks. Only update if
+   *   actual customer data (name, email, phone) changed.
    */
   private async handleCustomerUpdate(customerData: any, clientId: string): Promise<void> {
     try {
@@ -926,28 +934,54 @@ export class Commerce7Provider implements CrmProvider {
         return;
       }
 
-      // Update customer using C7 customer conversion
+      // Convert C7 customer data
       const c7Customer = fromC7Customer(customerData);
-      const supabase = db.getSupabaseClient();
       
-      await supabase
-        .from('customers')
-        .update({
-          email: c7Customer.email,
-          first_name: c7Customer.firstName || null,
-          last_name: c7Customer.lastName || null,
-          phone: c7Customer.phone || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', customer.id);
+      // Check if any actual customer data changed (not just club membership status)
+      const hasChanges = 
+        c7Customer.email !== customer.email ||
+        c7Customer.firstName !== customer.first_name ||
+        c7Customer.lastName !== customer.last_name ||
+        c7Customer.phone !== customer.phone;
+      
+      // Update customer if data changed
+      if (hasChanges) {
+        const supabase = db.getSupabaseClient();
+        await supabase
+          .from('customers')
+          .update({
+            email: c7Customer.email,
+            first_name: c7Customer.firstName || null,
+            last_name: c7Customer.lastName || null,
+            phone: c7Customer.phone || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', customer.id);
 
-      // Update communication preferences if email changed
-      if (c7Customer.email !== customer.email) {
-        // Email changed - update preferences if needed
-        // This is handled automatically by communication system
+        console.log(`Customer ${crmCustomerId} updated successfully (data changed)`);
       }
 
-      console.log(`Customer ${crmCustomerId} updated successfully`);
+      // Sync marketing preferences: C7 emailMarketingStatus → LV emailPromotions
+      // This is separate from customer data - if customer unsubscribes in C7, we should respect it
+      if (customerData.emailMarketingStatus !== undefined) {
+        const currentPrefs = await db.getCommunicationPreferences(customer.id);
+        const shouldReceivePromotions = customerData.emailMarketingStatus === 'Subscribed';
+        
+        // Only update if preference changed
+        if (currentPrefs.emailPromotions !== shouldReceivePromotions) {
+          await db.upsertCommunicationPreferences(customer.id, {
+            ...currentPrefs,
+            emailPromotions: shouldReceivePromotions,
+          });
+          
+          console.log(`Updated email promotions preference for ${crmCustomerId}: ${shouldReceivePromotions}`);
+        }
+      }
+      
+      // If no changes to customer data or preferences, log it
+      if (!hasChanges && customerData.emailMarketingStatus === undefined) {
+        console.log(`Customer ${crmCustomerId} update skipped - no changes to customer data or preferences (likely club membership change already handled)`);
+      }
     } catch (error) {
       console.error('Error handling customer/update webhook:', error);
       throw error;
@@ -981,10 +1015,11 @@ export class Commerce7Provider implements CrmProvider {
 
       // Update club_stage with changes from C7
       // Note: Only sync name changes, other config is managed in LV
+      // Commerce7 uses 'title' field, we store as 'name' in our database
       await supabase
         .from('club_stages')
         .update({
-          name: clubData.name || stage.name,
+          name: clubData.title || stage.name,
           updated_at: new Date().toISOString(),
         })
         .eq('id', stage.id);
@@ -1080,6 +1115,127 @@ export class Commerce7Provider implements CrmProvider {
   }
 
   /**
+   * Handle club-membership/create webhook
+   * - Create new enrollment when admin creates membership in C7
+   * - Only process if it's for an LV-managed club
+   */
+  private async handleClubMembershipCreate(membershipData: C7ClubMembershipResponse, clientId: string): Promise<void> {
+    try {
+      const c7MembershipId = membershipData.id;
+      const c7CustomerId = membershipData.customerId;
+      const c7ClubId = membershipData.clubId;
+
+      if (!c7MembershipId || !c7CustomerId || !c7ClubId) {
+        console.error('Missing required fields in club-membership/create webhook');
+        return;
+      }
+
+      console.log(`Processing club-membership/create webhook: membership=${c7MembershipId}, customer=${c7CustomerId}, club=${c7ClubId}`);
+
+      const supabase = db.getSupabaseClient();
+
+      // Check if this club is managed by LiberoVino
+      const { data: clubStage } = await supabase
+        .from('club_stages')
+        .select('id, name, duration_months, club_program_id')
+        .eq('c7_club_id', c7ClubId)
+        .eq('is_active', true)
+        .single();
+
+      if (!clubStage) {
+        console.log(`Club ${c7ClubId} not managed by LiberoVino, skipping enrollment creation`);
+        return;
+      }
+
+      // Get or create customer in LV
+      let customer = await db.getCustomerByCrmId(clientId, c7CustomerId);
+      
+      if (!customer) {
+        console.log(`Customer ${c7CustomerId} not found in LV, fetching from C7 and creating...`);
+        
+        // Fetch customer from C7
+        const c7Customer = await this.getCustomer(c7CustomerId);
+        
+        // Create customer in LV
+        customer = await db.createCustomer(clientId, {
+          email: c7Customer.email,
+          firstName: c7Customer.firstName || '',
+          lastName: c7Customer.lastName || '',
+          phone: c7Customer.phone || null,
+          crmId: c7CustomerId,
+        });
+
+        // Create communication preferences - respect C7's marketing status
+        const defaultPrefs = db.getDefaultCommunicationPreferences();
+        const preferences = {
+          ...defaultPrefs,
+          // Sync C7 emailMarketingStatus to emailPromotions
+          emailPromotions: c7Customer.emailMarketingStatus === 'Subscribed',
+        };
+        await db.upsertCommunicationPreferences(customer.id, preferences);
+      }
+
+      // Check if customer already has an active enrollment
+      const { data: existingEnrollment } = await supabase
+        .from('club_enrollments')
+        .select('id, club_stage_id, status')
+        .eq('customer_id', customer.id)
+        .eq('status', 'active')
+        .single();
+
+      if (existingEnrollment) {
+        console.warn(`Customer ${customer.id} already has active enrollment ${existingEnrollment.id}, cannot create duplicate. Updating c7_membership_id instead.`);
+        
+        // Update existing enrollment with new C7 membership ID (edge case: membership was recreated in C7)
+        await supabase
+          .from('club_enrollments')
+          .update({
+            c7_membership_id: c7MembershipId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingEnrollment.id);
+        
+        return;
+      }
+
+      // Calculate expiration date
+      const enrolledAt = membershipData.signupDate || new Date().toISOString();
+      const expiresAt = new Date(enrolledAt);
+      expiresAt.setMonth(expiresAt.getMonth() + clubStage.duration_months);
+
+      // Determine status
+      let status: 'active' | 'expired' = 'active';
+      if (membershipData.status === 'Cancelled') {
+        status = 'expired';
+      } else if (membershipData.cancelDate) {
+        const cancelDateInPast = new Date(membershipData.cancelDate) <= new Date();
+        if (cancelDateInPast) {
+          status = 'expired';
+        }
+      }
+
+      // Create new enrollment
+      const enrollment = await db.createClubEnrollment({
+        customerId: customer.id,
+        clubStageId: clubStage.id,
+        status: status,
+        enrolledAt: enrolledAt,
+        expiresAt: membershipData.cancelDate || expiresAt.toISOString(),
+        crmMembershipId: c7MembershipId,
+      });
+
+      console.log(`✅ Created enrollment ${enrollment.id} for customer ${customer.email} in tier ${clubStage.name}`);
+
+      // Note: Not sending welcome notification here - member was enrolled via C7 admin,
+      // they likely already received C7's notifications
+      
+    } catch (error) {
+      console.error('Error handling club-membership/create webhook:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Handle club-membership/update webhook
    * - Update enrollment record
    * - Sync status, tier, and cancel_date changes
@@ -1119,24 +1275,41 @@ export class Commerce7Provider implements CrmProvider {
       let expiresAt = enrollment.expires_at;
       if (membershipData.cancelDate) {
         expiresAt = membershipData.cancelDate;
-        // If cancelDate is set, membership is effectively expired
-        if (status === 'active') {
+        
+        // Only mark as expired if:
+        // 1. Status is already 'Cancelled' in C7, OR
+        // 2. cancelDate is in the past
+        const cancelDateInPast = new Date(membershipData.cancelDate) <= new Date();
+        
+        if (status === 'active' && (membershipData.status === 'Cancelled' || cancelDateInPast)) {
           status = 'expired';
         }
+        // If cancelDate is in the future and status is still Active in C7,
+        // keep status as 'active' - member retains benefits until cancelDate
       }
 
       // Check if club/tier changed
       let clubStageId = enrollment.club_stage_id;
+      let tierChanged = false;
+      let movedToNonLVClub = false;
+
       if (membershipData.clubId) {
         // Find club_stage by c7_club_id
         const { data: newStage } = await supabase
           .from('club_stages')
-          .select('id')
+          .select('id, stage_order')
           .eq('c7_club_id', membershipData.clubId)
           .single();
 
-        if (newStage && newStage.id !== enrollment.club_stage_id) {
+        if (!newStage) {
+          // Member moved to a non-LV club - expire enrollment (keep old club_stage_id for history), no notification
+          movedToNonLVClub = true;
+          // Keep the old club_stage_id in enrollment for history, but mark as expired
+          tierChanged = true;
+        } else if (newStage.id !== enrollment.club_stage_id) {
+          // Member moved to a different LV tier
           clubStageId = newStage.id;
+          tierChanged = true;
         }
       }
 
@@ -1147,8 +1320,9 @@ export class Commerce7Provider implements CrmProvider {
 
       // Update enrollment
       const updateData: any = {
-        status,
-        club_stage_id: clubStageId,
+        status: movedToNonLVClub ? 'expired' : status,
+        // Keep old club_stage_id if moved to non-LV club (for history), otherwise update to new tier
+        club_stage_id: movedToNonLVClub ? enrollment.club_stage_id : clubStageId,
         updated_at: new Date().toISOString(),
       };
 
@@ -1162,8 +1336,45 @@ export class Commerce7Provider implements CrmProvider {
         .update(updateData)
         .eq('id', enrollment.id);
 
-      // Update customer current_club_stage_id if tier changed
-      if (clubStageId !== enrollment.club_stage_id && status === 'active') {
+      // Handle customer flags and notifications based on tier change type
+      if (tierChanged) {
+        if (movedToNonLVClub) {
+          // Member moved to non-LV club - clear customer flags, no notification
+          await supabase
+            .from('customers')
+            .update({
+              is_club_member: false,
+              current_club_stage_id: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', enrollment.customer_id);
+        } else {
+          // LV tier change - update customer flags and send notification
+          await supabase
+            .from('customers')
+            .update({
+              current_club_stage_id: clubStageId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', enrollment.customer_id);
+
+          // Send tier change notification (works for both upgrade and downgrade)
+          if (status === 'active') {
+            try {
+              await sendUpgradeNotification(
+                clientId,
+                membershipData.customerId,
+                enrollment.club_stage_id,
+                clubStageId
+              );
+            } catch (error) {
+              console.error(`Failed to send tier change notification for membership ${c7MembershipId}:`, error);
+              // Don't throw - notification failure shouldn't break webhook processing
+            }
+          }
+        }
+      } else if (clubStageId !== enrollment.club_stage_id && status === 'active') {
+        // Existing logic for non-tier-change updates
         await supabase
           .from('customers')
           .update({
@@ -1174,7 +1385,8 @@ export class Commerce7Provider implements CrmProvider {
       }
 
       // Send expiration notification if membership was just cancelled
-      if (justCancelled) {
+      // Skip if moved to non-LV club (C7 handles those notifications)
+      if (justCancelled && !movedToNonLVClub) {
         try {
           // Use the enrollment's original club_stage_id for the notification
           await sendExpirationNotification(clientId, membershipData.customerId, enrollment.club_stage_id);
@@ -1370,6 +1582,7 @@ export class Commerce7Provider implements CrmProvider {
       },
       body: JSON.stringify({
         cancelDate: new Date().toISOString(),
+        cancellationReason: 'Other', // Required by Commerce7 ENUM when setting cancelDate
       }),
     });
     

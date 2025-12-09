@@ -1,5 +1,5 @@
--- Fix sync queue processor to use club-based architecture
--- Replace discountId references with clubId (for Commerce7) or promotionIds (for Shopify)
+-- Fix CRM sync queue to handle HTTP timeouts gracefully
+-- The current implementation hangs indefinitely on http_collect_response
 
 CREATE OR REPLACE FUNCTION process_crm_sync_queue()
 RETURNS TABLE(processed_count INTEGER, success_count INTEGER, error_count INTEGER)
@@ -26,6 +26,7 @@ DECLARE
   v_club_id TEXT;
   v_old_club_id TEXT;
   v_membership_id TEXT;
+  v_wait_attempts INTEGER;
 BEGIN
   -- Get API base URL from environment (our API endpoint)
   -- PRODUCTION: Override with ALTER DATABASE postgres SET app.api_base_url = 'https://your-production-domain.com';
@@ -147,41 +148,70 @@ BEGIN
         END IF;
       END IF;
 
-      -- Call our API endpoint via pg_net
-      -- This will call POST /api/cron/sync which processes the sync
+      -- Call our API endpoint via pg_net with timeout
+      -- Set a 30 second timeout for the HTTP request
+      RAISE NOTICE 'Making HTTP POST to % with body: %', v_api_base_url || '/api/cron/sync', v_request_body::text;
+      
       v_request_id := net.http_post(
         v_api_base_url || '/api/cron/sync',  -- url
         v_request_body,                      -- body (jsonb)
-        '{}',                                -- params
+        '{}'::jsonb,                         -- params (empty)
         jsonb_build_object(                  -- headers
           'Content-Type', 'application/json',
           'User-Agent', 'pg_net-cron-processor'
-        )
+        ),
+        30000  -- timeout in milliseconds (30 seconds)
       );
+      
+      RAISE NOTICE 'HTTP POST initiated with request ID: %', v_request_id;
 
-      -- Wait for response (pg_net is async, but we can check immediately in most cases)
-      -- In production, we might want to check periodically
-      PERFORM pg_sleep(1); -- Give it a moment
-
-      -- Collect the response
-      PERFORM net.http_collect_response(v_request_id, false);
-
-      -- Try to get the response from _http_response table
-      SELECT 
-        id,
-        status_code,
-        content::jsonb
-      INTO 
-        v_response_id,
-        v_response_status,
-        v_response_body
-      FROM net._http_response
-      WHERE id = v_request_id;
+      -- Wait for response with polling and timeout
+      -- Try up to 10 times (10 seconds total) before giving up
+      v_wait_attempts := 0;
+      v_response_id := NULL;
+      
+      RAISE NOTICE 'Waiting for HTTP response...';
+      
+      WHILE v_wait_attempts < 10 AND v_response_id IS NULL LOOP
+        -- Wait 1 second
+        PERFORM pg_sleep(1);
+        v_wait_attempts := v_wait_attempts + 1;
+        
+        RAISE NOTICE 'Attempt % of 10: collecting response...', v_wait_attempts;
+        
+        -- Try to collect response
+        PERFORM net.http_collect_response(v_request_id, false);
+        
+        -- Check if response is available
+        SELECT 
+          id,
+          status_code,
+          content::jsonb,
+          error_msg
+        INTO 
+          v_response_id,
+          v_response_status,
+          v_response_body,
+          v_error_msg
+        FROM net._http_response
+        WHERE id = v_request_id;
+        
+        -- If we got a response (success or error), break the loop
+        IF v_response_id IS NOT NULL THEN
+          RAISE NOTICE 'Response received! Status: %, Body: %', v_response_status, v_response_body::text;
+          EXIT;
+        END IF;
+      END LOOP;
 
       -- Check if we got a response
       IF v_response_id IS NULL THEN
-        -- Request might still be processing, mark for retry
-        RAISE EXCEPTION 'Response not yet available for request %', v_request_id;
+        -- Request timed out - mark for retry
+        RAISE EXCEPTION 'HTTP request timed out after 10 seconds (request ID: %)', v_request_id;
+      END IF;
+      
+      -- Check for HTTP-level errors (pg_net timeout, connection refused, etc)
+      IF v_error_msg IS NOT NULL THEN
+        RAISE EXCEPTION 'HTTP request error: %', v_error_msg;
       END IF;
 
       -- Check response status
@@ -209,6 +239,7 @@ BEGIN
       SET 
         status = 'completed',
         error_message = NULL,
+        completed_at = NOW(),
         updated_at = NOW()
       WHERE id = v_job.id;
 
@@ -216,10 +247,10 @@ BEGIN
 
     EXCEPTION
       WHEN OTHERS THEN
+        -- Handle errors - retry with exponential backoff
         v_errors := v_errors + 1;
-        v_error_msg := SQLERRM;
-
-        -- Calculate exponential backoff (2^attempts minutes)
+        
+        -- Calculate next retry time (exponential backoff: 2^attempts minutes)
         v_next_retry := NOW() + (POWER(2, v_job.attempts) || ' minutes')::INTERVAL;
 
         -- Update queue with error
@@ -229,16 +260,16 @@ BEGIN
             WHEN v_job.attempts >= v_job.max_attempts - 1 THEN 'failed'
             ELSE 'pending'
           END,
-          error_message = v_error_msg,
-          next_retry_at = CASE 
+          error_message = SQLERRM,
+          next_retry_at = CASE
             WHEN v_job.attempts >= v_job.max_attempts - 1 THEN NULL
             ELSE v_next_retry
           END,
           updated_at = NOW()
         WHERE id = v_job.id;
-
-        -- Log warning
-        RAISE WARNING 'Error processing sync job %: %', v_job.id, v_error_msg;
+        
+        -- Log the error but continue processing other jobs
+        RAISE NOTICE 'Error processing job %: %', v_job.id, SQLERRM;
     END;
   END LOOP;
 
@@ -246,5 +277,5 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION process_crm_sync_queue() IS 'Processes pending CRM sync queue items by calling our API endpoint via pg_net. Handles cancel_membership (from cron expirations) and upgrade_membership (from background webhooks). add_membership is never queued - it happens in UI and must succeed immediately. Commerce7 uses clubs, Shopify uses promotions.';
+COMMENT ON FUNCTION process_crm_sync_queue() IS 'Processes pending CRM sync queue items by calling our API endpoint via pg_net with 30-second timeout. Handles cancel_membership (from cron expirations) and upgrade_membership (from background webhooks). add_membership is never queued - it happens in UI and must succeed immediately. Commerce7 uses clubs, Shopify uses promotions.';
 

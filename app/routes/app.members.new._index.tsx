@@ -36,7 +36,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   
   return {
     session,
-    tiers: clubProgram.club_stages,
+    tiers: clubProgram.club_stages.filter((t: any) => t.is_active), // Only show active tiers
   };
 }
 
@@ -231,7 +231,7 @@ export default function QualifyTier() {
             <Autocomplete
               options={searchResults.map((c) => ({
                 value: c.id,
-                label: `${c.firstName} ${c.lastName} (${c.email}) - LTV: $${c.ltv.toFixed(2)}`,
+                label: `${c.firstName} ${c.lastName} (${c.email}) - LTV: $${c.ltv.toFixed(2)}${c.inSystem ? ' • Already in System' : ''}`,
               }))}
               selected={[]}
               onSelect={([selection]) => {

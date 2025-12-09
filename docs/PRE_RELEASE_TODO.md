@@ -16,6 +16,53 @@ A running list of follow-up items to complete before launch, spanning communicat
 - [ ] Log warnings in-app if Klaviyo returns a 4xx/5xx during enrollment so the client can retry or contact support.
 - [ ] Add email notification setup and templates for members when membership is cancelled via Commerce7 webhook (club-membership/update with status='Cancelled').
 
+### Email Unsubscribe & Legal Compliance (CAN-SPAM, GDPR, CASL)
+
+**Required by law before sending marketing emails:**
+
+- [ ] Create unsubscribe route (`/unsubscribe/:token`) that:
+  - Validates the token
+  - Sets `unsubscribed_all = true` in `communication_preferences`
+  - Records `unsubscribed_at` timestamp
+  - Shows confirmation page (no login required)
+  - Processes requests within 10 business days (ideally instant)
+- [ ] Create preference management page (`/preferences/:token`) for granular control:
+  - Allow toggling individual email types (monthly status, expiration warnings, promotions)
+  - Allow toggling SMS preferences
+  - Include "unsubscribe from all" option
+  - No login/password required (token-based access)
+- [ ] Add winery physical address to client configuration:
+  - Add fields to `clients` table or `communication_configs` for physical address
+  - Required by CAN-SPAM Act (must appear in every marketing email)
+  - Fields needed: address line 1, address line 2 (optional), city, state/province, postal code, country
+- [ ] Update all email templates to include compliant footer:
+  - Physical mailing address of winery (or "c/o LiberoVino" address)
+  - Clear unsubscribe link ("Unsubscribe from all")
+  - Preference center link ("Manage email preferences")
+  - Optional: Reason for receiving email ("You're receiving this as a LiberoVino member")
+- [ ] Verify email provider configurations (Klaviyo, Mailchimp, SendGrid):
+  - Confirm physical address is configured in provider settings
+  - Verify List-Unsubscribe headers are enabled (RFC 8058 for one-click unsubscribe)
+  - Set up complaint feedback loops for each provider
+  - Test that provider's native unsubscribe mechanisms sync with our `communication_preferences` table
+- [ ] Generate secure unsubscribe tokens:
+  - Create token generation utility (signed JWT or similar)
+  - Include customer_id, client_id, and expiration (suggest 90 days minimum)
+  - Add token to all email template variables (`{{unsubscribe_url}}`, `{{preferences_url}}`)
+- [ ] Test unsubscribe flow end-to-end:
+  - User clicks unsubscribe link from email
+  - Instant opt-out (no additional clicks or confirmations required for CAN-SPAM)
+  - Confirmation page shows successful unsubscribe
+  - Verify no more emails are sent to unsubscribed users
+  - Test granular preferences (unsubscribe from promotions only, etc.)
+- [ ] Document compliance requirements for winery clients:
+  - Explain CAN-SPAM, GDPR, and CASL requirements
+  - Requirement to include valid physical address
+  - 10-day opt-out processing requirement
+  - No fees or login barriers for unsubscribe
+  - GDPR: Need explicit consent for EU recipients
+  - Provide best practices guide
+
 ## Member Enrollment
 
 - [ ] Add indicators in the enrollment review step showing whether automations ran (e.g., Klaviyo event success, unsubscribed).

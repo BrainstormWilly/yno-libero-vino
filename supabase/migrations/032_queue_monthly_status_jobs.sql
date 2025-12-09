@@ -22,8 +22,7 @@ BEGIN
     SELECT c.id, c.org_name
     FROM clients c
     INNER JOIN communication_configs cc ON cc.client_id = c.id
-    WHERE c.is_active = true
-      AND cc.send_monthly_status = true
+    WHERE cc.send_monthly_status = true
   LOOP
     BEGIN
       -- Queue all active club members for this client

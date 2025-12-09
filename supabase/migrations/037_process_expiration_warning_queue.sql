@@ -25,9 +25,10 @@ DECLARE
   v_request_body JSONB;
 BEGIN
   -- Get API base URL from environment (our API endpoint)
+  -- PRODUCTION: Override with ALTER DATABASE postgres SET app.api_base_url = 'https://your-production-domain.com';
   v_api_base_url := COALESCE(
     current_setting('app.api_base_url', true),
-    'http://localhost:5173'  -- Default for local dev
+    'https://c7-kindly-balanced-macaw.ngrok-free.app'  -- Static Ngrok URL for dev (paid plan)
   );
 
   -- Process up to 50 pending jobs
@@ -68,20 +69,23 @@ BEGIN
       );
 
       -- Call our API endpoint via pg_net
-      SELECT id INTO v_request_id
-      FROM net.http_post(
-        url := v_api_base_url || '/api/cron/expiration-warning/queue',
-        headers := jsonb_build_object(
+      v_request_id := net.http_post(
+        v_api_base_url || '/api/cron/expiration-warning/queue',  -- url
+        v_request_body,                                           -- body (jsonb)
+        '{}',                                                     -- params
+        jsonb_build_object(                                       -- headers
           'Content-Type', 'application/json',
           'User-Agent', 'pg_net-cron-processor'
-        ),
-        body := v_request_body::text
+        )
       );
 
       -- Wait for response (pg_net is async, but we can check immediately in most cases)
       PERFORM pg_sleep(1); -- Give it a moment
 
-      -- Try to get the response
+      -- Collect the response
+      PERFORM net.http_collect_response(v_request_id, false);
+
+      -- Try to get the response from _http_response table
       SELECT 
         id,
         status_code,
@@ -90,7 +94,8 @@ BEGIN
         v_response_id,
         v_response_status,
         v_response_body
-      FROM net.http_collect_response(request_id := v_request_id, async := false);
+      FROM net._http_response
+      WHERE id = v_request_id;
 
       -- Check if we got a response
       IF v_response_id IS NULL THEN

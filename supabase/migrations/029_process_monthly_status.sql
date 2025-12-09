@@ -42,12 +42,13 @@ BEGIN
       -- Call the API endpoint via pg_net
       SELECT content::jsonb INTO response_data
       FROM net.http_post(
-        url := api_base_url || '/api/cron/monthly-status',
-        headers := jsonb_build_object(
+        api_base_url || '/api/cron/monthly-status',  -- url
+        request_body,                                 -- body (jsonb)
+        '{}',                                         -- params
+        jsonb_build_object(                           -- headers
           'Content-Type', 'application/json',
           'User-Agent', 'pg_net-cron-processor'
-        ),
-        body := request_body::text
+        )
       );
 
       -- Check if request was successful

@@ -88,7 +88,8 @@ export default function MemberDetail() {
   
   const handleEditInC7 = () => {
     if (enrollment.c7_membership_id) {
-      window.open(`/club/membership/${enrollment.c7_membership_id}`, '_blank');
+      const customerUrl = `https://${session.tenantShop}.admin.platform.commerce7.com/crm/customer/${enrollment.customers.crm_id}/overview`;
+      window.open(customerUrl, '_blank');
     }
   };
   
