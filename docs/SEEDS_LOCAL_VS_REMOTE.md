@@ -166,7 +166,9 @@ npm run db:export-seeds
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "SELECT version();"
 
 # Test remote connection (use your URL)
-psql $SUPABASE_DB_URL -c "SELECT version();"
+# Note: In shell, use quotes to ensure variable expansion: psql "$SUPABASE_DB_URL" -c "SELECT version();"
+# Or use the npm script which handles this automatically: npm run db:import-seeds
+psql "$SUPABASE_DB_URL" -c "SELECT version();"
 ```
 
 ## Troubleshooting

@@ -241,7 +241,9 @@ async function exportSeeds() {
     console.log('\n✅ Seed data exported successfully!');
     console.log(`📁 File: ${seedFilePath}`);
     console.log('\n📝 To restore this data, run:');
-    console.log('   psql $SUPABASE_DB_URL -f supabase/seeds/001_exported_data.sql');
+    console.log('   npm run db:import-seeds');
+    console.log('\n   Or manually with psql (shell expansion required):');
+    console.log('   psql "$SUPABASE_DB_URL" -f supabase/seeds/001_exported_data.sql');
 
   } catch (error) {
     console.error('❌ Error exporting seeds:', error);
