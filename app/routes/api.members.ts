@@ -8,8 +8,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
-import { crmManager } from '~/lib/crm';
-import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
