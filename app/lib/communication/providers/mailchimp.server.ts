@@ -164,8 +164,8 @@ export class MailchimpProvider implements CommunicationProvider {
     }
   }
 
-  async updateProfile(params: UpdateProfileParams): Promise<void> {
-    if (!this.marketingAccessToken || !this.audienceId) return;
+  async updateProfile(params: UpdateProfileParams): Promise<string | null> {
+    if (!this.marketingAccessToken || !this.audienceId) return null;
 
     const body: Record<string, unknown> = {
       email_address: params.email,
@@ -185,6 +185,9 @@ export class MailchimpProvider implements CommunicationProvider {
         body: JSON.stringify(body),
       }
     );
+    
+    // Mailchimp doesn't return a profile ID in the same way, return null
+    return null;
   }
 
   private async applyTag(email: string, tag: string) {

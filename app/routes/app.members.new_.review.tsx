@@ -24,8 +24,36 @@ import { KlaviyoProvider } from '~/lib/communication/providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from '~/lib/communication/preferences';
 import { sendClientEmail, trackClientEvent } from '~/lib/communication/communication.service.server';
+import { sendSMSOptInRequest, shouldSendSMSOptIn } from '~/lib/communication/sms-opt-in.server';
+import { flattenSMSOptInProperties } from '~/lib/communication/preferences';
+import { fromC7Promotion } from '~/types/discount-commerce7';
 
 type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
+
+/**
+ * Get the shop/store URL for a client based on their CRM type
+ * TODO: Update to use customer-facing website URL instead of CRM admin URL
+ * For Commerce7: Should use the actual storefront URL (may be custom domain)
+ * For Shopify: Should use the customer-facing store URL (not admin)
+ */
+function getShopUrl(client: { crm_type: string; tenant_shop: string } | null): string {
+  if (!client) {
+    return 'https://example.com'; // Fallback
+  }
+
+  if (client.crm_type === 'commerce7') {
+    // Commerce7: tenant_shop is the tenant identifier
+    // Customer-facing storefront is typically at: https://{tenant}.commerce7.com
+    // TODO: Check if client has a custom domain or organization-website stored
+    return `https://${client.tenant_shop}.commerce7.com`;
+  } else if (client.crm_type === 'shopify') {
+    // Shopify: tenant_shop is the shop domain (e.g., "mystore.myshopify.com")
+    // TODO: Convert myshopify.com domain to customer-facing store URL if custom domain exists
+    return `https://${client.tenant_shop}`;
+  }
+
+  return 'https://example.com'; // Fallback
+}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -113,6 +141,31 @@ export async function action({ request }: ActionFunctionArgs) {
     
     await db.upsertCommunicationPreferences(lvCustomer.id, preferences);
     
+    // Send SMS opt-in request if customer has phone and SMS preferences enabled
+    let updatedPreferences = preferences;
+    if (shouldSendSMSOptIn(draft.customer.phone, preferences)) {
+      try {
+        await sendSMSOptInRequest(
+          session.clientId,
+          lvCustomer.id,
+          draft.customer.phone!,
+          client?.org_name
+        );
+        
+        // Mark that they opted in via signup form
+        updatedPreferences = {
+          ...preferences,
+          smsOptedInAt: new Date().toISOString(),
+          smsOptInMethod: 'signup_form',
+          smsOptInSource: '/app/members/new',
+        };
+        await db.upsertCommunicationPreferences(lvCustomer.id, updatedPreferences);
+      } catch (error) {
+        // Log but don't fail enrollment
+        console.warn('SMS opt-in request failed during signup:', error);
+      }
+    }
+    
     // Sync to CRM FIRST - MUST succeed before creating enrollment
     // If CRM sync fails, enrollment fails (customer won't get discount otherwise)
     let crmMembershipId: string | null = null;
@@ -174,13 +227,14 @@ export async function action({ request }: ActionFunctionArgs) {
           clientName: client?.org_name ?? null,
           communicationConfig,
           providerData,
-          preferences,
+          preferences: updatedPreferences, // Use updated preferences with SMS opt-in info
           customer: {
             email: draft.customer.email,
             firstName: draft.customer.firstName,
             lastName: draft.customer.lastName,
             phone: draft.customer.phone ?? null,
             crmId: draft.customer.crmId,
+            birthdate: draft.customer.birthdate, // Required for wine sales and Klaviyo SMS age-gating
           },
           lvCustomerId: lvCustomer.id,
           crmMembershipId: crmMembershipId,
@@ -278,6 +332,7 @@ async function triggerKlaviyoClubSignup(options: {
     lastName: string;
     phone?: string | null;
     crmId: string;
+    birthdate: string; // Required for wine sales and Klaviyo SMS age-gating
   };
   lvCustomerId: string;
   crmMembershipId: string | null;
@@ -318,25 +373,120 @@ async function triggerKlaviyoClubSignup(options: {
     defaultFromName: communicationConfig.email_from_name ?? undefined,
   });
 
+  // Fetch additional data needed for template variables
+  const supabase = db.getSupabaseClient();
+  const client = await db.getClient(options.clientId);
+  
+  const [customerData, tierDetails, promotions, nextTier] = await Promise.all([
+    supabase
+      .from('customers')
+      .select('loyalty_points_balance')
+      .eq('id', options.lvCustomerId)
+      .maybeSingle(),
+    db.getClubStageWithDetails(options.tier.id),
+    db.getStagePromotions(options.tier.id),
+    // Get next tier if current tier has stage_order
+    (async () => {
+      const currentTier = await db.getClubStageWithDetails(options.tier.id);
+      if (!currentTier?.club_program_id || currentTier.stage_order === null) {
+        return null;
+      }
+      const { data: nextTierData } = await supabase
+        .from('club_stages')
+        .select('id, name, min_purchase_amount, stage_order')
+        .eq('club_program_id', currentTier.club_program_id)
+        .eq('is_active', true)
+        .gt('stage_order', currentTier.stage_order)
+        .order('stage_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      return nextTierData;
+    })(),
+  ]);
+
+  const customer = customerData?.data || null;
+
+  // Calculate days remaining
+  const now = new Date();
+  const daysRemaining = Math.ceil((options.expirationDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Get discount percentage from first percentage-based promotion
+  let discountPercentage = 0;
+  if (client && client.crm_type === 'commerce7' && client.tenant_shop && promotions.length > 0) {
+    try {
+      const crmProvider = crmManager.getProvider(client.crm_type, client.tenant_shop);
+      // Fetch the first promotion's details from Commerce7
+      const firstPromo = promotions[0];
+      if (firstPromo.crm_type === 'commerce7') {
+        const c7Promotion = await crmProvider.getPromotion(firstPromo.crm_id);
+        const discount = fromC7Promotion(c7Promotion);
+        if (discount.value.type === 'percentage' && discount.value.percentage !== undefined) {
+          discountPercentage = discount.value.percentage;
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch discount from Commerce7 promotion:', error);
+      // Fall back to 0 if fetch fails
+    }
+  }
+
   const wineryName = options.clientName ?? undefined;
+  const shopUrl = getShopUrl(client);
+  
   const profileProperties: Record<string, unknown> = {
     client_id: options.clientId,
     winery_name: wineryName,
+    shop_url: shopUrl,
     libero_member: true,
     membership_status: 'active',
     membership_started_at: options.enrollmentDate.toISOString(),
     membership_expires_at: options.expirationDate.toISOString(),
     tier_id: options.tier.id,
     tier_name: options.tier.name,
+    current_stage: options.tier.name, // Alias for template compatibility
     tier_duration_months: options.tier.durationMonths,
     tier_min_purchase_amount: options.tier.minPurchaseAmount,
+    min_purchase_amount: options.tier.minPurchaseAmount, // Alias for template
+    discount_percentage: discountPercentage, // Fetched from Commerce7 promotions
+    days_remaining: daysRemaining,
+    points_balance: customer?.loyalty_points_balance ?? 0,
     communication_preferences: options.preferences,
     include_marketing_flows: options.providerData?.includeMarketing ?? false,
     seeded_at: options.providerData?.seededAt ?? null,
+    // Flattened SMS opt-in properties (for Klaviyo conditional splits)
+    ...flattenSMSOptInProperties(options.preferences),
   };
 
   if (options.purchaseAmount !== undefined) {
     profileProperties.tier_purchase_amount = options.purchaseAmount;
+  }
+
+  // Add next tier info if available
+  let nextTierDiscount = 0;
+  if (nextTier && client && client.crm_type === 'commerce7' && client.tenant_shop) {
+    try {
+      const nextTierPromotions = await db.getStagePromotions(nextTier.id);
+      if (nextTierPromotions.length > 0) {
+        const crmProvider = crmManager.getProvider(client.crm_type, client.tenant_shop);
+        const firstNextPromo = nextTierPromotions[0];
+        if (firstNextPromo.crm_type === 'commerce7') {
+          const c7Promotion = await crmProvider.getPromotion(firstNextPromo.crm_id);
+          const discount = fromC7Promotion(c7Promotion);
+          if (discount.value.type === 'percentage' && discount.value.percentage !== undefined) {
+            nextTierDiscount = discount.value.percentage;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch next tier discount from Commerce7 promotion:', error);
+      // Fall back to 0 if fetch fails
+    }
+  }
+  
+  if (nextTier) {
+    profileProperties.next_stage = nextTier.name;
+    profileProperties.next_stage_amount = nextTier.min_purchase_amount;
+    profileProperties.next_stage_discount = nextTierDiscount;
   }
 
   const eventProperties = {
@@ -350,12 +500,67 @@ async function triggerKlaviyoClubSignup(options: {
   };
 
   try {
-    await provider.updateProfile({
+    // Update/create profile and get profile ID
+    const profileId = await provider.updateProfile({
       email: options.customer.email,
       phone: options.customer.phone || undefined,
       firstName: options.customer.firstName,
       lastName: options.customer.lastName,
       properties: profileProperties,
+      externalId: options.customer.crmId, // Use CRM customer ID to help Klaviyo merge profiles
+    });
+
+    // Subscribe profile to email and SMS - required for flows to send
+    // Note: Klaviyo email API only supports 'marketing' subscription
+    // We use 'marketing' even for transactional flows to enable email sending
+    if (profileId && provider instanceof KlaviyoProvider) {
+      // Subscribe to SMS if transactional or marketing is enabled
+      const smsChannels: ('transactional' | 'marketing')[] = [];
+      if (options.preferences.smsTransactional) {
+        smsChannels.push('transactional');
+      }
+      if (options.preferences.smsMarketing) {
+        smsChannels.push('marketing');
+      }
+      const shouldSubscribeSMS = options.customer.phone && smsChannels.length > 0;
+      
+      // Format birthdate as YYYY-MM-DD - required for wine sales and Klaviyo SMS age-gating
+      if (!options.customer.birthdate) {
+        throw new Error('Birthdate is required for wine sales but was not provided');
+      }
+      const date = new Date(options.customer.birthdate);
+      const birthdate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      // Use actual SMS opt-in timestamp if available, otherwise let the method use default
+      // The subscribeProfileToChannels method will:
+      // - Use the provided timestamp if it's > 1 day old (historical import)
+      // - Otherwise use 5 seconds ago for real-time enrollments (ensures it's after profile creation)
+      const smsOptedInAt = flattenSMSOptInProperties(options.preferences).sms_opted_in_at;
+      const consentedAt = smsOptedInAt || undefined; // Let method handle default for real-time enrollments
+      
+      await provider.subscribeProfileToChannels({
+        profileId,
+        email: options.customer.email,
+        phoneNumber: options.customer.phone || undefined,
+        birthdate,
+        emailChannel: 'marketing', // Use 'marketing' to enable email sending (even for transactional flows)
+        sms: shouldSubscribeSMS ? smsChannels : undefined, // Subscribe to requested SMS channels
+        consentedAt, // Use actual opt-in timestamp if available, otherwise method uses real-time default
+      });
+    }
+
+    // Log template variables for debugging
+    console.info('Klaviyo ClubSignup - Template variables being sent:', {
+      current_stage: profileProperties.current_stage,
+      days_remaining: profileProperties.days_remaining,
+      discount_percentage: profileProperties.discount_percentage,
+      points_balance: profileProperties.points_balance,
+      next_stage: profileProperties.next_stage,
+      tier_name: profileProperties.tier_name,
+      membership_expires_at: options.expirationDate.toISOString(),
+      sms_opted_in_at: flattenSMSOptInProperties(options.preferences).sms_opted_in_at,
+      sms_opt_in_method: flattenSMSOptInProperties(options.preferences).sms_opt_in_method,
+      sms_opt_in_confirmed_at: flattenSMSOptInProperties(options.preferences).sms_opt_in_confirmed_at,
     });
 
     await provider.trackEvent({
@@ -364,14 +569,17 @@ async function triggerKlaviyoClubSignup(options: {
         email: options.customer.email,
         phone: options.customer.phone || undefined,
         id: options.customer.crmId,
+        firstName: options.customer.firstName,
+        lastName: options.customer.lastName,
+        // Put ALL template variables in customer.properties so they're stored on the profile
+        // This ensures templates can access them even if updateProfile fails
         properties: {
+          ...profileProperties, // Include all profile properties (template variables, SMS props, etc.)
           membership_status: 'active',
           membership_expires_at: options.expirationDate.toISOString(),
-          tier_name: options.tier.name,
-          communication_preferences: options.preferences,
         },
       },
-      properties: eventProperties,
+      properties: eventProperties, // Event-level properties for flow logic (templates can access these too)
       time: options.enrollmentDate.toISOString(),
     });
 
@@ -838,13 +1046,10 @@ export default function ReviewAndEnroll() {
                   Email
                 </Text>
                 <Text variant="bodySm" as="p" tone="subdued">
-                  Monthly status: {draft.preferences.emailMonthlyStatus ? 'On' : 'Off'}
+                  Marketing: {(draft.preferences.emailMarketing ?? false) ? 'On' : 'Off'}
                 </Text>
                 <Text variant="bodySm" as="p" tone="subdued">
-                  Duration reminders: {draft.preferences.emailExpirationWarnings ? 'On' : 'Off'}
-                </Text>
-                <Text variant="bodySm" as="p" tone="subdued">
-                  Promotions: {draft.preferences.emailPromotions ? 'On' : 'Off'}
+                  Transactional emails (monthly status, expiration warnings) are automatic
                 </Text>
               </BlockStack>
 
@@ -855,13 +1060,10 @@ export default function ReviewAndEnroll() {
                   SMS
                 </Text>
                 <Text variant="bodySm" as="p" tone="subdued">
-                  Monthly status: {draft.preferences.smsMonthlyStatus ? 'On' : 'Off'}
+                  Transactional: {(draft.preferences.smsTransactional ?? false) ? 'On' : 'Off'}
                 </Text>
                 <Text variant="bodySm" as="p" tone="subdued">
-                  Duration reminders: {draft.preferences.smsExpirationWarnings ? 'On' : 'Off'}
-                </Text>
-                <Text variant="bodySm" as="p" tone="subdued">
-                  Promotions: {draft.preferences.smsPromotions ? 'On' : 'Off'}
+                  Marketing: {(draft.preferences.smsMarketing ?? false) ? 'On' : 'Off'}
                 </Text>
               </BlockStack>
             </BlockStack>
@@ -874,9 +1076,27 @@ export default function ReviewAndEnroll() {
         <Form method="post">
           <BlockStack gap="300">
             <Text variant="bodyMd" as="p">
-              All information has been verified. Click the button below to complete the enrollment 
-              and create the membership in Commerce7.
+              All information has been verified. Please confirm the member's information and communication preferences are correct before completing enrollment.
             </Text>
+            
+            <Banner tone="info">
+              <BlockStack gap="200">
+                <Text variant="bodyMd" as="p">
+                  By completing enrollment, you confirm that:
+                </Text>
+                <BlockStack gap="100">
+                  <Text variant="bodySm" as="p">
+                    • All customer information is accurate
+                  </Text>
+                  <Text variant="bodySm" as="p">
+                    • The customer has provided consent for the selected communication preferences
+                  </Text>
+                  <Text variant="bodySm" as="p">
+                    • Age verification is complete (required for wine club membership)
+                  </Text>
+                </BlockStack>
+              </BlockStack>
+            </Banner>
             
             <Button
               variant="primary"

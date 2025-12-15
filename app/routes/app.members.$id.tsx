@@ -14,6 +14,7 @@ import {
   Banner,
   Box,
 } from '@shopify/polaris';
+import { CommunicationPreferencesForm } from '~/components/CommunicationPreferencesForm';
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
@@ -38,9 +39,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response('Enrollment not found', { status: 404 });
   }
   
+  // Get communication preferences
+  const preferences = await db.getCommunicationPreferences(enrollment.customers.id);
+  
   return {
     session,
     enrollment,
+    preferences,
   };
 }
 
@@ -74,11 +79,43 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
   }
   
+  if (action === 'update_preferences') {
+    try {
+      const enrollment = await db.getEnrollmentById(id);
+      if (!enrollment) {
+        return { success: false, error: 'Enrollment not found' };
+      }
+      
+      // Get customer ID from form or enrollment
+      const customerId = (formData.get('customer_id') as string) || enrollment.customers.id;
+      
+      const currentPreferences = await db.getCommunicationPreferences(customerId);
+      
+      await db.upsertCommunicationPreferences(customerId, {
+        ...currentPreferences,
+        emailMarketing: formData.get('email_marketing') === 'true',
+        smsTransactional: formData.get('sms_transactional') === 'true',
+        smsMarketing: formData.get('sms_marketing') === 'true',
+        unsubscribedAll: formData.get('unsubscribed_all') === 'true',
+      });
+      
+      return {
+        success: true,
+        message: 'Communication preferences updated successfully',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update preferences',
+      };
+    }
+  }
+  
   return { success: false, error: 'Invalid action' };
 }
 
 export default function MemberDetail() {
-  const { session, enrollment } = useLoaderData<typeof loader>();
+  const { session, enrollment, preferences } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   
@@ -290,6 +327,14 @@ export default function MemberDetail() {
                 </BlockStack>
               </BlockStack>
             </Card>
+            
+            {/* Communication Preferences */}
+            <CommunicationPreferencesForm
+              preferences={preferences}
+              customerId={enrollment.customers.id}
+              showSmsOptInStatus={true}
+              readOnly={false}
+            />
             
           </BlockStack>
           

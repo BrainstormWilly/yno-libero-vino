@@ -143,3 +143,13 @@ export async function trackClientEvent(
   const config = ensureConfigForEmail(await getCommunicationConfig(clientId));
   return communicationManager.trackEvent(config, params);
 }
+
+/**
+ * Send SMS message to customer
+ * Uses the configured SMS provider for the client
+ */
+export async function sendClientSMS(clientId: string, params: SMSParams): Promise<SMSResult> {
+  const config = await getCommunicationConfig(clientId);
+  const smsConfig = ensureConfigForSMS(config);
+  return communicationManager.sendSMS(smsConfig, params);
+}

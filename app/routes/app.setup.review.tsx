@@ -1,4 +1,4 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, Form } from 'react-router';
 import { useLoaderData, useActionData, useNavigate } from 'react-router';
 import { useEffect } from 'react';
 import {
@@ -14,7 +14,6 @@ import {
   Divider,
   List,
   Box,
-  Form,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -470,7 +469,7 @@ export default function SetupReview() {
             <BlockStack gap="400">
               <InlineStack align="space-between">
                 <Text variant="headingMd" as="h3">
-                  Membership Tiers ({tiersWithData.length})
+                  Membership Tiers ({activeTiers.length})
                 </Text>
                 <Button
                   variant="plain"
@@ -483,7 +482,7 @@ export default function SetupReview() {
               <Divider />
               
               <BlockStack gap="500">
-                {tiersWithData.map((tier: any, index: number) => (
+                {activeTiers.map((tier: any, index: number) => (
                   <BlockStack key={tier.id} gap="300">
                     
                     <InlineStack align="space-between" blockAlign="start">
@@ -620,7 +619,7 @@ export default function SetupReview() {
                       )}
                     </BlockStack>
                     
-                    {index < tiersWithData.length - 1 && <Divider />}
+                    {index < activeTiers.length - 1 && <Divider />}
                   </BlockStack>
                 ))}
               </BlockStack>

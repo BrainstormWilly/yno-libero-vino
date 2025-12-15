@@ -101,8 +101,9 @@ export class SendGridProvider implements CommunicationProvider {
     return { success: false };
   }
 
-  async updateProfile(_params: UpdateProfileParams): Promise<void> {
+  async updateProfile(_params: UpdateProfileParams): Promise<string | null> {
     // SendGrid does not manage profiles in the same way; no-op for fallback provider.
+    return null;
   }
 
   getTestEmailContent(): TestEmailContent {

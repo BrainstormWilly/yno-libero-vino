@@ -74,6 +74,14 @@ const TEMPLATE_CONFIG: Record<KlaviyoTemplateKey, TemplateConfig> = {
       'Make a quick purchase to keep your liberation rolling. No auto ship, no minimum cases—just your pace.',
     cta: 'Stay a liberated member',
   },
+  TIER_UPGRADE: {
+    subject: 'Congratulations! You\'ve unlocked {{ current_stage }}',
+    previewText: 'Your membership tier has been upgraded.',
+    headline: 'Tier upgrade unlocked',
+    intro:
+      'Your recent purchase elevated you to a higher tier. Enjoy enhanced benefits and greater savings.',
+    cta: 'Explore your new benefits',
+  },
   ANNUAL_RESIGN: {
     subject: 'Ready for another liberated year with {{ winery_name }}?',
     previewText: 'Renew on your own terms and keep the perks flowing.',
@@ -109,6 +117,7 @@ const TEMPLATE_LOOKUP: Record<KlaviyoMetricKey, KlaviyoTemplateKey> = {
   MONTHLY_STATUS_PROMO: 'MONTHLY_STATUS_PROMO',
   EXPIRATION_WARNING: 'EXPIRATION_WARNING',
   EXPIRATION_NOTICE: 'EXPIRATION_NOTICE',
+  TIER_UPGRADE: 'TIER_UPGRADE',
   ANNUAL_RESIGN: 'ANNUAL_RESIGN',
   SALES_BLAST: 'SALES_BLAST',
   TEST: 'TEST',
@@ -208,16 +217,16 @@ function renderHtml(key: KlaviyoTemplateKey, config: TemplateConfig): string {
   </head>
   <body>
     <div class="card">
-      <p>Hi {{ first_name }},</p>
+      <p>Hi {{ person.first_name }},</p>
       <h1>${config.headline}</h1>
       <p>${config.intro}</p>
       ${renderHighlight(key)}
       ${renderSecondaryCopy(key)}
-      <a class="cta" href="{{ shop_url }}">${config.cta}</a>
+      <a class="cta" href="{{ person.shop_url }}">${config.cta}</a>
       <div class="footer">
         <p>Stay liberated, stay curious.</p>
-        <p>{{ winery_name }} × LiberoVino</p>
-        <p><a href="{{ unsubscribe_url }}">Update preferences</a></p>
+        <p>{{ person.winery_name }} × LiberoVino</p>
+        <p><a href="{% unsubscribe_link %}">Update preferences</a></p>
       </div>
     </div>
   </body>
@@ -228,32 +237,37 @@ function renderHighlight(key: KlaviyoTemplateKey): string {
   switch (key) {
     case 'CLUB_SIGNUP':
       return `<div class="highlight">
-  <p><strong>Tier:</strong> {{ current_stage }} • {{ discount_percentage }}% off</p>
-  <p><strong>Duration remaining:</strong> {{ days_remaining }} days</p>
-  <p><strong>Loyalty balance:</strong> {{ points_balance }} points</p>
+  <p><strong>Tier:</strong> {{ person.current_stage }} • {{ person.discount_percentage }}% off</p>
+  <p><strong>Duration remaining:</strong> {{ person.days_remaining }} days</p>
+  <p><strong>Loyalty balance:</strong> {{ person.points_balance }} points</p>
 </div>`;
     case 'MONTHLY_STATUS':
     case 'MONTHLY_STATUS_PROMO':
       return `<div class="highlight">
-  <p><strong>Tier:</strong> {{ current_stage }} • {{ discount_percentage }}% off</p>
-  <p><strong>Renew with:</strong> ${'{{ min_purchase_amount }}'} before {{ expires_at }}</p>
+  <p><strong>Tier:</strong> {{ person.current_stage }} • {{ person.discount_percentage }}% off</p>
+  <p><strong>Renew with:</strong> {{ person.min_purchase_amount }} before {{ person.expires_at }}</p>
 </div>`;
     case 'EXPIRATION_WARNING':
       return `<div class="highlight">
-  <p><strong>${'{{ days_remaining }}'} days left.</strong> Purchase ${'{{ min_purchase_amount }}'} to stay liberated.</p>
+  <p><strong>{{ person.days_remaining }} days left.</strong> Purchase {{ person.min_purchase_amount }} to stay liberated.</p>
 </div>`;
     case 'EXPIRATION_NOTICE':
       return `<div class="highlight">
   <p><strong>Last chance:</strong> Make a purchase now to keep your benefits active.</p>
 </div>`;
+    case 'TIER_UPGRADE':
+      return `<div class="highlight">
+  <p><strong>Upgraded to:</strong> {{ person.current_stage }} • {{ person.discount_percentage }}% off</p>
+  <p><strong>Previous tier:</strong> {{ person.previous_tier_name }}</p>
+</div>`;
     case 'ANNUAL_RESIGN':
       return `<div class="highlight">
-  <p><strong>Keep the liberation going.</strong> Renew to protect your loyalty balance of {{ points_balance }} points.</p>
+  <p><strong>Keep the liberation going.</strong> Renew to protect your loyalty balance of {{ person.points_balance }} points.</p>
 </div>`;
     case 'SALES_BLAST':
       return `<div class="highlight">
-  <p><strong>Spotlight:</strong> {{ suggested_wines.0.name }} • ${'{{ suggested_wines.0.price }}'}</p>
-  <p>Redeem with {{ discount_percentage }}% and loyalty points.</p>
+  <p><strong>Spotlight:</strong> {{ person.suggested_wines.0.name }} • {{ person.suggested_wines.0.price }}</p>
+  <p>Redeem with {{ person.discount_percentage }}% and loyalty points.</p>
 </div>`;
     case 'TEST':
     default:
@@ -266,14 +280,16 @@ function renderHighlight(key: KlaviyoTemplateKey): string {
 function renderSecondaryCopy(key: KlaviyoTemplateKey): string {
   switch (key) {
     case 'CLUB_SIGNUP':
-      return `<p>Upgrade opportunity: reach ${'{{ next_stage_amount }}'} to unlock ${'{{ next_stage_discount }}'}% and exclusive drops.</p>`;
+      return `<p>Upgrade opportunity: reach {{ person.next_stage_amount }} to unlock {{ person.next_stage_discount }}% and exclusive drops.</p>`;
     case 'MONTHLY_STATUS':
-      return `<p>Need momentum? Purchasing ${'{{ next_stage_amount }}'} elevates you to ${'{{ next_stage }}'} for ${'{{ next_stage_discount }}'}% savings.</p>`;
+      return `<p>Need momentum? Purchasing {{ person.next_stage_amount }} elevates you to {{ person.next_stage }} for {{ person.next_stage_discount }}% savings.</p>`;
     case 'MONTHLY_STATUS_PROMO':
-      return `<p>Spotlight pick: {{ suggested_wines.0.name }} – ideal for maintaining your liberated pace.</p>`;
+      return `<p>Spotlight pick: {{ person.suggested_wines.0.name }} – ideal for maintaining your liberated pace.</p>`;
     case 'EXPIRATION_WARNING':
     case 'EXPIRATION_NOTICE':
-      return `<p>LiberoVino members never face forced shipments—just purchase the wines you want before ${'{{ expires_at }}'}.</p>`;
+      return `<p>LiberoVino members never face forced shipments—just purchase the wines you want before {{ person.expires_at }}.</p>`;
+    case 'TIER_UPGRADE':
+      return `<p>Your upgrade unlocks enhanced benefits and greater savings. Enjoy your new tier status!</p>`;
     case 'ANNUAL_RESIGN':
       return `<p>Renew to protect your loyalty streak and keep choosing shipments only when you are ready.</p>`;
     case 'SALES_BLAST':
@@ -294,10 +310,10 @@ function renderText(key: KlaviyoTemplateKey, config: TemplateConfig): string {
     stripHtml(renderHighlight(key)),
     stripHtml(renderSecondaryCopy(key)),
     '',
-    `${config.cta}: {{ shop_url }}`,
+    `${config.cta}: {{ person.shop_url }}`,
     '',
     'Stay liberated,',
-    '{{ winery_name }} × LiberoVino',
+    '{{ person.winery_name }} × LiberoVino',
   ].join('\n');
 }
 
@@ -315,5 +331,5 @@ function withSeedTimestamp<T extends { seededAt?: string }>(resource: T): T {
 function getSMSBody(templateKey: KlaviyoTemplateKey): string {
   const config = TEMPLATE_CONFIG[templateKey];
   // Create a concise SMS version of the message
-  return `${config.headline}. ${config.intro} ${config.cta}: {{ shop_url }}`;
+  return `${config.headline}. ${config.intro} ${config.cta}: {{ person.shop_url }}`;
 }

@@ -260,17 +260,12 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
               <dl className="noIndent">
                 <dd>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    Monthly status: {draft.preferences.emailMonthlyStatus ? 'On' : 'Off'}
+                    Marketing: {(draft.preferences.emailMarketing ?? false) ? 'On' : 'Off'}
                   </Text>
                 </dd>
                 <dd>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    Duration reminders: {draft.preferences.emailExpirationWarnings ? 'On' : 'Off'}
-                  </Text>
-                </dd>
-                <dd>
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    Promotions: {draft.preferences.emailPromotions ? 'On' : 'Off'}
+                    Transactional emails (monthly status, expiration warnings) are automatic
                   </Text>
                 </dd>
               </dl>
@@ -283,17 +278,12 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
               <dl className="noIndent">
                 <dd>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    Monthly status: {draft.preferences.smsMonthlyStatus ? 'On' : 'Off'}
+                    Transactional: {(draft.preferences.smsTransactional ?? false) ? 'On' : 'Off'}
                   </Text>
                 </dd>
                 <dd>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    Duration reminders: {draft.preferences.smsExpirationWarnings ? 'On' : 'Off'}
-                  </Text>
-                </dd>
-                <dd>
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    Promotions: {draft.preferences.smsPromotions ? 'On' : 'Off'}
+                    Marketing: {(draft.preferences.smsMarketing ?? false) ? 'On' : 'Off'}
                   </Text>
                 </dd>
               </dl>

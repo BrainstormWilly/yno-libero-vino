@@ -41,6 +41,8 @@ export interface TrackEventParams {
     email?: string;
     phone?: string;
     id?: string;
+    firstName?: string;
+    lastName?: string;
     properties?: Record<string, unknown>;
   };
   properties?: Record<string, unknown>;
@@ -58,6 +60,7 @@ export interface UpdateProfileParams {
   firstName?: string;
   lastName?: string;
   properties?: Record<string, unknown>;
+  externalId?: string; // CRM customer ID for profile merging
 }
 
 export interface TestEmailContent {
@@ -74,6 +77,6 @@ export interface CommunicationProvider {
   sendEmail(params: EmailParams): Promise<EmailResult>;
   sendSMS?(params: SMSParams): Promise<SMSResult>;
   trackEvent?(params: TrackEventParams): Promise<TrackEventResult>;
-  updateProfile?(params: UpdateProfileParams): Promise<void>;
+  updateProfile?(params: UpdateProfileParams): Promise<string | null>; // Returns profile ID if available
   getTestEmailContent?(): TestEmailContent;
 }

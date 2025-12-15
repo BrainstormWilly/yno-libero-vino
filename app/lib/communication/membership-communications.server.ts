@@ -11,6 +11,7 @@ import { sendClientEmail, trackClientEvent } from './communication.service.serve
 import { KlaviyoProvider } from './providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from './preferences';
+import { flattenSMSOptInProperties } from './preferences';
 import { crmManager } from '~/lib/crm';
 import { c7CentsToDollars } from '~/types/customer-commerce7';
 import type { C7ClubMembershipResponse } from '~/types/member-commerce7';
@@ -347,8 +348,10 @@ async function triggerKlaviyoExpiration(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || !options.preferences.emailExpirationWarnings) {
-    console.info('Skipping Klaviyo expiration notification: member unsubscribed or preferences disabled.');
+  // Transactional emails (expiration notices) are always sent (required for membership management)
+  // Only skip if member has unsubscribed from all communications
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Klaviyo expiration notification: member unsubscribed from all communications.');
     return;
   }
 
@@ -373,6 +376,8 @@ async function triggerKlaviyoExpiration(options: {
     tier_id: options.tier.id,
     tier_name: options.tier.name,
     communication_preferences: options.preferences,
+    // Flattened SMS opt-in properties (for Klaviyo conditional splits)
+    ...flattenSMSOptInProperties(options.preferences),
   };
 
   const eventProperties = {
@@ -386,13 +391,45 @@ async function triggerKlaviyoExpiration(options: {
   };
 
   try {
-    await provider.updateProfile({
+    const profileId = await provider.updateProfile({
       email: options.customer.email,
       phone: options.customer.phone || undefined,
       firstName: options.customer.firstName,
       lastName: options.customer.lastName,
       properties: profileProperties,
+      externalId: options.customer.crmId, // Use CRM customer ID to help Klaviyo merge profiles
     });
+
+    // Ensure profile is subscribed to email and SMS (transactional) for flows to send
+    if (profileId && provider instanceof KlaviyoProvider) {
+      // Subscribe to SMS if transactional or marketing is enabled
+      const smsChannels: ('transactional' | 'marketing')[] = [];
+      if (options.preferences.smsTransactional) {
+        smsChannels.push('transactional');
+      }
+      if (options.preferences.smsMarketing) {
+        smsChannels.push('marketing');
+      }
+      const shouldSubscribeSMS = options.customer.phone && smsChannels.length > 0;
+      
+      // Format birthdate as YYYY-MM-DD if available (optional - may not be in customer data)
+      let birthdate: string | undefined;
+      const customerWithBirthdate = options.customer as typeof options.customer & { birthdate?: string | null };
+      if (customerWithBirthdate.birthdate) {
+        const date = new Date(customerWithBirthdate.birthdate);
+        birthdate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      }
+      
+      await provider.subscribeProfileToChannels({
+        profileId,
+        email: options.customer.email,
+        phoneNumber: options.customer.phone || undefined,
+        birthdate,
+        emailChannel: 'marketing', // Klaviyo only supports 'marketing' for email (even for transactional flows)
+        sms: shouldSubscribeSMS ? smsChannels : undefined, // Subscribe to requested SMS channels
+        consentedAt: new Date().toISOString(),
+      });
+    }
 
     await provider.trackEvent({
       event: KLAVIYO_METRICS.EXPIRATION_NOTICE,
@@ -558,6 +595,8 @@ async function triggerKlaviyoUpgrade(options: {
     tier_min_purchase_amount: options.newTier.minPurchaseAmount,
     communication_preferences: options.preferences,
     include_marketing_flows: options.providerData?.includeMarketing ?? false,
+    // Flattened SMS opt-in properties (for Klaviyo conditional splits)
+    ...flattenSMSOptInProperties(options.preferences),
   };
 
   const eventProperties = {
@@ -572,13 +611,45 @@ async function triggerKlaviyoUpgrade(options: {
   };
 
   try {
-    await provider.updateProfile({
+    const profileId = await provider.updateProfile({
       email: options.customer.email,
       phone: options.customer.phone || undefined,
       firstName: options.customer.firstName,
       lastName: options.customer.lastName,
       properties: profileProperties,
+      externalId: options.customer.crmId, // Use CRM customer ID to help Klaviyo merge profiles
     });
+
+    // Ensure profile is subscribed to email and SMS (transactional) for flows to send
+    if (profileId && provider instanceof KlaviyoProvider) {
+      // Subscribe to SMS if transactional or marketing is enabled
+      const smsChannels: ('transactional' | 'marketing')[] = [];
+      if (options.preferences.smsTransactional) {
+        smsChannels.push('transactional');
+      }
+      if (options.preferences.smsMarketing) {
+        smsChannels.push('marketing');
+      }
+      const shouldSubscribeSMS = options.customer.phone && smsChannels.length > 0;
+      
+      // Format birthdate as YYYY-MM-DD if available (optional - may not be in customer data)
+      let birthdate: string | undefined;
+      const customerWithBirthdate = options.customer as typeof options.customer & { birthdate?: string | null };
+      if (customerWithBirthdate.birthdate) {
+        const date = new Date(customerWithBirthdate.birthdate);
+        birthdate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      }
+      
+      await provider.subscribeProfileToChannels({
+        profileId,
+        email: options.customer.email,
+        phoneNumber: options.customer.phone || undefined,
+        birthdate,
+        emailChannel: 'marketing', // Klaviyo only supports 'marketing' for email (even for transactional flows)
+        sms: shouldSubscribeSMS ? smsChannels : undefined, // Subscribe to requested SMS channels
+        consentedAt: new Date().toISOString(),
+      });
+    }
 
     await provider.trackEvent({
       event: KLAVIYO_METRICS.TIER_UPGRADE,
@@ -1011,8 +1082,10 @@ async function triggerKlaviyoMonthlyStatus(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailMonthlyStatus === false) {
-    console.info('Skipping Klaviyo monthly status: member unsubscribed or preferences disabled.');
+  // Transactional emails (monthly status) are always sent (required for membership management)
+  // Only skip if member has unsubscribed from all communications
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Klaviyo monthly status: member unsubscribed from all communications.');
     return;
   }
 
@@ -1044,6 +1117,8 @@ async function triggerKlaviyoMonthlyStatus(options: {
     tier_discount_percentage: options.tier.discountPercentage ?? 0,
     communication_preferences: options.preferences,
     include_marketing_flows: options.providerData?.includeMarketing ?? false,
+    // Flattened SMS opt-in properties (for Klaviyo conditional splits)
+    ...flattenSMSOptInProperties(options.preferences),
   };
 
   if (options.nextTier) {
@@ -1062,13 +1137,45 @@ async function triggerKlaviyoMonthlyStatus(options: {
   };
 
   try {
-    await provider.updateProfile({
+    const profileId = await provider.updateProfile({
       email: options.customer.email,
       phone: options.customer.phone || undefined,
       firstName: options.customer.firstName,
       lastName: options.customer.lastName,
       properties: profileProperties,
+      externalId: options.customer.crmId, // Use CRM customer ID to help Klaviyo merge profiles
     });
+
+    // Ensure profile is subscribed to email and SMS (transactional) for flows to send
+    if (profileId && provider instanceof KlaviyoProvider) {
+      // Subscribe to SMS if transactional or marketing is enabled
+      const smsChannels: ('transactional' | 'marketing')[] = [];
+      if (options.preferences.smsTransactional) {
+        smsChannels.push('transactional');
+      }
+      if (options.preferences.smsMarketing) {
+        smsChannels.push('marketing');
+      }
+      const shouldSubscribeSMS = options.customer.phone && smsChannels.length > 0;
+      
+      // Format birthdate as YYYY-MM-DD if available (optional - may not be in customer data)
+      let birthdate: string | undefined;
+      const customerWithBirthdate = options.customer as typeof options.customer & { birthdate?: string | null };
+      if (customerWithBirthdate.birthdate) {
+        const date = new Date(customerWithBirthdate.birthdate);
+        birthdate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      }
+      
+      await provider.subscribeProfileToChannels({
+        profileId,
+        email: options.customer.email,
+        phoneNumber: options.customer.phone || undefined,
+        birthdate,
+        emailChannel: 'marketing', // Klaviyo only supports 'marketing' for email (even for transactional flows)
+        sms: shouldSubscribeSMS ? smsChannels : undefined, // Subscribe to requested SMS channels
+        consentedAt: new Date().toISOString(),
+      });
+    }
 
     await provider.trackEvent({
       event: KLAVIYO_METRICS.MONTHLY_STATUS,
@@ -1087,6 +1194,9 @@ async function triggerKlaviyoMonthlyStatus(options: {
       properties: eventProperties,
       time: new Date().toISOString(),
     });
+
+    // Note: SMS opt-in requests for Klaviyo are handled by Klaviyo flows via conditional splits
+    // The flow should check smsOptInConfirmedAt and send opt-in request if needed
 
     console.info('Klaviyo monthly status sent', {
       clientId: options.clientId,
@@ -1221,8 +1331,10 @@ async function triggerSendGridMonthlyStatus(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailMonthlyStatus === false) {
-    console.info('Skipping SendGrid monthly status: member unsubscribed or preferences disabled.');
+  // Transactional emails (monthly status) are always sent (required for membership management)
+  // Only skip if member has unsubscribed from all communications
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping SendGrid monthly status: member unsubscribed from all communications.');
     return;
   }
 
@@ -1345,8 +1457,10 @@ async function triggerSendGridExpiration(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailExpirationWarnings === false) {
-    console.info('Skipping SendGrid expiration notification: member unsubscribed or preferences disabled.');
+  // Transactional emails (expiration notices) are always sent (required for membership management)
+  // Only skip if member has unsubscribed from all communications
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping SendGrid expiration notification: member unsubscribed from all communications.');
     return;
   }
 
@@ -1713,8 +1827,10 @@ async function triggerKlaviyoExpirationWarning(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailExpirationWarnings === false) {
-    console.info('Skipping Klaviyo expiration warning: member unsubscribed or preferences disabled.');
+  // Transactional emails (expiration warnings) are always sent (required for membership management)
+  // Only skip if member has unsubscribed from all communications
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Klaviyo expiration warning: member unsubscribed from all communications.');
     return;
   }
 
@@ -1743,6 +1859,8 @@ async function triggerKlaviyoExpirationWarning(options: {
     tier_min_purchase_amount: options.tier.minPurchaseAmount,
     communication_preferences: options.preferences,
     include_marketing_flows: options.providerData?.includeMarketing ?? false,
+    // Flattened SMS opt-in properties (for Klaviyo conditional splits)
+    ...flattenSMSOptInProperties(options.preferences),
   };
 
   const eventProperties = {
@@ -1754,13 +1872,45 @@ async function triggerKlaviyoExpirationWarning(options: {
   };
 
   try {
-    await provider.updateProfile({
+    const profileId = await provider.updateProfile({
       email: options.customer.email,
       phone: options.customer.phone || undefined,
       firstName: options.customer.firstName,
       lastName: options.customer.lastName,
       properties: profileProperties,
+      externalId: options.customer.crmId, // Use CRM customer ID to help Klaviyo merge profiles
     });
+
+    // Ensure profile is subscribed to email and SMS (transactional) for flows to send
+    if (profileId && provider instanceof KlaviyoProvider) {
+      // Subscribe to SMS if transactional or marketing is enabled
+      const smsChannels: ('transactional' | 'marketing')[] = [];
+      if (options.preferences.smsTransactional) {
+        smsChannels.push('transactional');
+      }
+      if (options.preferences.smsMarketing) {
+        smsChannels.push('marketing');
+      }
+      const shouldSubscribeSMS = options.customer.phone && smsChannels.length > 0;
+      
+      // Format birthdate as YYYY-MM-DD if available (optional - may not be in customer data)
+      let birthdate: string | undefined;
+      const customerWithBirthdate = options.customer as typeof options.customer & { birthdate?: string | null };
+      if (customerWithBirthdate.birthdate) {
+        const date = new Date(customerWithBirthdate.birthdate);
+        birthdate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+      }
+      
+      await provider.subscribeProfileToChannels({
+        profileId,
+        email: options.customer.email,
+        phoneNumber: options.customer.phone || undefined,
+        birthdate,
+        emailChannel: 'marketing', // Klaviyo only supports 'marketing' for email (even for transactional flows)
+        sms: shouldSubscribeSMS ? smsChannels : undefined, // Subscribe to requested SMS channels
+        consentedAt: new Date().toISOString(),
+      });
+    }
 
     await provider.trackEvent({
       event: KLAVIYO_METRICS.EXPIRATION_WARNING,
@@ -1778,6 +1928,9 @@ async function triggerKlaviyoExpirationWarning(options: {
       properties: eventProperties,
       time: new Date().toISOString(),
     });
+
+    // Note: SMS opt-in requests for Klaviyo are handled by Klaviyo flows via conditional splits
+    // The flow should check smsOptInConfirmedAt and send opt-in request if needed
 
     console.info('Klaviyo expiration warning sent', {
       clientId: options.clientId,

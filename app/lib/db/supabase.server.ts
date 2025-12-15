@@ -572,13 +572,15 @@ export async function getCommunicationPreferences(
   }
 
   return normalizeCommunicationPreferences({
-    emailMonthlyStatus: data.email_monthly_status ?? undefined,
-    emailExpirationWarnings: data.email_expiration_warnings ?? undefined,
-    emailPromotions: data.email_promotions ?? undefined,
-    smsMonthlyStatus: data.sms_monthly_status ?? undefined,
-    smsExpirationWarnings: data.sms_expiration_warnings ?? undefined,
-    smsPromotions: data.sms_promotions ?? undefined,
+    emailMarketing: data.email_marketing ?? undefined,
+    smsTransactional: data.sms_transactional ?? undefined,
+    smsMarketing: data.sms_marketing ?? undefined,
     unsubscribedAll: data.unsubscribed_all ?? undefined,
+    smsOptedInAt: data.sms_opted_in_at ?? undefined,
+    smsOptInMethod: data.sms_opt_in_method ?? undefined,
+    smsOptInSource: data.sms_opt_in_source ?? undefined,
+    smsOptInRequestSentAt: data.sms_opt_in_request_sent_at ?? undefined,
+    smsOptInConfirmedAt: data.sms_opt_in_confirmed_at ?? undefined,
   });
 }
 
@@ -588,17 +590,31 @@ export async function upsertCommunicationPreferences(
 ): Promise<void> {
   const supabase = getSupabaseClient();
 
-  const payload = {
+  const payload: any = {
     customer_id: customerId,
-    email_monthly_status: preferences.emailMonthlyStatus,
-    email_expiration_warnings: preferences.emailExpirationWarnings,
-    email_promotions: preferences.emailPromotions,
-    sms_monthly_status: preferences.smsMonthlyStatus,
-    sms_expiration_warnings: preferences.smsExpirationWarnings,
-    sms_promotions: preferences.smsPromotions,
+    email_marketing: preferences.emailMarketing,
+    sms_transactional: preferences.smsTransactional,
+    sms_marketing: preferences.smsMarketing,
     unsubscribed_all: preferences.unsubscribedAll,
     updated_at: new Date().toISOString(),
   };
+
+  // Add SMS opt-in tracking fields if provided
+  if (preferences.smsOptedInAt !== undefined) {
+    payload.sms_opted_in_at = preferences.smsOptedInAt;
+  }
+  if (preferences.smsOptInMethod !== undefined) {
+    payload.sms_opt_in_method = preferences.smsOptInMethod;
+  }
+  if (preferences.smsOptInSource !== undefined) {
+    payload.sms_opt_in_source = preferences.smsOptInSource;
+  }
+  if (preferences.smsOptInRequestSentAt !== undefined) {
+    payload.sms_opt_in_request_sent_at = preferences.smsOptInRequestSentAt;
+  }
+  if (preferences.smsOptInConfirmedAt !== undefined) {
+    payload.sms_opt_in_confirmed_at = preferences.smsOptInConfirmedAt;
+  }
 
   const { error } = await supabase
     .from('communication_preferences')
@@ -983,6 +999,7 @@ export interface EnrollmentDraft {
     firstName: string;
     lastName: string;
     phone?: string;
+    birthdate?: string;      // ISO date string (YYYY-MM-DD) - Required for wine sales
     ltv?: number;            // Customer's lifetime value
     isExisting: boolean;     // Whether customer already exists
     billingAddressId?: string;   // C7 billing address ID

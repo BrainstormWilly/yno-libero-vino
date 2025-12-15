@@ -55,6 +55,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const firstName = formData.get('first_name') as string;
   const lastName = formData.get('last_name') as string;
   const phone = formData.get('phone') as string;
+  const birthdate = formData.get('birthdate') as string;
   const address1 = formData.get('address_1') as string;
   const address2 = formData.get('address_2') as string;
   const city = formData.get('city') as string;
@@ -64,28 +65,22 @@ export async function action({ request }: ActionFunctionArgs) {
   const unsubscribedAll = parseBool(formData.get('pref_unsubscribed_all'));
   const preferences = unsubscribedAll
     ? {
-        emailMonthlyStatus: false,
-        emailExpirationWarnings: false,
-        emailPromotions: false,
-        smsMonthlyStatus: false,
-        smsExpirationWarnings: false,
-        smsPromotions: false,
+        emailMarketing: false,
+        smsTransactional: false,
+        smsMarketing: false,
         unsubscribedAll: true,
       }
     : {
-        emailMonthlyStatus: parseBool(formData.get('pref_email_monthly_status')),
-        emailExpirationWarnings: parseBool(formData.get('pref_email_expiration_warnings')),
-        emailPromotions: parseBool(formData.get('pref_email_promotions')),
-        smsMonthlyStatus: parseBool(formData.get('pref_sms_monthly_status')),
-        smsExpirationWarnings: parseBool(formData.get('pref_sms_expiration_warnings')),
-        smsPromotions: parseBool(formData.get('pref_sms_promotions')),
+        emailMarketing: parseBool(formData.get('pref_email_marketing')),
+        smsTransactional: parseBool(formData.get('pref_sms_transactional')),
+        smsMarketing: parseBool(formData.get('pref_sms_marketing')),
         unsubscribedAll: false,
       };
   
-  if (!email || !firstName || !lastName || !address1 || !city || !state || !zip) {
+  if (!email || !firstName || !lastName || !birthdate || !address1 || !city || !state || !zip) {
     return {
       success: false,
-      error: 'Email, name, and complete billing address are required',
+      error: 'Email, name, birthdate, and complete billing address are required',
     };
   }
   
@@ -124,6 +119,7 @@ export async function action({ request }: ActionFunctionArgs) {
         firstName: result.customer.firstName,
         lastName: result.customer.lastName,
         phone: result.customer.phone,
+        birthdate, // Required for wine sales and Klaviyo SMS age-gating
         ltv: draft?.tier?.purchaseAmount || 0,
         isExisting: false,
         billingAddressId: result.billingAddressId,
@@ -168,22 +164,16 @@ export default function CustomerDetails() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  const [birthdate, setBirthdate] = useState('');
   const [address1, setAddress1] = useState('');
   const [address2, setAddress2] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [zip, setZip] = useState('');
   const defaultPreferences = draft?.preferences ?? DEFAULT_COMMUNICATION_PREFERENCES;
-  const [emailMonthlyStatus, setEmailMonthlyStatus] = useState(defaultPreferences.emailMonthlyStatus);
-  const [emailExpirationWarnings, setEmailExpirationWarnings] = useState(
-    defaultPreferences.emailExpirationWarnings
-  );
-  const [emailPromotions, setEmailPromotions] = useState(defaultPreferences.emailPromotions);
-  const [smsMonthlyStatus, setSmsMonthlyStatus] = useState(defaultPreferences.smsMonthlyStatus);
-  const [smsExpirationWarnings, setSmsExpirationWarnings] = useState(
-    defaultPreferences.smsExpirationWarnings
-  );
-  const [smsPromotions, setSmsPromotions] = useState(defaultPreferences.smsPromotions);
+  const [emailMarketing, setEmailMarketing] = useState(defaultPreferences.emailMarketing);
+  const [smsTransactional, setSmsTransactional] = useState(defaultPreferences.smsTransactional);
+  const [smsMarketing, setSmsMarketing] = useState(defaultPreferences.smsMarketing);
   const [unsubscribedAll, setUnsubscribedAll] = useState(defaultPreferences.unsubscribedAll);
   const [showUnsubscribeModal, setShowUnsubscribeModal] = useState(false);
 
@@ -196,12 +186,9 @@ export default function CustomerDetails() {
 
   const confirmUnsubscribeAll = () => {
     setUnsubscribedAll(true);
-    setEmailMonthlyStatus(false);
-    setEmailExpirationWarnings(false);
-    setEmailPromotions(false);
-    setSmsMonthlyStatus(false);
-    setSmsExpirationWarnings(false);
-    setSmsPromotions(false);
+    setEmailMarketing(false);
+    setSmsTransactional(false);
+    setSmsMarketing(false);
     setShowUnsubscribeModal(false);
   };
 
@@ -298,55 +285,53 @@ export default function CustomerDetails() {
                 autoComplete="tel"
               />
               
+              <TextField
+                label="Date of Birth"
+                type="date"
+                value={birthdate}
+                onChange={setBirthdate}
+                autoComplete="bday"
+                requiredIndicator
+                helpText="Required for age verification (wine sales)"
+              />
+              
               <Divider />
               
               <Text variant="headingMd" as="h3">
                 Communication Preferences
               </Text>
               <Text variant="bodySm" as="p" tone="subdued">
-                Confirm with the member how they would like to hear from the winery. Preferences sync to LiberoVino and Klaviyo.
+                Confirm with the member how they would like to hear from LiberoVino. Transactional emails (monthly status, expiration warnings) are required for membership management. Preferences sync to LiberoVino and Klaviyo.
               </Text>
               
+              <Banner tone="info">
+                <Text variant="bodySm" as="p">
+                  <strong>Transactional emails are automatic:</strong> Monthly status updates and expiration warnings are required for membership management and will be sent automatically.
+                </Text>
+              </Banner>
+              
               <Checkbox
-                label="Email monthly status updates"
-                checked={emailMonthlyStatus}
-                onChange={handlePreferenceChange(setEmailMonthlyStatus)}
-                helpText="Sends the monthly liberation status email seeded in Klaviyo."
-                disabled={unsubscribedAll}
-              />
-              <Checkbox
-                label="Email duration reminders"
-                checked={emailExpirationWarnings}
-                onChange={handlePreferenceChange(setEmailExpirationWarnings)}
-                helpText="Alerts members before their duration ends so they can extend on their schedule."
-                disabled={unsubscribedAll}
-              />
-              <Checkbox
-                label="Email promotions and spotlights"
-                checked={emailPromotions}
-                onChange={handlePreferenceChange(setEmailPromotions)}
-                helpText="Includes optional marketing flows like Sales Spotlight and Annual Re-Sign."
+                label="Email marketing"
+                checked={emailMarketing}
+                onChange={handlePreferenceChange(setEmailMarketing)}
+                helpText="Product suggestions and LiberoVino-specific promotions."
                 disabled={unsubscribedAll}
               />
               
               <Divider />
               
               <Checkbox
-                label="SMS monthly status updates"
-                checked={smsMonthlyStatus}
-                onChange={handlePreferenceChange(setSmsMonthlyStatus)}
+                label="SMS transactional"
+                checked={smsTransactional}
+                onChange={handlePreferenceChange(setSmsTransactional)}
+                helpText="Monthly status updates and expiration warnings via SMS."
                 disabled={unsubscribedAll}
               />
               <Checkbox
-                label="SMS duration reminders"
-                checked={smsExpirationWarnings}
-                onChange={handlePreferenceChange(setSmsExpirationWarnings)}
-                disabled={unsubscribedAll}
-              />
-              <Checkbox
-                label="SMS promotions"
-                checked={smsPromotions}
-                onChange={handlePreferenceChange(setSmsPromotions)}
+                label="SMS marketing"
+                checked={smsMarketing}
+                onChange={handlePreferenceChange(setSmsMarketing)}
+                helpText="Promotions and product suggestions via SMS."
                 disabled={unsubscribedAll}
               />
               
@@ -415,6 +400,7 @@ export default function CustomerDetails() {
               <input type="hidden" name="first_name" value={firstName} />
               <input type="hidden" name="last_name" value={lastName} />
               <input type="hidden" name="phone" value={phone} />
+              <input type="hidden" name="birthdate" value={birthdate} />
               <input type="hidden" name="address_1" value={address1} />
               <input type="hidden" name="address_2" value={address2} />
               <input type="hidden" name="city" value={city} />
@@ -422,33 +408,18 @@ export default function CustomerDetails() {
               <input type="hidden" name="zip" value={zip} />
               <input
                 type="hidden"
-                name="pref_email_monthly_status"
-                value={emailMonthlyStatus ? 'true' : 'false'}
+                name="pref_email_marketing"
+                value={emailMarketing ? 'true' : 'false'}
               />
               <input
                 type="hidden"
-                name="pref_email_expiration_warnings"
-                value={emailExpirationWarnings ? 'true' : 'false'}
+                name="pref_sms_transactional"
+                value={smsTransactional ? 'true' : 'false'}
               />
               <input
                 type="hidden"
-                name="pref_email_promotions"
-                value={emailPromotions ? 'true' : 'false'}
-              />
-              <input
-                type="hidden"
-                name="pref_sms_monthly_status"
-                value={smsMonthlyStatus ? 'true' : 'false'}
-              />
-              <input
-                type="hidden"
-                name="pref_sms_expiration_warnings"
-                value={smsExpirationWarnings ? 'true' : 'false'}
-              />
-              <input
-                type="hidden"
-                name="pref_sms_promotions"
-                value={smsPromotions ? 'true' : 'false'}
+                name="pref_sms_marketing"
+                value={smsMarketing ? 'true' : 'false'}
               />
               <input
                 type="hidden"
@@ -460,7 +431,7 @@ export default function CustomerDetails() {
                 <Button
                   variant="primary"
                   submit
-                  disabled={!email || !firstName || !lastName || !address1 || !city || !state || !zip}
+                  disabled={!email || !firstName || !lastName || !birthdate || !address1 || !city || !state || !zip}
                   size="large"
                 >
                   Continue to Additional Addresses →
