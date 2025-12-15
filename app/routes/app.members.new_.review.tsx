@@ -152,10 +152,13 @@ export async function action({ request }: ActionFunctionArgs) {
           client?.org_name
         );
         
+        // Fetch fresh preferences to include smsOptInRequestSentAt that was just set
+        const freshPreferences = await db.getCommunicationPreferences(lvCustomer.id);
+        
         // Mark that they opted in via signup form
         updatedPreferences = {
-          ...preferences,
-          smsOptedInAt: new Date().toISOString(),
+          ...freshPreferences,
+          smsOptedInAt: freshPreferences.smsOptedInAt || new Date().toISOString(),
           smsOptInMethod: 'signup_form',
           smsOptInSource: '/app/members/new',
         };

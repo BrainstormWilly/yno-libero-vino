@@ -60,7 +60,10 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     } else if (message === 'STOP' || message === 'UNSUBSCRIBE' || message === 'QUIT') {
       // Handle opt-out - disable both transactional and marketing SMS
+      // Fetch current preferences first to preserve other fields
+      const currentPreferences = await db.getCommunicationPreferences(customer.id);
       await db.upsertCommunicationPreferences(customer.id, {
+        ...currentPreferences,
         smsTransactional: false,
         smsMarketing: false,
       });

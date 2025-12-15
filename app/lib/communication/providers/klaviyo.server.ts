@@ -330,12 +330,36 @@ export class KlaviyoProvider implements CommunicationProvider {
         currentSubscriptionDate = twoDaysAgo;
       }
       
-      // Ensure consented_at is at least 1 day before the current subscription date
-      // This ensures it's before Klaviyo's reference date
-      const consentedAtDate = new Date(currentSubscriptionDate.getTime() - (24 * 60 * 60 * 1000));
-      const consentedAt = consentedAtDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
-      
-      console.info(`[subscribeProfileToChannels] Using consented_at: ${consentedAt} (profileId: ${params.profileId}, profile updated_at: ${profileUpdatedAt?.toISOString() || 'unknown'}, current subscription date: ${currentSubscriptionDate.toISOString()}, historical_import: true)`);
+      // Use provided consentedAt if available, otherwise calculate from profile updated_at
+      // For historical_import, Klaviyo requires consented_at to be BEFORE the "current subscription date"
+      let consentedAt: string;
+      if (params.consentedAt) {
+        // Use the provided consent timestamp (e.g., actual SMS opt-in time for TCPA compliance)
+        // But ensure it's before Klaviyo's "current subscription date" for historical_import
+        const providedConsentDate = new Date(params.consentedAt);
+        const minConsentDate = new Date(currentSubscriptionDate.getTime() - (24 * 60 * 60 * 1000));
+        
+        // If provided date is valid (before current subscription date), use it
+        // Otherwise, adjust to minimum required date
+        let finalConsentDate: Date;
+        if (providedConsentDate < currentSubscriptionDate) {
+          // Provided date is valid - use it as-is
+          finalConsentDate = providedConsentDate;
+        } else {
+          // Provided date is too recent - adjust to minimum required date
+          finalConsentDate = minConsentDate;
+        }
+        
+        consentedAt = finalConsentDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        
+        console.info(`[subscribeProfileToChannels] Using provided consented_at: ${params.consentedAt}, final: ${consentedAt} (profileId: ${params.profileId}, profile updated_at: ${profileUpdatedAt?.toISOString() || 'unknown'}, current subscription date: ${currentSubscriptionDate.toISOString()}, historical_import: true)`);
+      } else {
+        // Calculate consented_at to be at least 1 day before the current subscription date
+        const consentedAtDate = new Date(currentSubscriptionDate.getTime() - (24 * 60 * 60 * 1000));
+        consentedAt = consentedAtDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+        
+        console.info(`[subscribeProfileToChannels] Using calculated consented_at: ${consentedAt} (profileId: ${params.profileId}, profile updated_at: ${profileUpdatedAt?.toISOString() || 'unknown'}, current subscription date: ${currentSubscriptionDate.toISOString()}, historical_import: true)`);
+      }
       
       // Email subscriptions: Klaviyo API only supports 'marketing' channel
       // We always subscribe to marketing to enable email sending (even for transactional flows)
