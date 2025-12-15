@@ -46,6 +46,7 @@ export async function sendSMSOptInRequest(
 
 /**
  * Confirm SMS opt-in (called when customer replies YES or confirms via web)
+ * Enables transactional SMS (monthly status and expiration warnings)
  */
 export async function confirmSMSOptIn(
   customerId: string,
@@ -55,8 +56,7 @@ export async function confirmSMSOptIn(
   
   await db.upsertCommunicationPreferences(customerId, {
     ...preferences,
-    smsMonthlyStatus: true, // Enable SMS monthly status
-    smsExpirationWarnings: true, // Enable SMS expiration warnings
+    smsTransactional: true, // Enable transactional SMS (monthly status and expiration warnings)
     smsOptedInAt: preferences.smsOptedInAt || new Date().toISOString(),
     smsOptInMethod: method,
     smsOptInConfirmedAt: new Date().toISOString(),
@@ -68,15 +68,14 @@ export async function confirmSMSOptIn(
  */
 export function shouldSendSMSOptIn(
   phone: string | null | undefined,
-  preferences: { smsMonthlyStatus?: boolean; smsExpirationWarnings?: boolean; smsPromotions?: boolean }
+  preferences: { smsTransactional?: boolean; smsMarketing?: boolean }
 ): boolean {
   if (!phone) return false;
   
   // Send if any SMS preference is enabled
   return !!(
-    preferences.smsMonthlyStatus ||
-    preferences.smsExpirationWarnings ||
-    preferences.smsPromotions
+    preferences.smsTransactional ||
+    preferences.smsMarketing
   );
 }
 

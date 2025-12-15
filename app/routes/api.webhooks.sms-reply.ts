@@ -59,11 +59,10 @@ export async function action({ request }: ActionFunctionArgs) {
         customerId: customer.id 
       });
     } else if (message === 'STOP' || message === 'UNSUBSCRIBE' || message === 'QUIT') {
-      // Handle opt-out
+      // Handle opt-out - disable both transactional and marketing SMS
       await db.upsertCommunicationPreferences(customer.id, {
-        smsMonthlyStatus: false,
-        smsExpirationWarnings: false,
-        smsPromotions: false,
+        smsTransactional: false,
+        smsMarketing: false,
       });
       console.info(`SMS opt-out processed for customer ${customer.id} via ${provider}`);
       
