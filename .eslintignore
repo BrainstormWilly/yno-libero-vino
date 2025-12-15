@@ -1,0 +1,9 @@
+node_modules/
+build/
+.react-router/
+*.config.js
+*.config.ts
+jest.config.cjs
+vite.config.ts
+react-router.config.ts
+

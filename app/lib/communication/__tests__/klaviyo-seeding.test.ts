@@ -84,9 +84,11 @@ describe('seedKlaviyoResources', () => {
       fromName: 'LiberoVino',
     });
 
-    expect(Object.keys(result.metrics ?? {})).toHaveLength(TRANSACTIONAL_METRICS.length);
-    expect(Object.keys(result.templates ?? {})).toHaveLength(TRANSACTIONAL_METRICS.length);
-    expect(Object.keys(result.flows ?? {})).toHaveLength(TRANSACTIONAL_METRICS.length);
+    // TEST is always included, so add 1 to the expected length
+    const expectedLength = TRANSACTIONAL_METRICS.length + 1;
+    expect(Object.keys(result.metrics ?? {})).toHaveLength(expectedLength);
+    expect(Object.keys(result.templates ?? {})).toHaveLength(expectedLength);
+    expect(Object.keys(result.flows ?? {})).toHaveLength(expectedLength);
 
     for (const metricKey of TRANSACTIONAL_METRICS) {
       const metricName = KLAVIYO_METRICS[metricKey];
@@ -111,8 +113,9 @@ describe('seedKlaviyoResources', () => {
       includeMarketing: true,
     });
 
+    // TEST is always included, so add 1 to the expected length
     const expectedLength =
-      TRANSACTIONAL_METRICS.length + MARKETING_METRICS.length;
+      TRANSACTIONAL_METRICS.length + MARKETING_METRICS.length + 1;
     expect(Object.keys(result.metrics ?? {})).toHaveLength(expectedLength);
     expect(result.includeMarketing).toBe(true);
 
