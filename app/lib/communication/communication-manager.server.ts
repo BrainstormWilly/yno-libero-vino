@@ -179,12 +179,12 @@ export class CommunicationManager {
   async updateProfile(
     config: CommunicationConfig | null | undefined,
     params: UpdateProfileParams
-  ): Promise<void> {
+  ): Promise<string | null> {
     const provider = this.resolveEmailProvider(config);
     if (!provider.updateProfile) {
-      return;
+      return null;
     }
-    await provider.updateProfile(params);
+    return provider.updateProfile(params);
   }
 }
 
