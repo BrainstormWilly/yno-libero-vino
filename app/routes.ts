@@ -34,7 +34,9 @@ export default [
   ]),
   route("home", "routes/home.tsx"),
   route("shp/auth", "routes/shp.auth.tsx"),
-  route("docs/sms-opt-in", "routes/docs.sms-opt-in.tsx"),
+  route("docs", "routes/docs.tsx", [
+    route("sms-opt-in", "routes/docs.sms-opt-in.tsx"),
+  ]),
   route("webhooks", "routes/webhooks._index.tsx", [
     route("c7", "routes/webhooks.c7.tsx"),
     route("shp", "routes/webhooks.shp.tsx"),
