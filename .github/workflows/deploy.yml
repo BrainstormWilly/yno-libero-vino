@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          fetch-depth: 0  # Fetch full history for Heroku deployment
       
       - name: Verify secrets are set
         run: |
