@@ -3,7 +3,7 @@
  * Shows how to integrate the discount form into a tier creation flow
  */
 
-import React, { useCallback } from "react";
+import { useCallback } from "react";
 import { Page, Layout, Card, Text, BlockStack } from "@shopify/polaris";
 import DiscountForm from "./DiscountForm";
 import { useDiscount } from "~/hooks/useDiscount";
@@ -13,7 +13,7 @@ import { toShopifyDiscount } from "~/types/discount-shopify";
 
 interface DiscountFormExampleProps {
   platform: PlatformType;
-  onSave?: (discount: any) => void;
+  onSave?: (discount: unknown) => void;
 }
 
 /**

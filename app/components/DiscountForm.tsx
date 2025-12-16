@@ -1,15 +1,13 @@
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Card,
   FormLayout,
   TextField,
   Select,
   Button,
-  ButtonGroup,
   Text,
   BlockStack,
   InlineStack,
-  Divider,
 } from "@shopify/polaris";
 import type { Discount, DiscountValueType, MinimumRequirementType } from "~/types/discount";
 

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Card,
   BlockStack,
@@ -138,14 +138,14 @@ export default function ProductCollectionSelector({
       // If query is empty, do a full browse; otherwise search with query
       Promise.resolve(onLoadProducts(debouncedSearchQuery.trim() || undefined)).catch(() => {});
     }
-  }, [debouncedSearchQuery]); // Only depend on debouncedSearchQuery to avoid infinite loops
+  }, [debouncedSearchQuery, onLoadProducts, selectedTab, hasSearchedProducts]);
   
   useEffect(() => {
     if (onLoadCollections && selectedTab === 1 && hasSearchedCollections) {
       // If query is empty, do a full browse; otherwise search with query
       Promise.resolve(onLoadCollections(debouncedSearchQuery.trim() || undefined)).catch(() => {});
     }
-  }, [debouncedSearchQuery]); // Only depend on debouncedSearchQuery to avoid infinite loops
+  }, [debouncedSearchQuery, onLoadCollections, selectedTab, hasSearchedCollections]);
 
   const filteredProducts = availableProducts.filter((product) =>
     product.title.toLowerCase().includes(searchQuery.toLowerCase())

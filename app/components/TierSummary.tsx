@@ -1,4 +1,4 @@
-import { Card, BlockStack, Text, Badge, InlineStack, InlineGrid, Box, Divider, List } from '@shopify/polaris';
+import { Card, BlockStack, Text, Badge, InlineGrid, Box, Divider } from '@shopify/polaris';
 
 interface TierSummaryProps {
   tier: {
