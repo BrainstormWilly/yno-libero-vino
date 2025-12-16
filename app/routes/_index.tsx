@@ -1,4 +1,4 @@
-import { type LoaderFunctionArgs, redirect } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { useLoaderData, Link } from 'react-router';
 import { 
   Page, 
@@ -41,6 +41,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     subdomainInfo,
     isSingleCrm: false
   };
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  // Handle POST requests gracefully - likely bots/scanners probing the site
+  if (request.method === "POST") {
+    return new Response("Method Not Allowed", { 
+      status: 405,
+      headers: { "Allow": "GET" }
+    });
+  }
+  return null;
 }
 
 export default function Index() {
