@@ -1,10 +1,8 @@
 name: Deploy to Heroku
 
-# Disabled - using Heroku's native GitHub integration instead
-# Re-enable if you want GitHub Actions to handle deployment
 on:
-  # push:
-  #   branches: [ main ]
+  push:
+    branches: [ main ]
   workflow_dispatch:  # Keep manual trigger option
 
 jobs:
@@ -30,31 +28,23 @@ jobs:
           sleep 30
           curl -f https://yno-libero-vino.herokuapp.com/health || exit 1
         continue-on-error: true
-      
-      - name: Notify deployment
-        uses: 8398a7/action-slack@v3
-        if: always()
-        with:
-          status: ${{ job.status }}
-          text: 'Deployment to production'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-        continue-on-error: true
 
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment:
-      name: staging
-      url: https://yno-libero-vino-staging.herokuapp.com
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Deploy to Heroku Staging
-        uses: akhileshns/heroku-deploy@v3.13.15
-        with:
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: ${{ secrets.HEROKU_STAGING_APP_NAME }}
-          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+  # Staging deployment - uncomment when staging app is created
+  # deploy-staging:
+  #   name: Deploy to Staging
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/develop'
+  #   environment:
+  #     name: staging
+  #     url: https://yno-libero-vino-staging.herokuapp.com
+  #   
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     
+  #     - name: Deploy to Heroku Staging
+  #       uses: akhileshns/heroku-deploy@v3.13.15
+  #       with:
+  #         heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+  #         heroku_app_name: ${{ secrets.HEROKU_STAGING_APP_NAME }}
+  #         heroku_email: ${{ secrets.HEROKU_EMAIL }}
 
