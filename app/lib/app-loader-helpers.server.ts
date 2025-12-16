@@ -25,7 +25,7 @@ export async function handleDevMode(request: Request, url: URL): Promise<LoaderR
   }
   
   // Check if we already have a session in the URL
-  let session = await getAppSession(request, 'commerce7');
+  const session = await getAppSession(request, 'commerce7');
   
   if (!session) {
     // No session yet - create a real one and redirect with session ID

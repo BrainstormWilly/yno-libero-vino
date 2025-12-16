@@ -67,14 +67,14 @@ async function importSeeds() {
 
   console.log('📊 Importing seed data...\n');
   console.log('📁 File:', seedFilePath);
-  console.log('🗄️  Database:', dbUrl.replace(/:[^:@]+@/, ':****@'), '\n');
+  console.log('🗄️  Database:', (dbUrl || '').replace(/:[^:@]+@/, ':****@'), '\n');
 
   try {
     // Read the SQL file
     const sqlContent = readFileSync(seedFilePath, 'utf-8');
     
     // Connect to database using postgres client
-    const sql = postgres(dbUrl, {
+    const sql = postgres(dbUrl!, {
       max: 1,
       onnotice: () => {}, // Suppress notices
     });

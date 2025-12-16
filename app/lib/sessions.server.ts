@@ -67,7 +67,7 @@ export async function getAppSession(
   }
 
   return await loadSession(sessionId);
-};
+}
 
 export function getFakeAppSession(crmType: CrmTypes): AppSessionData {
   return {

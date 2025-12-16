@@ -4,13 +4,12 @@ import type {
   EmailResult,
   TrackEventParams,
   TrackEventResult,
-} from '~/types/communication';
+ SMSParams, SMSResult } from '~/types/communication';
 
 import { createCommunicationManager } from './communication-manager.server';
 import { KLAVIYO_METRICS } from './klaviyo.constants';
 import { MAILCHIMP_TAGS } from './mailchimp.constants';
 import { ensureConfigForEmail, ensureConfigForSMS } from './communication-helpers';
-import type { SMSParams, SMSResult } from '~/types/communication';
 
 const communicationManager = createCommunicationManager();
 

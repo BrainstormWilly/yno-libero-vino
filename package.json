@@ -7,7 +7,7 @@
     "build": "react-router build",
     "dev": "react-router dev",
     "dev:ngrok": "echo 'Start Ngrok in another terminal: ngrok http 3000 --domain=${NGROK_URL:-kindly-balanced-macaw.ngrok-free.app}' && npm run dev",
-    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint app",
+    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint --max-warnings 500 'app/**/*.{ts,tsx}'",
     "start": "react-router-serve ./build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "test": "jest",

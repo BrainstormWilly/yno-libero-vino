@@ -2,6 +2,10 @@ import { Commerce7Provider } from '~/lib/crm/commerce7.server';
 import { serializeDiscount, parseDiscount, type Discount } from '~/types/discount';
 import { fromC7Coupon } from '~/types/discount-commerce7';
 import * as db from '~/lib/db/supabase.server';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 /**
  * Gets client data from Supabase

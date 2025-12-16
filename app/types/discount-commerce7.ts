@@ -346,3 +346,140 @@ export const fromC7Promotion = (c7Promotion: C7Promotion): Discount => {
   return discount;
 };
 
+// ============================================
+// Legacy Coupon Conversion Functions (for backward compatibility)
+// ============================================
+
+/**
+ * Convert unified Discount to C7CouponPayload (legacy coupon format)
+ * Used by tier-helpers and other legacy code that still uses coupons
+ */
+export const toC7Coupon = (discount: Discount): C7CouponPayload => {
+  // Determine discount type
+  const discountType = discount.value.type === "percentage" 
+    ? C7DiscountType.PERCENTAGE_OFF 
+    : C7DiscountType.DOLLAR_OFF;
+  
+  // Get discount value
+  const discountValue = discount.value.type === "percentage"
+    ? (discount.value.percentage || 0)
+    : c7CentsToDollars(discount.value.amount || 0);
+  
+  // Determine applies to
+  const appliesTo = discount.appliesTo.target === "shipping"
+    ? C7AppliesTo.STORE
+    : discount.appliesTo.scope === "all"
+    ? C7AppliesTo.STORE
+    : discount.appliesTo.products.length > 0
+    ? C7AppliesTo.PRODUCT
+    : C7AppliesTo.COLLECTION;
+  
+  // Get applies to object IDs
+  const appliesToObjectIds = discount.appliesTo.scope === "specific"
+    ? [
+        ...discount.appliesTo.products.map(p => p.id),
+        ...discount.appliesTo.collections.map(c => c.id),
+      ]
+    : [];
+  
+  // Determine available to (customer selection)
+  const availableTo = discount.customerSelection?.all 
+    ? C7AvailableTo.EVERYONE
+    : C7AvailableTo.TAG;
+  
+  const availableToObjectIds = discount.customerSelection?.segments.map(s => s.id) || [];
+  
+  // Cart requirement
+  const cartRequirementType = discount.minimumRequirement.type === "quantity"
+    ? C7CartRequirementType.MINIMUM_QUANTITY
+    : discount.minimumRequirement.type === "amount"
+    ? C7CartRequirementType.MINIMUM_PURCHASE
+    : C7CartRequirementType.NONE;
+  
+  const cartRequirement = discount.minimumRequirement.type === "quantity"
+    ? discount.minimumRequirement.quantity || null
+    : discount.minimumRequirement.type === "amount"
+    ? c7CentsToDollars(discount.minimumRequirement.amount || 0)
+    : null;
+  
+  return {
+    actionMessage: discount.title,
+    appliesTo,
+    appliesToObjectIds: appliesToObjectIds.length > 0 ? appliesToObjectIds : [],
+    availableTo,
+    availableToObjectIds: availableToObjectIds.length > 0 ? availableToObjectIds : [],
+    cartContainsObjectIds: null,
+    cartContainsType: "Anything",
+    cartRequirement,
+    cartRequirementCountType: C7CartRequirementCountType.ALL_ITEMS,
+    cartRequirementMaximum: null,
+    cartRequirementType,
+    code: discount.code || "",
+    discount: discountValue,
+    discountType,
+    dollarOffDiscountApplies: "All Items",
+    endDate: null,
+    excludes: null,
+    startDate: discount.startsAt.toISOString().split('T')[0],
+    status: discount.status === "active" ? C7CouponStatus.ENABLED : C7CouponStatus.DISABLED,
+    title: discount.title,
+    type: discount.appliesTo.target === "shipping" ? "Shipping" : "Product",
+    usageLimit: null,
+    usageLimitType: C7UsageLimitType.UNLIMITED,
+  };
+};
+
+/**
+ * Convert C7CouponPayload to unified Discount (legacy coupon format)
+ * Used by setup-loader-helpers and other legacy code
+ */
+export const fromC7Coupon = (coupon: C7CouponPayload): Discount => {
+  // Determine discount value
+  const value = coupon.discountType === C7DiscountType.PERCENTAGE_OFF
+    ? { type: "percentage" as const, percentage: coupon.discount }
+    : { type: "fixed-amount" as const, amount: c7DollarsToCents(coupon.discount) };
+  
+  // Determine applies to
+  const appliesToTarget = coupon.type === "Shipping" ? "shipping" : "product";
+  const appliesToScope = coupon.appliesTo === C7AppliesTo.STORE ? "all" : "specific";
+  
+  const appliesTo = {
+    target: appliesToTarget as "product" | "shipping",
+    scope: appliesToScope as "all" | "specific",
+    products: appliesToScope === "specific" && Array.isArray(coupon.appliesToObjectIds)
+      ? coupon.appliesToObjectIds.map(id => ({ id, title: "" }))
+      : [],
+    collections: [],
+  };
+  
+  // Customer segments from availableToObjectIds
+  const customerSegments = Array.isArray(coupon.availableToObjectIds)
+    ? coupon.availableToObjectIds.map(id => ({ id, name: "" }))
+    : [];
+  
+  // Minimum requirement
+  const minimumRequirement = coupon.cartRequirementType === C7CartRequirementType.MINIMUM_QUANTITY
+    ? { type: "quantity" as const, quantity: coupon.cartRequirement || undefined }
+    : coupon.cartRequirementType === C7CartRequirementType.MINIMUM_PURCHASE
+    ? { type: "amount" as const, amount: coupon.cartRequirement ? c7DollarsToCents(coupon.cartRequirement) : undefined }
+    : { type: "none" as const };
+  
+  return {
+    id: coupon.id,
+    title: coupon.title,
+    platform: "commerce7",
+    status: coupon.status === C7CouponStatus.ENABLED ? "active" : "inactive",
+    startsAt: coupon.startDate ? new Date(coupon.startDate) : new Date(),
+    value,
+    appliesTo,
+    customerSegments,
+    minimumRequirement,
+    code: coupon.code,
+    customerSelection: {
+      all: coupon.availableTo === C7AvailableTo.EVERYONE,
+      customers: [],
+      segments: customerSegments.map(s => ({ id: s.id, name: s.name || "" })),
+    },
+  };
+};
+

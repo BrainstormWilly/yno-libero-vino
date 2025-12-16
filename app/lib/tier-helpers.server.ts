@@ -40,7 +40,7 @@ export async function createTierTagAndCoupon(
     const discountWithNaming = {
       ...discount,
       title: formatCouponTitle(discount.title || tierName),
-      code: formatCouponCode(discount.code || tierName),
+      code: formatCouponCode(discount.code ?? tierName),
       // Set customer selection to use the tag
       customerSelection: {
         all: false,
@@ -185,7 +185,7 @@ export async function syncTierTagAndCoupon(
   if (existingCouponId) {
     try {
       // Try to get the coupon (this will throw if it doesn't exist)
-      await provider.getDiscount(existingCouponId);
+      await provider.getC7CouponFull(existingCouponId);
       couponId = existingCouponId;
       console.log(`✓ Found existing coupon: ${existingCouponId}`);
     } catch (error) {

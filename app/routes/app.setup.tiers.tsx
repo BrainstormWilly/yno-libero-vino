@@ -313,14 +313,14 @@ export default function SetupTiers() {
                     pressed={viewMode === 'active'}
                     onClick={() => setViewMode('active')}
                   >
-                    Active ({activeTiers.length})
+                    Active ({activeTiers.length.toString()})
                   </Button>
                   <Button
                     pressed={viewMode === 'inactive'}
                     onClick={() => setViewMode('inactive')}
                     disabled={inactiveTiers.length === 0}
                   >
-                    Inactive ({inactiveTiers.length})
+                    Inactive ({inactiveTiers.length.toString()})
                   </Button>
                 </ButtonGroup>
               </InlineStack>

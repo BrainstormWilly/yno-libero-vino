@@ -64,6 +64,8 @@ export type DiscountAppliesTo = {
   scope: "all" | "specific"; // All items or specific items
   products: DiscountProduct[]; // For specific products (when scope="specific")
   collections: DiscountCollection[]; // For specific collections (when scope="specific")
+  // Legacy field for backward compatibility
+  all?: boolean; // Shorthand for scope === "all"
 };
 
 /**
@@ -120,6 +122,14 @@ export type Discount = {
   
   // Platform-specific data (stored as JSON for flexibility)
   platformData?: Record<string, any>;
+  
+  // Legacy coupon fields (for backward compatibility with coupon-based code)
+  code?: string; // Coupon code (for manual discount codes, not auto-apply promotions)
+  customerSelection?: { // Customer eligibility for coupons
+    all: boolean;
+    customers: Array<{ id: string }>;
+    segments: Array<{ id: string; name: string }>;
+  };
 };
 
 /**

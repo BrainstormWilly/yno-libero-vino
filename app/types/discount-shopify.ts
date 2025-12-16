@@ -3,7 +3,7 @@
  * Converts between unified Discount type and Shopify Discount API format
  */
 
-import type { Discount, DiscountStatus } from "./discount";
+import type { Discount, DiscountStatus, DiscountMinimumRequirement } from "./discount";
 
 /**
  * Shopify Discount API types (based on yno-neighborly-s)
@@ -129,7 +129,7 @@ const fromShopifyStatus = (status: ShopifyDiscountStatus): DiscountStatus => {
     case ShopifyDiscountStatus.ACTIVE:
       return "active";
     case ShopifyDiscountStatus.EXPIRED:
-      return "expired";
+      return "inactive" as DiscountStatus; // DiscountStatus doesn't include "expired", use "inactive"
     case ShopifyDiscountStatus.SCHEDULED:
       return "scheduled";
     default:
@@ -143,7 +143,7 @@ const fromShopifyStatus = (status: ShopifyDiscountStatus): DiscountStatus => {
 export const toShopifyDiscount = (discount: Discount): ShopifyDiscountCodeInput => {
   // Build items input
   const items: ShopifyDiscountItemsInput = {
-    all: discount.appliesTo.all,
+    all: discount.appliesTo.scope === "all" || discount.appliesTo.all === true,
   };
 
   if (discount.appliesTo.collections.length > 0) {
@@ -160,18 +160,18 @@ export const toShopifyDiscount = (discount: Discount): ShopifyDiscountCodeInput 
 
   // Build customer selection
   const customerSelection: ShopifyCustomerSelectionInput = {
-    all: discount.customerSelection.all,
+    all: discount.customerSelection?.all || false,
   };
 
-  if (discount.customerSelection.segments.length > 0) {
+  if (discount.customerSelection?.segments && discount.customerSelection.segments.length > 0) {
     customerSelection.customerSegments = {
-      add: discount.customerSelection.segments.map(s => s.id),
+      add: discount.customerSelection.segments.map((s: any) => s.id),
     };
   }
 
-  if (discount.customerSelection.customers.length > 0) {
+  if (discount.customerSelection?.customers && discount.customerSelection.customers.length > 0) {
     customerSelection.customers = {
-      add: discount.customerSelection.customers.map(c => c.id),
+      add: discount.customerSelection.customers.map((c: any) => c.id),
     };
   }
 
@@ -208,12 +208,12 @@ export const toShopifyDiscount = (discount: Discount): ShopifyDiscountCodeInput 
   }
 
   const input: ShopifyDiscountCodeInput = {
-    appliesOncePerCustomer: discount.usageLimits.appliesOncePerCustomer,
-    code: discount.code,
-    combinesWith: {
-      orderDiscounts: discount.combinesWith.orderDiscounts,
-      productDiscounts: discount.combinesWith.productDiscounts,
-      shippingDiscounts: discount.combinesWith.shippingDiscounts,
+    appliesOncePerCustomer: (discount as any).usageLimits?.appliesOncePerCustomer || false,
+    code: discount.code || "",
+    combinesWith: (discount as any).combinesWith || {
+      orderDiscounts: false,
+      productDiscounts: false,
+      shippingDiscounts: false,
     },
     customerGets: {
       items,
@@ -224,7 +224,7 @@ export const toShopifyDiscount = (discount: Discount): ShopifyDiscountCodeInput 
     minimumRequirement,
     startsAt: discount.startsAt.toISOString(),
     title: discount.title,
-    usageLimit: discount.usageLimits.total,
+    usageLimit: (discount as any).usageLimits?.total || null,
   };
 
   return input;
@@ -317,34 +317,32 @@ export const fromShopifyDiscount = (shopifyDiscount: ShopifyDiscountOutput): Dis
   };
 
   // Parse customer selection
-  const selection = shopifyDiscount.customerSelection;
+  const selection = shopifyDiscount.customerSelection || {};
   const customerSelection = {
     all: selection.allCustomers || false,
-    customers: selection.customers?.nodes.map(c => ({
+    customers: selection.customers?.nodes?.map((c: any) => ({
       id: c.id,
-      email: c.email,
-      name: c.displayName,
     })) || [],
-    segments: selection.segments?.nodes.map(s => ({ id: s.id, name: s.name })) || [],
+    segments: selection.segments?.nodes?.map((s: any) => ({ id: s.id, name: s.name || "" })) || [],
   };
 
   // Parse minimum requirement
-  let minimumRequirement = {
-    type: "none" as const,
-    quantity: undefined,
-    amount: undefined,
-  };
+  let minimumRequirement: DiscountMinimumRequirement;
   
   if (shopifyDiscount.minimumRequirement?.greaterThanOrEqualToQuantity) {
     minimumRequirement = {
-      type: "quantity",
+      type: "quantity" as const,
       quantity: shopifyDiscount.minimumRequirement.greaterThanOrEqualToQuantity,
     };
   } else if (shopifyDiscount.minimumRequirement?.greaterThanOrEqualToSubtotal) {
     minimumRequirement = {
-      type: "amount",
+      type: "amount" as const,
       // Convert dollars to cents
       amount: parseFloat(shopifyDiscount.minimumRequirement.greaterThanOrEqualToSubtotal.amount) * 100,
+    };
+  } else {
+    minimumRequirement = {
+      type: "none" as const,
     };
   }
 
@@ -358,12 +356,13 @@ export const fromShopifyDiscount = (shopifyDiscount: ShopifyDiscountOutput): Dis
     amount: valueOutput.amount ? parseFloat(valueOutput.amount.amount) * 100 : undefined,
   };
 
-  // Parse usage limits
-  const usageLimits = {
-    total: shopifyDiscount.usageLimit,
-    perCustomer: shopifyDiscount.appliesOncePerCustomer ? 1 : null,
-    appliesOncePerCustomer: shopifyDiscount.appliesOncePerCustomer,
-  };
+  // Parse customer segments from customer selection
+  const customerSegments = customerSelection.segments.map(s => ({ id: s.id, name: s.name || "" }));
+
+  // Extract appliesTo values
+  const appliesToAll = appliesTo.all;
+  const appliesToProducts = appliesTo.products;
+  const appliesToCollections = appliesTo.collections;
 
   return {
     id: shopifyDiscount.discountId,
@@ -374,18 +373,36 @@ export const fromShopifyDiscount = (shopifyDiscount: ShopifyDiscountOutput): Dis
     startsAt: new Date(shopifyDiscount.startsAt),
     // No endsAt - discounts never expire
     value,
-    appliesTo,
-    customerSelection,
+    appliesTo: {
+      target: "product", // Default to product, could be shipping
+      scope: appliesToAll ? "all" : "specific",
+      products: appliesToProducts,
+      collections: appliesToCollections,
+      all: appliesToAll,
+    },
+    customerSegments,
     minimumRequirement,
-    usageLimits,
-    combinesWith: shopifyDiscount.combinesWith || {
-      productDiscounts: false,
-      orderDiscounts: false,
-      shippingDiscounts: false,
+    customerSelection: {
+      all: customerSelection.all,
+      customers: customerSelection.customers.map(c => ({ id: c.id })),
+      segments: customerSegments,
     },
     createdAt: new Date(shopifyDiscount.createdAt),
     updatedAt: new Date(shopifyDiscount.updatedAt),
-    usageCount: shopifyDiscount.asyncUsageCount,
+    // Legacy fields stored in platformData
+    platformData: {
+      usageLimits: {
+        total: shopifyDiscount.usageLimit,
+        perCustomer: shopifyDiscount.appliesOncePerCustomer ? 1 : null,
+        appliesOncePerCustomer: shopifyDiscount.appliesOncePerCustomer,
+      },
+      combinesWith: shopifyDiscount.combinesWith || {
+        productDiscounts: false,
+        orderDiscounts: false,
+        shippingDiscounts: false,
+      },
+      usageCount: shopifyDiscount.asyncUsageCount,
+    },
   };
 };
 

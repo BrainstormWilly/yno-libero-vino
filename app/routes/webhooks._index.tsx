@@ -148,13 +148,12 @@ export default function WebhooksIndex() {
       <Form method="post" key={webhook.id}>
         <input type="hidden" name="crmType" value={crmType} />
         <input type="hidden" name="webhookId" value={webhook.id} />
+        <input type="hidden" name="_action" value="delete" />
         <Button
           variant="primary"
           tone="critical"
           size="slim"
           submit
-          name="_action"
-          value="delete"
         >
           Delete
         </Button>
@@ -169,10 +168,10 @@ export default function WebhooksIndex() {
     >
       <Layout>
         {/* Status Messages */}
-        {(error || actionData?.error) && (
+        {(error || (actionData && !actionData.success && actionData.message)) && (
           <Layout.Section>
             <Banner tone="critical">
-              {error || actionData?.error}
+              {error || (actionData && !actionData.success ? actionData.message : '')}
             </Banner>
           </Layout.Section>
         )}
@@ -264,11 +263,10 @@ export default function WebhooksIndex() {
                     autoComplete="off"
                     helpText="The URL where webhooks will be sent"
                   />
+                  <input type="hidden" name="_action" value="register" />
                   <Button
                     variant="primary"
                     submit
-                    name="_action"
-                    value="register"
                   >
                     Register Webhook
                   </Button>

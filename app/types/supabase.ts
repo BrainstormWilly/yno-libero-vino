@@ -40,7 +40,7 @@ export type Database = {
           created_at: string | null
           expires_at: string
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           last_activity_at: string | null
           metadata: Json | null
           theme: string | null
@@ -54,7 +54,7 @@ export type Database = {
           created_at?: string | null
           expires_at: string
           id: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           last_activity_at?: string | null
           metadata?: Json | null
           theme?: string | null
@@ -68,7 +68,7 @@ export type Database = {
           created_at?: string | null
           expires_at?: string
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           last_activity_at?: string | null
           metadata?: Json | null
           theme?: string | null
@@ -175,6 +175,13 @@ export type Database = {
             foreignKeyName: "club_enrollments_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "club_enrollments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -228,6 +235,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "club_enrollments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_extensions_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["enrollment_id"]
           },
           {
             foreignKeyName: "club_extensions_extended_from_stage_id_fkey"
@@ -344,9 +358,9 @@ export type Database = {
           name: string
           platform_discount_id: string | null
           platform_tag_id: string | null
-          stage_order: number
-          upgradable: boolean
+          stage_order: number | null
           updated_at: string | null
+          upgradable: boolean
         }
         Insert: {
           c7_club_id?: string | null
@@ -360,9 +374,9 @@ export type Database = {
           name: string
           platform_discount_id?: string | null
           platform_tag_id?: string | null
-          stage_order: number
-          upgradable?: boolean
+          stage_order?: number | null
           updated_at?: string | null
+          upgradable?: boolean
         }
         Update: {
           c7_club_id?: string | null
@@ -376,9 +390,9 @@ export type Database = {
           name?: string
           platform_discount_id?: string | null
           platform_tag_id?: string | null
-          stage_order?: number | null // Nullable for inactive tiers (migration 046)
-          upgradable?: boolean
+          stage_order?: number | null
           updated_at?: string | null
+          upgradable?: boolean
         }
         Relationships: [
           {
@@ -528,6 +542,13 @@ export type Database = {
             foreignKeyName: "communication_log_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "communication_log_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -537,13 +558,15 @@ export type Database = {
         Row: {
           created_at: string | null
           customer_id: string
-          email_expiration_warnings: boolean | null
-          email_monthly_status: boolean | null
-          email_promotions: boolean | null
+          email_marketing: boolean | null
           id: string
-          sms_expiration_warnings: boolean | null
-          sms_monthly_status: boolean | null
-          sms_promotions: boolean | null
+          sms_marketing: boolean | null
+          sms_opt_in_confirmed_at: string | null
+          sms_opt_in_method: string | null
+          sms_opt_in_request_sent_at: string | null
+          sms_opt_in_source: string | null
+          sms_opted_in_at: string | null
+          sms_transactional: boolean | null
           unsubscribed_all: boolean | null
           unsubscribed_at: string | null
           updated_at: string | null
@@ -551,13 +574,15 @@ export type Database = {
         Insert: {
           created_at?: string | null
           customer_id: string
-          email_expiration_warnings?: boolean | null
-          email_monthly_status?: boolean | null
-          email_promotions?: boolean | null
+          email_marketing?: boolean | null
           id?: string
-          sms_expiration_warnings?: boolean | null
-          sms_monthly_status?: boolean | null
-          sms_promotions?: boolean | null
+          sms_marketing?: boolean | null
+          sms_opt_in_confirmed_at?: string | null
+          sms_opt_in_method?: string | null
+          sms_opt_in_request_sent_at?: string | null
+          sms_opt_in_source?: string | null
+          sms_opted_in_at?: string | null
+          sms_transactional?: boolean | null
           unsubscribed_all?: boolean | null
           unsubscribed_at?: string | null
           updated_at?: string | null
@@ -565,18 +590,27 @@ export type Database = {
         Update: {
           created_at?: string | null
           customer_id?: string
-          email_expiration_warnings?: boolean | null
-          email_monthly_status?: boolean | null
-          email_promotions?: boolean | null
+          email_marketing?: boolean | null
           id?: string
-          sms_expiration_warnings?: boolean | null
-          sms_monthly_status?: boolean | null
-          sms_promotions?: boolean | null
+          sms_marketing?: boolean | null
+          sms_opt_in_confirmed_at?: string | null
+          sms_opt_in_method?: string | null
+          sms_opt_in_request_sent_at?: string | null
+          sms_opt_in_source?: string | null
+          sms_opted_in_at?: string | null
+          sms_transactional?: boolean | null
           unsubscribed_all?: boolean | null
           unsubscribed_at?: string | null
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "communication_preferences_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "communication_preferences_customer_id_fkey"
             columns: ["customer_id"]
@@ -705,6 +739,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "club_enrollments"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_sync_queue_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["enrollment_id"]
           },
           {
             foreignKeyName: "crm_sync_queue_old_stage_id_fkey"
@@ -883,6 +924,87 @@ export type Database = {
         }
         Relationships: []
       }
+      expiration_warning_queue: {
+        Row: {
+          attempts: number | null
+          client_id: string
+          created_at: string | null
+          customer_id: string
+          enrollment_id: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number | null
+          next_retry_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          client_id: string
+          created_at?: string | null
+          customer_id: string
+          enrollment_id: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          client_id?: string
+          created_at?: string | null
+          customer_id?: string
+          enrollment_id?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expiration_warning_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expiration_warning_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "expiration_warning_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expiration_warning_queue_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "club_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expiration_warning_queue_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["enrollment_id"]
+          },
+        ]
+      }
       loyalty_point_rules: {
         Row: {
           bonus_points_percentage: number | null
@@ -1022,6 +1144,70 @@ export type Database = {
           },
         ]
       }
+      monthly_status_queue: {
+        Row: {
+          attempts: number | null
+          client_id: string
+          created_at: string | null
+          customer_id: string
+          error_message: string | null
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number | null
+          next_retry_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          client_id: string
+          created_at?: string | null
+          customer_id: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          client_id?: string
+          created_at?: string | null
+          customer_id?: string
+          error_message?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_status_queue_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_status_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "monthly_status_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           client_id: string
@@ -1066,6 +1252,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clients"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -1158,6 +1351,13 @@ export type Database = {
           transaction_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "point_transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "point_transactions_customer_id_fkey"
             columns: ["customer_id"]
@@ -1285,6 +1485,13 @@ export type Database = {
             foreignKeyName: "reward_redemptions_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "reward_redemptions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
           },
@@ -1350,12 +1557,111 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      customer_enrollment_summary: {
+        Row: {
+          c7_membership_id: string | null
+          client_id: string | null
+          club_stage_id: string | null
+          crm_id: string | null
+          cumulative_membership_days: number | null
+          customer_created_at: string | null
+          customer_id: string | null
+          duration_months: number | null
+          email: string | null
+          enrolled_at: string | null
+          enrollment_id: string | null
+          enrollment_status: string | null
+          expires_at: string | null
+          first_name: string | null
+          is_club_member: boolean | null
+          last_name: string | null
+          loyalty_earning_active: boolean | null
+          loyalty_eligible_since: string | null
+          loyalty_points_balance: number | null
+          loyalty_points_lifetime: number | null
+          min_purchase_amount: number | null
+          phone: string | null
+          tier_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_enrollments_club_stage_id_fkey"
+            columns: ["club_stage_id"]
+            isOneToOne: false
+            referencedRelation: "club_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      cleanup_expired_app_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
+      check_api_base_url: { Args: never; Returns: string }
+      cleanup_expired_app_sessions: { Args: never; Returns: number }
+      process_crm_sync_queue: {
+        Args: never
+        Returns: {
+          error_count: number
+          processed_count: number
+          success_count: number
+        }[]
+      }
+      process_expiration_warning_queue: {
+        Args: never
+        Returns: {
+          error_count: number
+          processed_count: number
+          success_count: number
+        }[]
+      }
+      process_expired_enrollments: {
+        Args: never
+        Returns: {
+          error_count: number
+          processed_count: number
+        }[]
+      }
+      process_monthly_status_notifications: {
+        Args: never
+        Returns: {
+          error_count: number
+          processed_count: number
+        }[]
+      }
+      process_monthly_status_queue: {
+        Args: never
+        Returns: {
+          error_count: number
+          processed_count: number
+          success_count: number
+        }[]
+      }
+      queue_expiration_warning_jobs: {
+        Args: never
+        Returns: {
+          queued_count: number
+          skipped_count: number
+        }[]
+      }
+      queue_monthly_status_jobs: {
+        Args: never
+        Returns: {
+          queued_count: number
+          skipped_count: number
+        }[]
+      }
+      test_process_expired_enrollments: {
+        Args: never
+        Returns: {
+          error_count: number
+          processed_count: number
+        }[]
       }
     }
     Enums: {

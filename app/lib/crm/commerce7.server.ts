@@ -968,10 +968,10 @@ export class Commerce7Provider implements CrmProvider {
         const shouldReceivePromotions = customerData.emailMarketingStatus === 'Subscribed';
         
         // Only update if preference changed
-        if (currentPrefs.emailPromotions !== shouldReceivePromotions) {
+        if (currentPrefs.emailMarketing !== shouldReceivePromotions) {
           await db.upsertCommunicationPreferences(customer.id, {
             ...currentPrefs,
-            emailPromotions: shouldReceivePromotions,
+            emailMarketing: shouldReceivePromotions,
           });
           
           console.log(`Updated email promotions preference for ${crmCustomerId}: ${shouldReceivePromotions}`);
@@ -1170,8 +1170,8 @@ export class Commerce7Provider implements CrmProvider {
         const defaultPrefs = db.getDefaultCommunicationPreferences();
         const preferences = {
           ...defaultPrefs,
-          // Sync C7 emailMarketingStatus to emailPromotions
-          emailPromotions: c7Customer.emailMarketingStatus === 'Subscribed',
+          // Sync C7 emailMarketingStatus to emailMarketing
+          emailMarketing: c7Customer.emailMarketingStatus === 'Subscribed',
         };
         await db.upsertCommunicationPreferences(customer.id, preferences);
       }

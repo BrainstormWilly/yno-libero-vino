@@ -47,8 +47,8 @@ interface TiersStepProps {
   onUpdateTier: (id: string, field: keyof TierFormData, value: string) => void;
   onUpdateTierDiscount: (id: string, discount: Discount) => void;
   onToggleDiscountForm: (id: string) => void;
-  onLoadProducts: (q?: string) => void;
-  onLoadCollections: (q?: string) => void;
+  onLoadProducts?: (q?: string) => void | Promise<void>;
+  onLoadCollections?: (q?: string) => void | Promise<void>;
 }
 
 export default function TiersStep({

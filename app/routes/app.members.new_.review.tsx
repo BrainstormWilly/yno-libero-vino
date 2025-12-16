@@ -16,7 +16,8 @@ import {
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
-import { crmManager } from '~/lib/crm';
+import { crmManager, getPromotion } from '~/lib/crm';
+import type { AppSessionData } from '~/lib/session-storage.server';
 import { addSessionToUrl } from '~/util/session';
 import { KLAVIYO_METRICS } from '~/lib/communication/klaviyo.constants';
 import { MAILCHIMP_TAGS } from '~/lib/communication/mailchimp.constants';
@@ -26,7 +27,6 @@ import type { CommunicationPreferences } from '~/lib/communication/preferences';
 import { sendClientEmail, trackClientEvent } from '~/lib/communication/communication.service.server';
 import { sendSMSOptInRequest, shouldSendSMSOptIn } from '~/lib/communication/sms-opt-in.server';
 import { flattenSMSOptInProperties } from '~/lib/communication/preferences';
-import { fromC7Promotion } from '~/types/discount-commerce7';
 
 type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
 
@@ -237,7 +237,7 @@ export async function action({ request }: ActionFunctionArgs) {
             lastName: draft.customer.lastName,
             phone: draft.customer.phone ?? null,
             crmId: draft.customer.crmId,
-            birthdate: draft.customer.birthdate, // Required for wine sales and Klaviyo SMS age-gating
+            birthdate: draft.customer.birthdate || "1900-01-01", // Required for wine sales and Klaviyo SMS age-gating
           },
           lvCustomerId: lvCustomer.id,
           crmMembershipId: crmMembershipId,
@@ -417,12 +417,11 @@ async function triggerKlaviyoClubSignup(options: {
   let discountPercentage = 0;
   if (client && client.crm_type === 'commerce7' && client.tenant_shop && promotions.length > 0) {
     try {
-      const crmProvider = crmManager.getProvider(client.crm_type, client.tenant_shop);
       // Fetch the first promotion's details from Commerce7
       const firstPromo = promotions[0];
       if (firstPromo.crm_type === 'commerce7') {
-        const c7Promotion = await crmProvider.getPromotion(firstPromo.crm_id);
-        const discount = fromC7Promotion(c7Promotion);
+        const session = { crmType: client.crm_type, tenantShop: client.tenant_shop } as AppSessionData;
+        const discount = await getPromotion(session, firstPromo.crm_id);
         if (discount.value.type === 'percentage' && discount.value.percentage !== undefined) {
           discountPercentage = discount.value.percentage;
         }
@@ -470,11 +469,10 @@ async function triggerKlaviyoClubSignup(options: {
     try {
       const nextTierPromotions = await db.getStagePromotions(nextTier.id);
       if (nextTierPromotions.length > 0) {
-        const crmProvider = crmManager.getProvider(client.crm_type, client.tenant_shop);
         const firstNextPromo = nextTierPromotions[0];
         if (firstNextPromo.crm_type === 'commerce7') {
-          const c7Promotion = await crmProvider.getPromotion(firstNextPromo.crm_id);
-          const discount = fromC7Promotion(c7Promotion);
+          const session = { crmType: client.crm_type, tenantShop: client.tenant_shop } as AppSessionData;
+          const discount = await getPromotion(session, firstNextPromo.crm_id);
           if (discount.value.type === 'percentage' && discount.value.percentage !== undefined) {
             nextTierDiscount = discount.value.percentage;
           }
@@ -538,8 +536,7 @@ async function triggerKlaviyoClubSignup(options: {
       // The subscribeProfileToChannels method will:
       // - Use the provided timestamp if it's > 1 day old (historical import)
       // - Otherwise use 5 seconds ago for real-time enrollments (ensures it's after profile creation)
-      const smsOptedInAt = flattenSMSOptInProperties(options.preferences).sms_opted_in_at;
-      const consentedAt = smsOptedInAt || undefined; // Let method handle default for real-time enrollments
+      const consentedAt: string | undefined = options.preferences.smsOptedInAt || undefined; // Use actual opt-in timestamp if available
       
       await provider.subscribeProfileToChannels({
         profileId,

@@ -577,7 +577,7 @@ export async function getCommunicationPreferences(
     smsMarketing: data.sms_marketing ?? undefined,
     unsubscribedAll: data.unsubscribed_all ?? undefined,
     smsOptedInAt: data.sms_opted_in_at ?? undefined,
-    smsOptInMethod: data.sms_opt_in_method ?? undefined,
+    smsOptInMethod: data.sms_opt_in_method as 'web_form' | 'text_reply' | 'admin_manual' | 'signup_form' | undefined,
     smsOptInSource: data.sms_opt_in_source ?? undefined,
     smsOptInRequestSentAt: data.sms_opt_in_request_sent_at ?? undefined,
     smsOptInConfirmedAt: data.sms_opt_in_confirmed_at ?? undefined,
@@ -842,7 +842,8 @@ export async function getCustomersWithEnrollmentSummary(
   const supabase = getSupabaseClient();
   
   let query = supabase
-    .from('customer_enrollment_summary')
+    // Note: customer_enrollment_summary is a database view, not in Supabase types
+    .from('customer_enrollment_summary' as any)
     .select('*')
     .eq('client_id', clientId);
   

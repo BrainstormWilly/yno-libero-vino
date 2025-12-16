@@ -25,7 +25,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const supabase = getSupabaseClient();
 
     // Get cron job status
-    const { data: job, error: jobError } = await supabase
+    // Note: cron.job is a PostgreSQL extension table, not in Supabase types
+    const { data: job, error: jobError } = await (supabase as any)
       .from('cron.job')
       .select('*')
       .eq('jobname', jobName)
@@ -40,10 +41,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
 
     // Get execution history if job exists
-    const { data: history, error: historyError } = await supabase
+    // Note: cron.job_run_details is a PostgreSQL extension table, not in Supabase types
+    const { data: history, error: historyError } = await (supabase as any)
       .from('cron.job_run_details')
       .select('*')
-      .eq('jobid', job.jobid)
+      .eq('jobid', (job as any).jobid)
       .order('start_time', { ascending: false })
       .limit(limit);
 
@@ -56,17 +58,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
       };
     }
 
+    const typedJob = job as any;
     return {
       job: {
-        jobid: job.jobid,
-        schedule: job.schedule,
-        command: job.command,
-        nodename: job.nodename,
-        nodeport: job.nodeport,
-        database: job.database,
-        username: job.username,
-        active: job.active,
-        jobname: job.jobname,
+        jobid: typedJob.jobid,
+        schedule: typedJob.schedule,
+        command: typedJob.command,
+        nodename: typedJob.nodename,
+        nodeport: typedJob.nodeport,
+        database: typedJob.database,
+        username: typedJob.username,
+        active: typedJob.active,
+        jobname: typedJob.jobname,
       },
       history: history || [],
     };
@@ -96,7 +99,8 @@ export async function action({ request }: ActionFunctionArgs) {
 
     if (actionType === 'trigger') {
       // Manually trigger the expiration processing function
-      const { data, error } = await supabase.rpc('process_expired_enrollments');
+      // Note: RPC function not in Supabase types
+      const { data, error } = await (supabase as any).rpc('process_expired_enrollments');
 
       if (error) {
         console.error('Error triggering cron job:', error);
@@ -110,13 +114,13 @@ export async function action({ request }: ActionFunctionArgs) {
       return {
         success: true,
         result: data,
-        message: `Successfully processed ${data?.[0]?.processed_count || 0} enrollments with ${data?.[0]?.error_count || 0} errors`,
+        message: `Successfully processed ${(data as any[])?.[0]?.processed_count || 0} enrollments with ${(data as any[])?.[0]?.error_count || 0} errors`,
       };
     }
 
     if (actionType === 'test') {
       // Trigger the test function (same as trigger but uses test function)
-      const { data, error } = await supabase.rpc('test_process_expired_enrollments');
+      const { data, error } = await (supabase as any).rpc('test_process_expired_enrollments');
 
       if (error) {
         console.error('Error running test function:', error);
@@ -130,13 +134,13 @@ export async function action({ request }: ActionFunctionArgs) {
       return {
         success: true,
         result: data,
-        message: `Test run completed: ${data?.[0]?.processed_count || 0} processed, ${data?.[0]?.error_count || 0} errors`,
+        message: `Test run completed: ${(data as any[])?.[0]?.processed_count || 0} processed, ${(data as any[])?.[0]?.error_count || 0} errors`,
       };
     }
 
     if (actionType === 'sync') {
       // Manually trigger the CRM sync queue processor
-      const { data, error } = await supabase.rpc('process_crm_sync_queue');
+      const { data, error } = await (supabase as any).rpc('process_crm_sync_queue');
 
       if (error) {
         console.error('Error triggering sync queue processor:', error);
@@ -150,7 +154,7 @@ export async function action({ request }: ActionFunctionArgs) {
       return {
         success: true,
         result: data,
-        message: `Processed ${data?.[0]?.processed_count || 0} sync jobs: ${data?.[0]?.success_count || 0} succeeded, ${data?.[0]?.error_count || 0} failed`,
+        message: `Processed ${(data as any[])?.[0]?.processed_count || 0} sync jobs: ${(data as any[])?.[0]?.success_count || 0} succeeded, ${(data as any[])?.[0]?.error_count || 0} failed`,
       };
     }
 

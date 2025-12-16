@@ -89,14 +89,14 @@ export default function ReviewStep({
                 {tier.discount && (
                   <>
                     <Text variant="bodySm" as="p" tone="subdued">
-                      💳 Discount Code: <strong>{tier.discount.code}</strong>
+                      💳 Discount Code: <strong>{tier.discount.code || '(auto-generated)'}</strong>
                     </Text>
-                    {tier.discount.appliesTo.all && (
+                    {(tier.discount.appliesTo.scope === "all" || tier.discount.appliesTo.all === true) && (
                       <Text variant="bodySm" as="p" tone="subdued">
                         ✅ Applies to all products
                       </Text>
                     )}
-                    {!tier.discount.appliesTo.all && (
+                    {tier.discount.appliesTo.scope !== "all" && tier.discount.appliesTo.all !== true && (
                       <>
                         {tier.discount.appliesTo.products.length > 0 && (
                           <Text variant="bodySm" as="p" tone="subdued">

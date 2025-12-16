@@ -162,6 +162,8 @@ export default function DiscountForm({
     let isValid = true;
 
     if (!discount.code || discount.code.length === 0) {
+      // Code is optional for auto-apply promotions, but required for manual coupon codes
+      // For now, we'll allow it to be empty
       setCodeError("Discount code is required");
       isValid = false;
     }
@@ -232,7 +234,7 @@ export default function DiscountForm({
             <FormLayout.Group>
               <TextField
                 label="Discount Code"
-                value={discount.code}
+                value={discount.code || ''}
                 onChange={handleCodeChange}
                 placeholder="SUMMER15"
                 helpText="Code customers will use at checkout (automatically uppercase)"
@@ -281,7 +283,7 @@ export default function DiscountForm({
                 placeholder={discount.value.type === "percentage" ? "15" : "10.00"}
                 min="0"
                 max={discount.value.type === "percentage" ? "100" : undefined}
-                step={discount.value.type === "percentage" ? "1" : "0.01"}
+                step={discount.value.type === "percentage" ? 1 : 0.01}
                 autoComplete="off"
                 error={valueError}
                 requiredIndicator
@@ -314,7 +316,7 @@ export default function DiscountForm({
                 prefix="$"
                 placeholder="50.00"
                 min="0"
-                step="0.01"
+                step={0.01}
                 autoComplete="off"
                 helpText="Minimum order subtotal required to use this discount"
               />
@@ -328,7 +330,7 @@ export default function DiscountForm({
                 onChange={handleMinQuantityChange}
                 placeholder="1"
                 min="1"
-                step="1"
+                step={1}
                 autoComplete="off"
                 helpText="Minimum number of items required to use this discount"
               />
@@ -362,11 +364,11 @@ export default function DiscountForm({
 
           <Text as="p" variant="bodyMd" tone="subdued">
             Customers will be added to this discount as they join tiers.
-            {discount.customerSelection.all && " Currently available to all customers."}
-            {discount.customerSelection.customers.length > 0 && 
-              ` Currently available to ${discount.customerSelection.customers.length} customer(s).`}
-            {discount.customerSelection.segments.length > 0 && 
-              ` Currently available to ${discount.customerSelection.segments.length} segment(s).`}
+            {discount.customerSelection?.all && " Currently available to all customers."}
+            {(discount.customerSelection?.customers.length ?? 0) > 0 && 
+              ` Currently available to ${discount.customerSelection?.customers.length ?? 0} customer(s).`}
+            {(discount.customerSelection?.segments.length ?? 0) > 0 && 
+              ` Currently available to ${discount.customerSelection?.segments.length ?? 0} segment(s).`}
           </Text>
         </BlockStack>
       </Card>

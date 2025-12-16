@@ -8,7 +8,8 @@ import { Page, Layout, Card, Text, BlockStack } from "@shopify/polaris";
 import DiscountForm from "./DiscountForm";
 import { useDiscount } from "~/hooks/useDiscount";
 import type { PlatformType } from "~/types/discount";
-import { toC7Coupon, toShopifyDiscount } from "~/types";
+import { toC7Coupon } from "~/types/discount-commerce7";
+import { toShopifyDiscount } from "~/types/discount-shopify";
 
 interface DiscountFormExampleProps {
   platform: PlatformType;

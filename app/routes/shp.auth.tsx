@@ -33,18 +33,16 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     if (action === 'install') {
       // Handle Shopify app installation
-      const isAuthorized = await crmManager.authorizeInstall('shopify', request);
-      if (isAuthorized) {
-        return { success: true, message: 'Shopify app installation authorized' };
-      } else {
-        return { success: false, message: 'Shopify app installation failed' };
-      }
+      // Note: ShopifyProvider methods require shop identifier which we don't have yet
+      // This route needs to be updated to handle Shopify OAuth flow properly
+      return { success: false, message: 'Shopify installation not yet implemented. Please use Shopify Partner Portal.' };
     }
 
     if (action === 'authenticate') {
       // Handle Shopify authentication
-      const auth = await crmManager.authenticate('shopify', request);
-      return { success: true, auth };
+      // Note: ShopifyProvider methods require shop identifier which we don't have yet
+      // This route needs to be updated to handle Shopify OAuth flow properly
+      return { success: false, message: 'Shopify authentication not yet implemented. Please use Shopify Partner Portal.' };
     }
 
     return { success: false, message: 'Invalid action' };

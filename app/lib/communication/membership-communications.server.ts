@@ -482,8 +482,9 @@ async function triggerMailchimpExpiration(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || !options.preferences.emailExpirationWarnings) {
-    console.info('Skipping Mailchimp expiration notification: member unsubscribed or preferences disabled.');
+  // Transactional emails are required - only check unsubscribedAll
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Mailchimp expiration notification: member unsubscribed.');
     return;
   }
 
@@ -894,7 +895,8 @@ export async function sendMonthlyStatusNotification(
       if (programStages) {
         const currentStage = programStages.find(s => s.id === tier.id);
         if (currentStage && currentStage.stage_order !== null) {
-          nextTier = programStages.find(s => s.stage_order !== null && s.stage_order > currentStage.stage_order);
+          const currentOrder = currentStage.stage_order;
+          nextTier = programStages.find(s => s.stage_order !== null && s.stage_order > currentOrder);
         }
       }
     }
@@ -1243,8 +1245,9 @@ async function triggerMailchimpMonthlyStatus(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailMonthlyStatus === false) {
-    console.info('Skipping Mailchimp monthly status: member unsubscribed or preferences disabled.');
+  // Transactional emails are required - only check unsubscribedAll
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Mailchimp monthly status: member unsubscribed.');
     return;
   }
 
@@ -1969,8 +1972,9 @@ async function triggerMailchimpExpirationWarning(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailExpirationWarnings === false) {
-    console.info('Skipping Mailchimp expiration warning: member unsubscribed or preferences disabled.');
+  // Transactional emails are required - only check unsubscribedAll
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping Mailchimp expiration warning: member unsubscribed.');
     return;
   }
 
@@ -2041,8 +2045,9 @@ async function triggerSendGridExpirationWarning(options: {
     return;
   }
 
-  if (options.preferences.unsubscribedAll || options.preferences.emailExpirationWarnings === false) {
-    console.info('Skipping SendGrid expiration warning: member unsubscribed or preferences disabled.');
+  // Transactional emails are required - only check unsubscribedAll
+  if (options.preferences.unsubscribedAll) {
+    console.info('Skipping SendGrid expiration warning: member unsubscribed.');
     return;
   }
 

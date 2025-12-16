@@ -49,7 +49,7 @@ try {
   })) as KlaviyoProviderData;
 
   await db.updateCommunicationConfig(clientId, {
-    providerData: providerData as unknown as Record<string, unknown>,
+    providerData: providerData as any, // Supabase Json type
   });
 
   console.log('✅ Klaviyo metrics, flows, and templates seeded successfully.');

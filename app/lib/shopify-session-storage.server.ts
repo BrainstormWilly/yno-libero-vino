@@ -103,7 +103,10 @@ export async function storeSession(session: Session): Promise<boolean> {
     clientId = newClient.id;
   }
 
-  const appSession = shopifySessionToAppSession(session, clientId);
+  if (!clientId) {
+    throw new Error('Client ID is required but not found');
+  }
+  const appSession = shopifySessionToAppSession(session, clientId as string);
   return await dbStoreSession(appSession);
 }
 

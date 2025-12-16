@@ -5,9 +5,10 @@ import { createDefaultDiscount } from "~/types/discount";
 /**
  * Hook for managing discount state
  */
-export function useDiscount(platform: PlatformType, initialDiscount?: Discount) {
+export function useDiscount(platform: PlatformType, initialDiscount?: Discount | Partial<Discount>) {
+  const defaultDiscount = { ...createDefaultDiscount(platform), status: "active" as const };
   const [discount, setDiscount] = useState<Discount>(
-    initialDiscount || createDefaultDiscount(platform)
+    (initialDiscount && 'status' in initialDiscount ? initialDiscount : { ...defaultDiscount, ...initialDiscount }) as Discount
   );
 
   const updateDiscount = useCallback((updatedDiscount: Discount) => {
@@ -15,7 +16,7 @@ export function useDiscount(platform: PlatformType, initialDiscount?: Discount) 
   }, []);
 
   const resetDiscount = useCallback(() => {
-    setDiscount(createDefaultDiscount(platform));
+    setDiscount({ ...createDefaultDiscount(platform), status: "active" as const });
   }, [platform]);
 
   const updateField = useCallback(<K extends keyof Discount>(

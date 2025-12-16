@@ -97,7 +97,13 @@ export async function action({ request }: ActionFunctionArgs) {
             state: address.state,
             zip: address.zip,
             country: address.country || 'US',
-          } : undefined),
+          } : {
+            address1: '',
+            city: '',
+            state: '',
+            zip: '',
+            country: 'US',
+          }),
           shipping: address ? {
             address1: address.address1,
             address2: address.address2,
@@ -148,7 +154,13 @@ export async function action({ request }: ActionFunctionArgs) {
           shippingAddressId: shippingAddress.id!,
         },
         address: {
-          ...draft.address,
+          billing: draft.address?.billing || {
+            address1: '',
+            city: '',
+            state: '',
+            zip: '',
+            country: 'US',
+          },
           shipping: {
             address1,
             address2: address2 || undefined,
@@ -173,7 +185,13 @@ export async function action({ request }: ActionFunctionArgs) {
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         address: {
-          ...draft.address,
+          billing: draft.address?.billing || {
+            address1: '',
+            city: '',
+            state: '',
+            zip: '',
+            country: 'US',
+          },
           // Shipping same as billing (already set in customer creation)
         },
         addressVerified: true,

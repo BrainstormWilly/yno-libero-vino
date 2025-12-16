@@ -32,8 +32,8 @@ interface ProductCollectionSelectorProps {
   onUpdateDiscount: (discount: Discount) => void;
   availableProducts?: Product[];
   availableCollections?: Collection[];
-  onLoadProducts?: (q?: string) => Promise<void>;
-  onLoadCollections?: (q?: string) => Promise<void>;
+  onLoadProducts?: (q?: string) => void | Promise<void>;
+  onLoadCollections?: (q?: string) => void | Promise<void>;
   isLoading?: boolean;
 }
 
@@ -55,7 +55,8 @@ export default function ProductCollectionSelector({
   const handleToggleAllProducts = useCallback(() => {
     const newAppliesTo = {
       ...discount.appliesTo,
-      all: !discount.appliesTo.all,
+      scope: (discount.appliesTo.scope === "all" ? "specific" : "all") as "all" | "specific",
+      all: discount.appliesTo.scope !== "all",
       products: [],
       collections: [],
     };
@@ -76,6 +77,7 @@ export default function ProductCollectionSelector({
         ...discount,
         appliesTo: {
           ...discount.appliesTo,
+          scope: "specific",
           all: false,
           products: newProducts,
         },
@@ -95,6 +97,7 @@ export default function ProductCollectionSelector({
         ...discount,
         appliesTo: {
           ...discount.appliesTo,
+          scope: "specific",
           all: false,
           collections: newCollections,
         },
@@ -133,14 +136,14 @@ export default function ProductCollectionSelector({
   useEffect(() => {
     if (onLoadProducts && selectedTab === 0 && hasSearchedProducts) {
       // If query is empty, do a full browse; otherwise search with query
-      onLoadProducts(debouncedSearchQuery.trim() || undefined);
+      Promise.resolve(onLoadProducts(debouncedSearchQuery.trim() || undefined)).catch(() => {});
     }
   }, [debouncedSearchQuery]); // Only depend on debouncedSearchQuery to avoid infinite loops
   
   useEffect(() => {
     if (onLoadCollections && selectedTab === 1 && hasSearchedCollections) {
       // If query is empty, do a full browse; otherwise search with query
-      onLoadCollections(debouncedSearchQuery.trim() || undefined);
+      Promise.resolve(onLoadCollections(debouncedSearchQuery.trim() || undefined)).catch(() => {});
     }
   }, [debouncedSearchQuery]); // Only depend on debouncedSearchQuery to avoid infinite loops
 
@@ -181,13 +184,13 @@ export default function ProductCollectionSelector({
         <Box paddingBlock="200">
           <Checkbox
             label="Apply to all products"
-            checked={discount.appliesTo.all}
+            checked={discount.appliesTo.scope === "all" || discount.appliesTo.all === true}
             onChange={handleToggleAllProducts}
             helpText="When enabled, this discount will work on any product"
           />
         </Box>
 
-        {!discount.appliesTo.all && (
+        {discount.appliesTo.scope !== "all" && discount.appliesTo.all !== true && (
           <>
             {/* Selected Items Summary */}
             {(discount.appliesTo.products.length > 0 || discount.appliesTo.collections.length > 0) && (
