@@ -7,7 +7,7 @@
 
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import * as db from '~/lib/db/supabase.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {

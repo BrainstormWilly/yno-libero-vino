@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from 'react-router';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import type { WebhookPayload, WebhookTopic } from '~/types/crm';
 import * as db from '~/lib/db/supabase.server';
 

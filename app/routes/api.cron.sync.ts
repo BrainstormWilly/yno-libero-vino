@@ -7,7 +7,7 @@
 
 import { type ActionFunctionArgs } from 'react-router';
 import { getSupabaseClient } from '~/lib/db/supabase.server';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import { sendExpirationNotification, sendUpgradeNotification } from '~/lib/communication/membership-communications.server';
 
 export async function action({ request }: ActionFunctionArgs) {

@@ -12,7 +12,7 @@ import { KlaviyoProvider } from './providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from './preferences';
 import { flattenSMSOptInProperties } from './preferences';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import { c7CentsToDollars } from '~/types/customer-commerce7';
 import type { C7ClubMembershipResponse } from '~/types/member-commerce7';
 

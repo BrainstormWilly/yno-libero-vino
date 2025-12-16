@@ -7,7 +7,7 @@
 
 import { type LoaderFunctionArgs } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);

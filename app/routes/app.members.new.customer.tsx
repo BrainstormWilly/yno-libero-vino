@@ -17,7 +17,7 @@ import {
 
 import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import { addSessionToUrl } from '~/util/session';
 import { DEFAULT_COMMUNICATION_PREFERENCES } from '~/lib/communication/preferences';
 

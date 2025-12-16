@@ -10,7 +10,6 @@ import {
   Banner
 } from '@shopify/polaris';
 import { StoreIcon } from '@shopify/polaris-icons';
-import { crmManager } from '~/lib/crm';
 import { getSubdomainInfo } from '~/util/subdomain';
 
 export async function loader({ request }: LoaderFunctionArgs) {

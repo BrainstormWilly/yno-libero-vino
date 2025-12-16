@@ -14,7 +14,7 @@ import {
   Select,
   TextField
 } from '@shopify/polaris';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import { getWebhookEndpoint, getAvailableWebhookTopics, formatWebhookTopic } from '~/util/webhook';
 import type { WebhookTopic } from '~/types/crm';
 

@@ -1,8 +1,8 @@
 import type { CrmProvider } from '~/types/crm';
 import { ShopifyProvider } from './shopify.server';
 import { Commerce7Provider } from './commerce7.server';
-import { toC7Promotion, fromC7Promotion, type Discount } from '~/types';
 import type { AppSessionData } from '~/lib/session-storage.server';
+import type { Discount } from '~/types';
 
 export class CrmManager {
   /**
@@ -39,6 +39,8 @@ export const crmManager = new CrmManager();
  * @param clubId - CRM club ID to link promotion to
  * @returns Created promotion with CRM ID and title
  */
+import { toC7Promotion, fromC7Promotion } from '~/types/discount-commerce7';
+
 export async function createPromotion(
   session: AppSessionData,
   discount: Discount,

@@ -19,7 +19,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
-import { crmManager } from '~/lib/crm';
+import { crmManager } from '~/lib/crm/index.server';
 import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
 
 // Type for enriched promotions from the parent loader

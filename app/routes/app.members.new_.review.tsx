@@ -16,7 +16,7 @@ import {
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
-import { crmManager, getPromotion } from '~/lib/crm';
+import { crmManager, getPromotion } from '~/lib/crm/index.server';
 import type { AppSessionData } from '~/lib/session-storage.server';
 import { addSessionToUrl } from '~/util/session';
 import { KLAVIYO_METRICS } from '~/lib/communication/klaviyo.constants';
