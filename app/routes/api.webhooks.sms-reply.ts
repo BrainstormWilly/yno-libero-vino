@@ -13,6 +13,7 @@ import type { ActionFunctionArgs } from 'react-router';
 import * as db from '~/lib/db/supabase.server';
 import { getSupabaseClient } from '~/lib/db/supabase.server';
 import { confirmSMSOptIn } from '~/lib/communication/sms-opt-in.server';
+import { sendClientSMS } from '~/lib/communication/communication.service.server';
 import { normalizePhoneNumber } from '~/util/phone.utils';
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -72,6 +73,30 @@ export async function action({ request }: ActionFunctionArgs) {
       return Response.json({ 
         success: true, 
         message: 'Opt-out processed',
+        customerId: customer.id 
+      });
+    } else if (message === 'HELP' || message === 'INFO') {
+      // Handle HELP request - send SMS reply with instructions (SendGrid only)
+      if (provider === 'sendgrid') {
+        try {
+          const helpMessage = `Reply STOP to opt out of SMS messages. Reply HELP for support. Msg & data rates may apply.`;
+          
+          await sendClientSMS(customer.client_id, {
+            to: normalizedPhone,
+            message: helpMessage,
+            tags: ['sms-help-reply'],
+          });
+          
+          console.info(`HELP message sent to ${normalizedPhone} for customer ${customer.id} via ${provider}`);
+        } catch (error) {
+          // Log error but don't fail the webhook
+          console.error(`Failed to send HELP reply to ${normalizedPhone}:`, error);
+        }
+      }
+      
+      return Response.json({ 
+        success: true, 
+        message: 'Help message sent',
         customerId: customer.id 
       });
     } else {
