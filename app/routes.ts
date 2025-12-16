@@ -34,6 +34,8 @@ export default [
   ]),
   route("home", "routes/home.tsx"),
   route("shp/auth", "routes/shp.auth.tsx"),
+  route("robots.txt", "routes/robots[.]txt.tsx"),
+  route("sitemap.xml", "routes/sitemap[.]xml.tsx"),
   route("docs", "routes/docs.tsx", [
     route("sms-opt-in", "routes/docs.sms-opt-in.tsx"),
   ]),

@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Disallow admin and internal routes
+Disallow: /app/
+Disallow: /install
+Disallow: /uninstall
+Disallow: /webhooks/
+Disallow: /api/
+
+# Allow public documentation
+Allow: /docs/
+
+Sitemap: https://liberovino.wine/sitemap.xml
+
