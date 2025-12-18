@@ -24,8 +24,7 @@ import { MAILCHIMP_TAGS } from '~/lib/communication/mailchimp.constants';
 import { KlaviyoProvider } from '~/lib/communication/providers/klaviyo.server';
 import type { KlaviyoProviderData } from '~/types/communication-klaviyo';
 import type { CommunicationPreferences } from '~/lib/communication/preferences';
-import { sendClientEmail, trackClientEvent } from '~/lib/communication/communication.service.server';
-import { sendSMSOptInRequest, shouldSendSMSOptIn } from '~/lib/communication/sms-opt-in.server';
+import { sendClientEmail, sendClientSMS, trackClientEvent } from '~/lib/communication/communication.service.server';
 import { flattenSMSOptInProperties } from '~/lib/communication/preferences';
 
 type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfig>>;
@@ -139,35 +138,15 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
     
-    await db.upsertCommunicationPreferences(lvCustomer.id, preferences);
-    
-    // Send SMS opt-in request if customer has phone and SMS preferences enabled
-    let updatedPreferences = preferences;
-    if (shouldSendSMSOptIn(draft.customer.phone, preferences)) {
-      try {
-        await sendSMSOptInRequest(
-          session.clientId,
-          lvCustomer.id,
-          draft.customer.phone!,
-          client?.org_name
-        );
-        
-        // Fetch fresh preferences to include smsOptInRequestSentAt that was just set
-        const freshPreferences = await db.getCommunicationPreferences(lvCustomer.id);
-        
-        // Mark that they opted in via signup form
-        updatedPreferences = {
-          ...freshPreferences,
-          smsOptedInAt: freshPreferences.smsOptedInAt || new Date().toISOString(),
-          smsOptInMethod: 'signup_form',
-          smsOptInSource: '/app/members/new',
-        };
-        await db.upsertCommunicationPreferences(lvCustomer.id, updatedPreferences);
-      } catch (error) {
-        // Log but don't fail enrollment
-        console.warn('SMS opt-in request failed during signup:', error);
-      }
-    }
+    // Mark SMS opt-in via signup form (form checkbox is sufficient TCPA consent)
+    // No need to send separate opt-in request SMS - consent is given via form
+    const updatedPreferences: CommunicationPreferences = {
+      ...preferences,
+      smsOptedInAt: preferences.smsOptedInAt || new Date().toISOString(),
+      smsOptInMethod: 'signup_form',
+      smsOptInSource: '/app/members/new',
+    };
+    await db.upsertCommunicationPreferences(lvCustomer.id, updatedPreferences);
     
     // Sync to CRM FIRST - MUST succeed before creating enrollment
     // If CRM sync fails, enrollment fails (customer won't get discount otherwise)
@@ -280,11 +259,12 @@ export async function action({ request }: ActionFunctionArgs) {
             clientId: session.clientId,
             clientName: client?.org_name ?? null,
             communicationConfig,
-            preferences,
+            preferences: updatedPreferences,
             customer: {
               email: draft.customer.email,
               firstName: draft.customer.firstName,
               lastName: draft.customer.lastName,
+              phone: draft.customer.phone ?? null,
             },
             tier: {
               name: draft.tier.name,
@@ -293,6 +273,7 @@ export async function action({ request }: ActionFunctionArgs) {
             },
             enrollmentDate,
             expirationDate,
+            shopUrl: getShopUrl(client),
           });
         } catch (error) {
           console.warn('SendGrid welcome email failed:', error);
@@ -678,6 +659,7 @@ async function sendSendGridWelcomeEmail(options: {
     email: string;
     firstName: string;
     lastName: string;
+    phone?: string | null;
   };
   tier: {
     name: string;
@@ -686,6 +668,7 @@ async function sendSendGridWelcomeEmail(options: {
   };
   enrollmentDate: Date;
   expirationDate: Date;
+  shopUrl: string;
 }): Promise<void> {
   if (options.preferences.unsubscribedAll) {
     return;
@@ -703,13 +686,13 @@ async function sendSendGridWelcomeEmail(options: {
       <body style="font-family: Helvetica, Arial, sans-serif; color: #202124;">
         <h1 style="font-size:22px;">Welcome to ${options.clientName ?? 'LiberoVino'}!</h1>
         <p>Hi ${options.customer.firstName},</p>
-        <p>Thanks for joining the ${options.tier.name} tier. We’ve confirmed your membership and logged it in your account.</p>
+        <p>Thanks for joining the ${options.tier.name} tier. We've confirmed your membership and logged it in your account.</p>
         <ul>
           <li><strong>Tier duration:</strong> ${options.tier.durationMonths} months</li>
           <li><strong>Minimum purchase commitment:</strong> $${options.tier.minPurchaseAmount.toFixed(2)}</li>
           <li><strong>Membership duration ends:</strong> ${expirationFormatted}</li>
         </ul>
-        <p>You’re in control—shop when you’re ready and keep an eye on your inbox for monthly status updates.</p>
+        <p>You're in control—shop when you're ready and keep an eye on your inbox for monthly status updates.</p>
         <p style="margin-top:24px;">Cheers,<br/>${options.clientName ?? 'The LiberoVino Team'}</p>
       </body>
     </html>`;
@@ -723,7 +706,7 @@ Thanks for joining the ${options.tier.name} tier. Your membership is active and 
 • Minimum purchase commitment: $${options.tier.minPurchaseAmount.toFixed(2)}
 • Membership duration ends: ${expirationFormatted}
 
-Shop when you’re ready and watch for future status updates.
+Shop when you're ready and watch for future status updates.
 
 Cheers,
 ${options.clientName ?? 'The LiberoVino Team'}`;
@@ -736,6 +719,27 @@ ${options.clientName ?? 'The LiberoVino Team'}`;
     text,
     tags: ['membership', 'welcome'],
   });
+
+  // Send SMS if customer has phone and SMS preferences enabled
+  if (
+    options.customer.phone &&
+    (options.preferences.smsTransactional || options.preferences.smsMarketing)
+  ) {
+    try {
+      const smsMessage = `Hi ${options.customer.firstName}! Your ${options.clientName ?? 'LiberoVino'} ${options.tier.name} membership is live! You choose what ships and when. Shop: ${options.shopUrl} Reply STOP to opt out. Msg & data rates may apply.`;
+
+      await sendClientSMS(options.clientId, {
+        to: options.customer.phone,
+        message: smsMessage,
+        tags: ['membership', 'welcome', 'club-signup'],
+      });
+
+      console.info(`Club signup SMS sent to ${options.customer.phone} for customer ${options.customer.email}`);
+    } catch (error) {
+      // Log but don't fail enrollment if SMS fails
+      console.warn(`Failed to send club signup SMS to ${options.customer.phone}:`, error);
+    }
+  }
 }
 
 export default function ReviewAndEnroll() {

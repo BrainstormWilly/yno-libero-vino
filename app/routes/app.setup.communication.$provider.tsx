@@ -115,8 +115,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
       }
 
-      const emailApiKey = formData.get('email_api_key') as string | null;
-      if (emailApiKey !== null) configData.emailApiKey = emailApiKey || null;
+      // For SendGrid, always ensure email_api_key is null (uses env var)
+      if (emailProvider === 'sendgrid' || newProvider === 'sendgrid') {
+        configData.emailApiKey = null;
+      } else {
+        // For other providers, use form data if provided
+        const emailApiKey = formData.get('email_api_key') as string | null;
+        if (emailApiKey !== null) configData.emailApiKey = emailApiKey || null;
+      }
 
       const emailFromAddress = formData.get('email_from_address') as string | null;
       if (emailFromAddress !== null) configData.emailFromAddress = emailFromAddress || null;

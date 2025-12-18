@@ -331,5 +331,12 @@ function withSeedTimestamp<T extends { seededAt?: string }>(resource: T): T {
 function getSMSBody(templateKey: KlaviyoTemplateKey): string {
   const config = TEMPLATE_CONFIG[templateKey];
   // Create a concise SMS version of the message
-  return `${config.headline}. ${config.intro} ${config.cta}: {{ person.shop_url }}`;
+  const baseMessage = `${config.headline}. ${config.intro} ${config.cta}: {{ person.shop_url }}`;
+  
+  // Add opt-out instructions for club signup (entry point message)
+  if (templateKey === 'CLUB_SIGNUP') {
+    return `${baseMessage} Reply STOP to opt out. Msg & data rates may apply.`;
+  }
+  
+  return baseMessage;
 }

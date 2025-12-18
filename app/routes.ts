@@ -39,10 +39,6 @@ export default [
   route("docs", "routes/docs.tsx", [
     route("sms-opt-in", "routes/docs.sms-opt-in.tsx"),
   ]),
-  route("webhooks", "routes/webhooks._index.tsx", [
-    route("c7", "routes/webhooks.c7.tsx"),
-    route("shp", "routes/webhooks.shp.tsx"),
-  ]),
   // API resource routes
   route("api/products", "routes/api.products.ts"),
   route("api/collections", "routes/api.collections.ts"),
@@ -53,4 +49,9 @@ export default [
   route("api/cron/monthly-status", "routes/api.cron.monthly-status.ts"),
   route("api/cron/monthly-status/queue", "routes/api.cron.monthly-status.queue.ts"),
   route("api/cron/expiration-warning/queue", "routes/api.cron.expiration-warning.queue.ts"),
+  // API webhook routes (flat structure, matching api/cron pattern)
+  route("api/webhooks", "routes/api.webhooks._index.tsx"), // UI page for webhook management
+  route("api/webhooks/c7", "routes/api.webhooks.c7.tsx"),
+  route("api/webhooks/shp", "routes/api.webhooks.shp.tsx"),
+  route("api/webhooks/sms-reply", "routes/api.webhooks.sms-reply.tsx"),
 ] satisfies RouteConfig;

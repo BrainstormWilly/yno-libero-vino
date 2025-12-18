@@ -38,7 +38,7 @@ function mapC7WebhookToTopic(object: string, action: string): WebhookTopic | nul
 
 /**
  * Commerce7 webhook endpoint
- * POST /webhooks/c7
+ * POST /api/webhooks/c7
  * 
  * Security Measures (Basic Auth not available from Commerce7):
  * 1. Tenant Validation - Verifies tenantId exists in our database (403 if unknown)
@@ -145,6 +145,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // Loader to handle GET requests (Commerce7 may send verification requests)
 export async function loader() {
-  return Response.json({ message: 'Commerce7 webhook endpoint at /webhooks/c7' }, { status: 200 });
+  return Response.json({ message: 'Commerce7 webhook endpoint at /api/webhooks/c7' }, { status: 200 });
 }
 

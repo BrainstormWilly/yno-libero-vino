@@ -79,14 +79,33 @@ export async function action({ request }: ActionFunctionArgs) {
       const emailProviderChanged = previousEmailProvider !== newEmailProvider;
       const smsProviderChanged = previousSmsProvider !== finalSmsProvider?.toLowerCase();
 
+      // Clear provider-specific data when switching providers
+      const updateData: Parameters<typeof db.updateCommunicationConfig>[1] = {
+        emailProvider,
+        smsProvider: finalSmsProvider,
+        emailProviderConfirmed: emailProviderChanged ? false : undefined,
+        smsProviderConfirmed: smsProviderChanged ? false : undefined,
+      };
+
+      // Clear email_api_key when switching to SendGrid (uses env var)
+      if (newEmailProvider === 'sendgrid') {
+        updateData.emailApiKey = null;
+      }
+      
+      // Clear provider_data when switching away from Klaviyo or Mailchimp
+      if (emailProviderChanged) {
+        if (previousEmailProvider === 'klaviyo' || previousEmailProvider === 'mailchimp') {
+          updateData.providerData = {}; // provider_data is NOT NULL, use empty object
+        }
+        // Clear email_list_id when switching away from Mailchimp/Klaviyo
+        if (previousEmailProvider === 'mailchimp' || previousEmailProvider === 'klaviyo') {
+          updateData.emailListId = null;
+        }
+      }
+
       if (existingConfig) {
         // Update existing config
-        await db.updateCommunicationConfig(session.clientId, {
-          emailProvider,
-          smsProvider: finalSmsProvider,
-          emailProviderConfirmed: emailProviderChanged ? false : undefined,
-          smsProviderConfirmed: smsProviderChanged ? false : undefined,
-        });
+        await db.updateCommunicationConfig(session.clientId, updateData);
       } else {
         // Create new config
         await db.createCommunicationConfig(

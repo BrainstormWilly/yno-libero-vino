@@ -91,14 +91,35 @@ export class CommunicationManager {
       });
     }
 
-    const sendgridApiKey =
-      config?.email_api_key ?? process.env.SENDGRID_API_KEY ?? this.options.defaultSendgridApiKey;
-    const sendgridFromEmail = config?.email_from_address ?? this.options.defaultSendgridFromEmail;
-    const sendgridFromName = config?.email_from_name ?? this.options.defaultSendgridFromName;
-
+    // For SendGrid, prefer env var unless explicitly set in database
+    // Empty strings should fall back to env var
+    const dbApiKey = config?.email_api_key?.trim();
+    const envApiKey = process.env.SENDGRID_API_KEY;
+    const sendgridApiKey = dbApiKey && dbApiKey !== '' ? dbApiKey : envApiKey ?? this.options.defaultSendgridApiKey;
+    
+    // Debug logging to help diagnose API key issues
     if (!sendgridApiKey) {
+      console.error('[SendGrid] No API key found:', {
+        hasDbKey: !!dbApiKey,
+        dbKeyLength: dbApiKey?.length,
+        hasEnvKey: !!envApiKey,
+        envKeyLength: envApiKey?.length,
+        hasDefaultKey: !!this.options.defaultSendgridApiKey,
+      });
       throw new Error('SendGrid fallback selected but no API key is configured.');
     }
+    
+    // Log which source is being used (without exposing the key)
+    if (dbApiKey && dbApiKey !== '') {
+      console.info('[SendGrid] Using API key from database (length:', dbApiKey.length, ')');
+    } else if (envApiKey) {
+      console.info('[SendGrid] Using API key from environment variable (length:', envApiKey.length, ')');
+    } else {
+      console.info('[SendGrid] Using default API key from options (length:', this.options.defaultSendgridApiKey?.length, ')');
+    }
+    
+    const sendgridFromEmail = config?.email_from_address ?? this.options.defaultSendgridFromEmail;
+    const sendgridFromName = config?.email_from_name ?? this.options.defaultSendgridFromName;
 
     if (!sendgridFromEmail) {
       throw new Error('SendGrid fallback selected but no from email address is configured.');

@@ -25,7 +25,7 @@ export function getAvailableWebhookTopics(): WebhookTopic[] {
  */
 export function getWebhookEndpoint(crmType: 'commerce7' | 'shopify'): string {
   const prefix = crmType === 'commerce7' ? 'c7' : 'shp';
-  const path = `/webhooks/${prefix}`;
+  const path = `/api/webhooks/${prefix}`;
   return getWebhookUrl(crmType, path);
 }
 
