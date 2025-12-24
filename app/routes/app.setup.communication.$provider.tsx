@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useActionData, useNavigate } from 'react-router';
-import { Banner, Box, Button, InlineStack, BlockStack } from '@shopify/polaris';
+import { Box, Button, InlineStack } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
@@ -291,7 +291,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
             message = `Triggered the Klaviyo test flow for ${testEmail}. Make sure "LiberoVino – Test Flow" is set to Live in Klaviyo to see the message.`;
           }
         } else if (providerKey === 'mailchimp') {
-          message = `Triggered the Mailchimp test tag for ${testEmail}. Check your LiberoVino test flow to confirm delivery.`;
+          if (testPhone && smsResult?.success) {
+            message = `Triggered the Mailchimp test tag for ${testEmail} and sent test SMS to ${testPhone}. Check your LiberoVino test flow and phone to confirm delivery.`;
+          } else if (testPhone && !smsResult?.success) {
+            message = `Triggered the Mailchimp test tag for ${testEmail}. SMS test failed: ${smsResult?.message || 'Unknown error'}. Check your LiberoVino test flow to confirm email delivery.`;
+          } else {
+            message = `Triggered the Mailchimp test tag for ${testEmail}. Check your LiberoVino test flow to confirm delivery.`;
+          }
         } else if (providerKey === 'sendgrid') {
           if (testPhone && smsResult?.success) {
             message = `Sent test email to ${testEmail} and test SMS to ${testPhone}. Check your inbox and phone to confirm delivery. Allow 5-10 minutes.`;
@@ -343,7 +349,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function ProviderSetup() {
-  const { session, provider, existingConfig } = useLoaderData<typeof loader>();
+  const { session, client, provider, existingConfig } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   
@@ -361,8 +367,14 @@ export default function ProviderSetup() {
   // Get the provider-specific component
   const EmailProviderComponent = getEmailProviderComponent(provider);
   
-  // For LV-managed, also show SMS option if configured
-  const showSMS = provider === 'sendgrid' && existingConfig?.sms_provider === 'twilio';
+  // Show SMS option if:
+  // - SendGrid with Twilio SMS configured, OR
+  // - Mailchimp (SMS is integrated with email, like Klaviyo), OR
+  // - Klaviyo (SMS is integrated with email)
+  const showSMS = 
+    (provider === 'sendgrid' && existingConfig?.sms_provider === 'twilio') ||
+    provider === 'mailchimp' ||
+    provider === 'klaviyo';
 
   return (
     <>
@@ -392,6 +404,7 @@ export default function ProviderSetup() {
           existingConfig={existingConfig}
           actionData={actionData ?? null}
           session={session}
+          client={client}
           onBack={() => {}}
           onContinue={() => navigate(addSessionToUrl('/app/setup/communication/templates', session.id))}
           hasSms={showSMS}

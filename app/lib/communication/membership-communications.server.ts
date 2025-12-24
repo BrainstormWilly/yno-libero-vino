@@ -149,6 +149,8 @@ export async function sendExpirationNotification(
           minPurchaseAmount: tier.min_purchase_amount,
         },
         expirationDate: new Date(enrollment.expires_at ?? new Date()),
+        clientHeaderImageUrl: client?.email_header_image_url ?? null,
+        clientFooterImageUrl: client?.email_footer_image_url ?? null,
       });
     }
   } catch (error) {
@@ -311,6 +313,8 @@ export async function sendUpgradeNotification(
         },
         enrollmentDate: new Date(enrollment.enrolled_at),
         expirationDate: new Date(enrollment.expires_at),
+        clientHeaderImageUrl: client?.email_header_image_url ?? null,
+        clientFooterImageUrl: client?.email_footer_image_url ?? null,
       });
     }
   } catch (error) {
@@ -991,6 +995,8 @@ export async function sendMonthlyStatusNotification(
           name: nextTier.name,
           minPurchaseAmount: nextTier.min_purchase_amount,
         } : null,
+        clientHeaderImageUrl: client?.email_header_image_url ?? null,
+        clientFooterImageUrl: client?.email_footer_image_url ?? null,
       });
     }
   } catch (error) {
@@ -1329,6 +1335,8 @@ async function triggerSendGridMonthlyStatus(options: {
     name: string;
     minPurchaseAmount: number;
   } | null;
+  clientHeaderImageUrl?: string | null;
+  clientFooterImageUrl?: string | null;
 }): Promise<void> {
   if (!options.communicationConfig || options.communicationConfig.email_provider !== 'sendgrid') {
     return;
@@ -1370,29 +1378,48 @@ async function triggerSendGridMonthlyStatus(options: {
 
   const subject = `${clientName} – Your Monthly Membership Status`;
   
-  const html = `<!doctype html>
-    <html lang="en">
-      <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6;">
-        <h1 style="font-size:22px;">Your ${clientName} Membership Status</h1>
-        <p>Hi ${options.customer.firstName},</p>
-        <p>Here's your monthly membership update:</p>
-        <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
-          <h2 style="margin-top:0; color:#202124;">${options.tier.name} Member</h2>
-          <p><strong>Status:</strong> ${statusMessage}</p>
-          <ul style="margin:16px 0; padding-left:20px;">
-            <li><strong>Tier duration:</strong> ${options.tier.durationMonths} months</li>
-            <li><strong>Minimum purchase commitment:</strong> $${options.tier.minPurchaseAmount.toFixed(2)}</li>
-            <li><strong>Days remaining:</strong> ${options.daysRemaining}</li>
-          </ul>
-        </div>
-        ${upgradeMessage}
-        <div style="margin-top:24px; padding:16px; background-color:#fff3cd; border-left:4px solid #ffc107;">
-          <p style="margin:0;"><strong>Renewal reminder:</strong> To keep your discount active, purchase at least $${options.tier.minPurchaseAmount.toFixed(2)} before ${expirationFormatted}.</p>
-        </div>
-        <p style="margin-top:24px;">You're in control—shop when you're ready.</p>
-        <p style="margin-top:24px;">Cheers,<br/>${clientName}</p>
-      </body>
-    </html>`;
+  // Load template from database or fallback to base file
+  const { loadBaseTemplate, renderSendGridTemplate, buildUpgradeMessage } = await import('~/lib/communication/templates.server');
+  const { getCommunicationTemplate } = await import('~/lib/db/supabase.server');
+  
+  let template = '';
+  let customContent: string | null = null;
+  
+  const dbTemplate = await getCommunicationTemplate(options.clientId, 'monthly_status', 'email');
+  if (dbTemplate?.html_body) {
+    template = dbTemplate.html_body;
+    customContent = dbTemplate.custom_content ?? null;
+  } else {
+    // Fallback to base template
+    template = loadBaseTemplate('monthly-status');
+  }
+  
+  // Get image URLs (use client's custom images or defaults)
+  const { getEmailImageUrls } = await import('~/lib/storage/sendgrid-images.server');
+  const { headerUrl, footerUrl } = await getEmailImageUrls(
+    'sendgrid',
+    options.clientHeaderImageUrl,
+    options.clientFooterImageUrl
+  );
+  
+  // Build upgrade message HTML
+  const upgradeMessageHtml = buildUpgradeMessage(options.nextTier);
+  
+  // Prepare variables for template
+  const variables = {
+    client_name: clientName,
+    customer_first_name: options.customer.firstName,
+    tier_name: options.tier.name,
+    status_message: statusMessage,
+    tier_duration_months: options.tier.durationMonths,
+    tier_min_purchase_amount: options.tier.minPurchaseAmount.toFixed(2),
+    days_remaining: options.daysRemaining,
+    expiration_formatted: expirationFormatted,
+    upgrade_message: upgradeMessageHtml,
+  };
+  
+  // Render template (use DB template if available, otherwise use template type to load base)
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
 
   const text = `Your ${clientName} Membership Status
 
@@ -1455,6 +1482,8 @@ async function triggerSendGridExpiration(options: {
     minPurchaseAmount: number;
   };
   expirationDate: Date;
+  clientHeaderImageUrl?: string | null;
+  clientFooterImageUrl?: string | null;
 }): Promise<void> {
   if (!options.communicationConfig || options.communicationConfig.email_provider !== 'sendgrid') {
     return;
@@ -1476,23 +1505,41 @@ async function triggerSendGridExpiration(options: {
 
   const subject = `${clientName} – Membership Expired`;
   
-  const html = `<!doctype html>
-    <html lang="en">
-      <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6;">
-        <h1 style="font-size:22px;">Your ${options.tier.name} Membership Has Expired</h1>
-        <p>Hi ${options.customer.firstName},</p>
-        <p>Your ${options.tier.name} membership expired on ${expirationFormatted}.</p>
-        <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
-          <p>To continue enjoying your member benefits, you'll need to make a qualifying purchase to renew your membership.</p>
-          <ul style="margin:16px 0; padding-left:20px;">
-            <li><strong>Tier:</strong> ${options.tier.name}</li>
-            <li><strong>Minimum purchase to renew:</strong> $${options.tier.minPurchaseAmount.toFixed(2)}</li>
-          </ul>
-        </div>
-        <p>We hope to see you back soon!</p>
-        <p style="margin-top:24px;">Cheers,<br/>${clientName}</p>
-      </body>
-    </html>`;
+  // Load template from database or fallback to base file
+  const { loadBaseTemplate, renderSendGridTemplate } = await import('~/lib/communication/templates.server');
+  const { getCommunicationTemplate } = await import('~/lib/db/supabase.server');
+  
+  let template = '';
+  let customContent: string | null = null;
+  
+  const dbTemplate = await getCommunicationTemplate(options.clientId, 'expiration', 'email');
+  if (dbTemplate?.html_body) {
+    template = dbTemplate.html_body;
+    customContent = dbTemplate.custom_content ?? null;
+  } else {
+    // Fallback to base template
+    template = loadBaseTemplate('expiration');
+  }
+  
+  // Get image URLs (use client's custom images or defaults)
+  const { getEmailImageUrls } = await import('~/lib/storage/sendgrid-images.server');
+  const { headerUrl, footerUrl } = await getEmailImageUrls(
+    'sendgrid',
+    options.clientHeaderImageUrl,
+    options.clientFooterImageUrl
+  );
+  
+  // Prepare variables for template
+  const variables = {
+    client_name: clientName,
+    customer_first_name: options.customer.firstName,
+    tier_name: options.tier.name,
+    tier_min_purchase_amount: options.tier.minPurchaseAmount.toFixed(2),
+    expiration_formatted: expirationFormatted,
+  };
+  
+  // Render template (use DB template if available, otherwise use template type to load base)
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
 
   const text = `Your ${options.tier.name} Membership Has Expired
 
@@ -1554,6 +1601,8 @@ async function triggerSendGridUpgrade(options: {
   };
   enrollmentDate: Date;
   expirationDate: Date;
+  clientHeaderImageUrl?: string | null;
+  clientFooterImageUrl?: string | null;
 }): Promise<void> {
   if (!options.communicationConfig || options.communicationConfig.email_provider !== 'sendgrid') {
     return;
@@ -1573,29 +1622,43 @@ async function triggerSendGridUpgrade(options: {
 
   const subject = `${clientName} – Congratulations on Your Tier Upgrade!`;
   
-  const html = `<!doctype html>
-    <html lang="en">
-      <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6;">
-        <h1 style="font-size:22px;">Congratulations on Your Upgrade! 🎉</h1>
-        <p>Hi ${options.customer.firstName},</p>
-        <p>Great news! You've been upgraded to the <strong>${options.newTier.name}</strong> tier!</p>
-        <div style="margin:20px 0; padding:16px; background-color:#e8f5e9; border-left:4px solid #4caf50; border-radius:4px;">
-          <h2 style="margin-top:0; color:#2e7d32;">Previous Tier: ${options.oldTier.name}</h2>
-          <p style="font-size:24px; margin:16px 0;">↓</p>
-          <h2 style="margin-bottom:0; color:#2e7d32;">New Tier: ${options.newTier.name}</h2>
-        </div>
-        <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
-          <h3 style="margin-top:0;">Your New Benefits:</h3>
-          <ul style="margin:16px 0; padding-left:20px;">
-            <li><strong>Tier duration:</strong> ${options.newTier.durationMonths} months</li>
-            <li><strong>Minimum purchase commitment:</strong> $${options.newTier.minPurchaseAmount.toFixed(2)}</li>
-            <li><strong>Membership duration ends:</strong> ${expirationFormatted}</li>
-          </ul>
-        </div>
-        <p>Enjoy your enhanced membership benefits!</p>
-        <p style="margin-top:24px;">Cheers,<br/>${clientName}</p>
-      </body>
-    </html>`;
+  // Load template from database or fallback to base file
+  const { loadBaseTemplate, renderSendGridTemplate } = await import('~/lib/communication/templates.server');
+  const { getCommunicationTemplate } = await import('~/lib/db/supabase.server');
+  
+  let template = '';
+  let customContent: string | null = null;
+  
+  const dbTemplate = await getCommunicationTemplate(options.clientId, 'upgrade_available', 'email');
+  if (dbTemplate?.html_body) {
+    template = dbTemplate.html_body;
+    customContent = dbTemplate.custom_content ?? null;
+  } else {
+    // Fallback to base template
+    template = loadBaseTemplate('upgrade');
+  }
+  
+  // Get image URLs (use client's custom images or defaults)
+  const { getEmailImageUrls } = await import('~/lib/storage/sendgrid-images.server');
+  const { headerUrl, footerUrl } = await getEmailImageUrls(
+    'sendgrid',
+    options.clientHeaderImageUrl,
+    options.clientFooterImageUrl
+  );
+  
+  // Prepare variables for template
+  const variables = {
+    client_name: clientName,
+    customer_first_name: options.customer.firstName,
+    old_tier_name: options.oldTier.name,
+    new_tier_name: options.newTier.name,
+    new_tier_duration_months: options.newTier.durationMonths,
+    new_tier_min_purchase_amount: options.newTier.minPurchaseAmount.toFixed(2),
+    expiration_formatted: expirationFormatted,
+  };
+  
+  // Render template (use DB template if available, otherwise use template type to load base)
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
 
   const text = `Congratulations on Your Tier Upgrade!
 
@@ -1792,6 +1855,8 @@ export async function sendExpirationWarningNotification(
         },
         expirationDate: expiresAt,
         daysRemaining,
+        clientHeaderImageUrl: client?.email_header_image_url ?? null,
+        clientFooterImageUrl: client?.email_footer_image_url ?? null,
       });
     }
   } catch (error) {
@@ -2040,6 +2105,8 @@ async function triggerSendGridExpirationWarning(options: {
   };
   expirationDate: Date;
   daysRemaining: number;
+  clientHeaderImageUrl?: string | null;
+  clientFooterImageUrl?: string | null;
 }): Promise<void> {
   if (!options.communicationConfig || options.communicationConfig.email_provider !== 'sendgrid') {
     return;
@@ -2060,25 +2127,44 @@ async function triggerSendGridExpirationWarning(options: {
 
   const subject = `${clientName} – Your Membership Expires Soon`;
   
-  const html = `<!doctype html>
-    <html lang="en">
-      <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6;">
-        <h1 style="font-size:22px;">⚠️ Your Membership Expires in ${options.daysRemaining} Day${options.daysRemaining === 1 ? '' : 's'}</h1>
-        <p>Hi ${options.customer.firstName},</p>
-        <p>Your ${options.tier.name} membership expires on ${expirationFormatted} (${options.daysRemaining} day${options.daysRemaining === 1 ? '' : 's'} from now).</p>
-        <div style="margin:20px 0; padding:16px; background-color:#fff3cd; border-left:4px solid #ffc107; border-radius:4px;">
-          <h3 style="margin-top:0; color:#856404;">Renewal Reminder</h3>
-          <p>To keep your member benefits active, make a qualifying purchase before your membership expires:</p>
-          <ul style="margin:16px 0; padding-left:20px;">
-            <li><strong>Tier:</strong> ${options.tier.name}</li>
-            <li><strong>Minimum purchase to renew:</strong> $${options.tier.minPurchaseAmount.toFixed(2)}</li>
-            <li><strong>Expires on:</strong> ${expirationFormatted}</li>
-          </ul>
-        </div>
-        <p>Don't let your benefits expire—shop now to renew your membership!</p>
-        <p style="margin-top:24px;">Cheers,<br/>${clientName}</p>
-      </body>
-    </html>`;
+  // Load template from database or fallback to base file
+  const { loadBaseTemplate, renderSendGridTemplate } = await import('~/lib/communication/templates.server');
+  const { getCommunicationTemplate } = await import('~/lib/db/supabase.server');
+  
+  let template = '';
+  let customContent: string | null = null;
+  
+  const dbTemplate = await getCommunicationTemplate(options.clientId, 'expiration_warning', 'email');
+  if (dbTemplate?.html_body) {
+    template = dbTemplate.html_body;
+    customContent = dbTemplate.custom_content ?? null;
+  } else {
+    // Fallback to base template
+    template = loadBaseTemplate('expiration-warning');
+  }
+  
+  // Get image URLs (use client's custom images or defaults)
+  const { getEmailImageUrls } = await import('~/lib/storage/sendgrid-images.server');
+  const { headerUrl, footerUrl } = await getEmailImageUrls(
+    'sendgrid',
+    options.clientHeaderImageUrl,
+    options.clientFooterImageUrl
+  );
+  
+  // Prepare variables for template
+  const daysRemainingText = `${options.daysRemaining} Day${options.daysRemaining === 1 ? '' : 's'}`;
+  const variables = {
+    client_name: clientName,
+    customer_first_name: options.customer.firstName,
+    tier_name: options.tier.name,
+    tier_min_purchase_amount: options.tier.minPurchaseAmount.toFixed(2),
+    days_remaining: options.daysRemaining,
+    days_remaining_text: daysRemainingText,
+    expiration_formatted: expirationFormatted,
+  };
+  
+  // Render template (use DB template if available, otherwise use template type to load base)
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
 
   const text = `Your Membership Expires in ${options.daysRemaining} Day${options.daysRemaining === 1 ? '' : 's'}
 

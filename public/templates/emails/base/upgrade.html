@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6; margin: 0; padding: 0;">
+    {{header_image_block}}
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="font-size:22px;">Congratulations on Your Upgrade! 🎉</h1>
+      <p>Hi {{customer_first_name}},</p>
+      <p>Great news! You've been upgraded to the <strong>{{new_tier_name}}</strong> tier!</p>
+      {{highlight_content}}
+      <div style="margin:20px 0; padding:16px; background-color:#e8f5e9; border-left:4px solid #4caf50; border-radius:4px;">
+        <h2 style="margin-top:0; color:#2e7d32;">Previous Tier: {{old_tier_name}}</h2>
+        <p style="font-size:24px; margin:16px 0;">↓</p>
+        <h2 style="margin-bottom:0; color:#2e7d32;">New Tier: {{new_tier_name}}</h2>
+      </div>
+      {{secondary_content}}
+      <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
+        <h3 style="margin-top:0;">Your New Benefits:</h3>
+        <ul style="margin:16px 0; padding-left:20px;">
+          <li><strong>Tier duration:</strong> {{new_tier_duration_months}} months</li>
+          <li><strong>Minimum purchase commitment:</strong> ${{new_tier_min_purchase_amount}}</li>
+          <li><strong>Membership duration ends:</strong> {{expiration_formatted}}</li>
+        </ul>
+      </div>
+      {{custom_content_block}}
+      <p>Enjoy your enhanced membership benefits!</p>
+      <p style="margin-top:24px;">Cheers,<br/>{{client_name}}</p>
+    </div>
+    {{footer_image_block}}
+  </body>
+</html>
+

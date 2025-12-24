@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Form, useNavigation } from 'react-router';
-import { Card, BlockStack, Text, Banner, TextField, InlineStack, Button } from '@shopify/polaris';
+import { Card, BlockStack, Text, Banner, TextField, InlineStack, Button, Thumbnail } from '@shopify/polaris';
 import EmailPreferencesForm from '../EmailPreferencesForm';
 import type { EmailProviderComponentProps } from './types';
 
-export default function LiberoVinoManagedEmailProvider({ existingConfig, actionData, hasSms, onContinue }: EmailProviderComponentProps) {
+export default function LiberoVinoManagedEmailProvider({ existingConfig, actionData, hasSms, onContinue, client }: EmailProviderComponentProps) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
   
@@ -15,9 +15,67 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
   );
   const [testEmail, setTestEmail] = useState('');
   const [testPhone, setTestPhone] = useState('');
+  const [headerImageUrl, setHeaderImageUrl] = useState(client?.email_header_image_url || '');
+  const [footerImageUrl, setFooterImageUrl] = useState(client?.email_footer_image_url || '');
+  const [uploading, setUploading] = useState<'header' | 'footer' | null>(null);
+  
+  const headerInputRef = useRef<HTMLInputElement>(null);
+  const footerInputRef = useRef<HTMLInputElement>(null);
 
   const handleWarningDaysChange = (value: string) => {
     setWarningDays(value);
+  };
+  
+  const handleImageUpload = async (imageType: 'header' | 'footer', file: File) => {
+    setUploading(imageType);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('imageType', imageType);
+      
+      const response = await fetch('/api/upload-sendgrid-image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      if (result.success && result.url) {
+        if (imageType === 'header') {
+          setHeaderImageUrl(result.url);
+        } else {
+          setFooterImageUrl(result.url);
+        }
+      } else {
+        console.error('Upload failed:', result.error);
+        alert(result.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(null);
+    }
+  };
+  
+  const handleImageFileSelect = (imageType: 'header' | 'footer', event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a JPEG, PNG, GIF, or WebP image');
+      return;
+    }
+    
+    // Validate file size (5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+    
+    handleImageUpload(imageType, file);
   };
 
   return (
@@ -40,6 +98,72 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
               </Text>
             </BlockStack>
           </Banner>
+          
+          {/* Email Image Upload Section - SendGrid Only */}
+          <BlockStack gap="400">
+            <Text variant="headingSm" as="h4">
+              Email Images (Optional)
+            </Text>
+            <Text variant="bodySm" tone="subdued" as="p">
+              Upload custom header and footer images for your email templates. If not provided, default LiberoVino images will be used.
+            </Text>
+            
+            {/* Header Image */}
+            <BlockStack gap="200">
+              <Text variant="bodyMd" fontWeight="semibold" as="p">
+                Header Image
+              </Text>
+              {headerImageUrl && (
+                <Thumbnail
+                  source={headerImageUrl}
+                  alt="Email header image"
+                  size="large"
+                />
+              )}
+              <input
+                ref={headerInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={(e) => handleImageFileSelect('header', e)}
+                style={{ display: 'none' }}
+              />
+              <Button
+                onClick={() => headerInputRef.current?.click()}
+                loading={uploading === 'header'}
+                disabled={uploading !== null}
+              >
+                {headerImageUrl ? 'Replace Header Image' : 'Upload Header Image'}
+              </Button>
+            </BlockStack>
+            
+            {/* Footer Image */}
+            <BlockStack gap="200">
+              <Text variant="bodyMd" fontWeight="semibold" as="p">
+                Footer Image
+              </Text>
+              {footerImageUrl && (
+                <Thumbnail
+                  source={footerImageUrl}
+                  alt="Email footer image"
+                  size="large"
+                />
+              )}
+              <input
+                ref={footerInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={(e) => handleImageFileSelect('footer', e)}
+                style={{ display: 'none' }}
+              />
+              <Button
+                onClick={() => footerInputRef.current?.click()}
+                loading={uploading === 'footer'}
+                disabled={uploading !== null}
+              >
+                {footerImageUrl ? 'Replace Footer Image' : 'Upload Footer Image'}
+              </Button>
+            </BlockStack>
+          </BlockStack>
           
           <EmailPreferencesForm
             warningDays={warningDays}

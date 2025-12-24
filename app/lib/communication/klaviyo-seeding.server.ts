@@ -12,7 +12,6 @@ import { KlaviyoProvider } from '~/lib/communication/providers/klaviyo.server';
 import type {
   KlaviyoProviderData,
   KlaviyoTemplateSeedInput,
-  KlaviyoTemplateSeedResult,
 } from '~/types/communication-klaviyo';
 
 interface SeedKlaviyoOptions {
@@ -123,6 +122,22 @@ const TEMPLATE_LOOKUP: Record<KlaviyoMetricKey, KlaviyoTemplateKey> = {
   TEST: 'TEST',
 };
 
+// Map Klaviyo template keys to base template file names (where applicable)
+// Templates not in this map will use the hardcoded HTML in renderHtml
+const KLAVIYO_TO_BASE_TEMPLATE_MAP: Record<KlaviyoTemplateKey, string> = {
+  CLUB_SIGNUP: 'welcome',
+  MONTHLY_STATUS: 'monthly-status',
+  // MONTHLY_STATUS_PROMO shares the same base template but injects promotional content
+  // (see renderHtml lines 238-245 for differentiation)
+  MONTHLY_STATUS_PROMO: 'monthly-status',
+  EXPIRATION_WARNING: 'expiration-warning',
+  EXPIRATION_NOTICE: 'expiration',
+  TIER_UPGRADE: 'upgrade',
+  ANNUAL_RESIGN: 'annual-resign',
+  SALES_BLAST: 'sales-blast',
+  TEST: 'test',
+};
+
 export async function seedKlaviyoResources(
   options: SeedKlaviyoOptions
 ): Promise<KlaviyoProviderData> {
@@ -145,7 +160,7 @@ export async function seedKlaviyoResources(
   for (const metricKey of metricKeys) {
     const metricName = KLAVIYO_METRICS[metricKey];
     const templateKey = TEMPLATE_LOOKUP[metricKey];
-    const templateSeed = buildTemplateSeed(templateKey);
+    const templateSeed = await buildTemplateSeed(templateKey);
     const flowKey = templateKey as KlaviyoFlowKey;
 
     const metric = await provider.ensureMetric(metricName);
@@ -185,52 +200,81 @@ export async function seedKlaviyoResources(
   };
 }
 
-export function buildTemplateSeed(
+export async function buildTemplateSeed(
   templateKey: KlaviyoTemplateKey
-): KlaviyoTemplateSeedInput {
+): Promise<KlaviyoTemplateSeedInput> {
   const config = TEMPLATE_CONFIG[templateKey];
+  const html = await renderHtml(templateKey, config);
   return {
     name: KLAVIYO_TEMPLATES[templateKey],
     subject: config.subject,
     previewText: config.previewText,
-    html: renderHtml(templateKey, config),
+    html,
     text: renderText(templateKey, config),
     editorType: 'HTML',
   };
 }
 
-function renderHtml(key: KlaviyoTemplateKey, config: TemplateConfig): string {
-  return `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>${KLAVIYO_TEMPLATES[key]}</title>
-    <style>
-      body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 24px; color: #202124; }
-      .card { max-width: 640px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 32px; }
-      h1 { font-size: 28px; margin-bottom: 16px; }
-      p { font-size: 16px; line-height: 1.6; margin-bottom: 16px; }
-      .highlight { background: #161f30; color: #ffffff; padding: 20px; border-radius: 10px; margin: 24px 0; }
-      .cta { display: inline-block; padding: 14px 24px; background: #ff4f45; color: #ffffff; border-radius: 6px; font-weight: 600; text-decoration: none; }
-      .footer { margin-top: 32px; font-size: 14px; color: #5f6368; }
-    </style>
-  </head>
-  <body>
-    <div class="card">
-      <p>Hi {{ person.first_name }},</p>
-      <h1>${config.headline}</h1>
-      <p>${config.intro}</p>
-      ${renderHighlight(key)}
-      ${renderSecondaryCopy(key)}
-      <a class="cta" href="{{ person.shop_url }}">${config.cta}</a>
-      <div class="footer">
-        <p>Stay liberated, stay curious.</p>
-        <p>{{ person.winery_name }} × LiberoVino</p>
-        <p><a href="{% unsubscribe_link %}">Update preferences</a></p>
-      </div>
-    </div>
-  </body>
-</html>`;
+async function renderHtml(key: KlaviyoTemplateKey, config: TemplateConfig): Promise<string> {
+  // All templates now load from base HTML files
+  const baseTemplateName = KLAVIYO_TO_BASE_TEMPLATE_MAP[key];
+  
+  // Load from base template file
+  const { loadBaseTemplate, convertTemplateForKlaviyo } = await import('~/lib/communication/templates.server');
+  const { getDefaultHeaderImageUrl, getDefaultFooterImageUrl } = await import('~/lib/storage/sendgrid-images.server');
+  
+  let html = loadBaseTemplate(baseTemplateName);
+  
+  // Get default branding image URLs
+  const headerUrl = await getDefaultHeaderImageUrl();
+  const footerUrl = await getDefaultFooterImageUrl();
+  
+  // Replace image blocks with actual URLs (they're placeholders in base templates)
+  const headerImageBlock = `<div style="width: 100%; text-align: center; margin-bottom: 20px;"><img src="${headerUrl}" alt="LiberoVino Header" style="max-width: 600px; height: auto;" /></div>`;
+  const footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${footerUrl}" alt="LiberoVino Footer" style="max-width: 600px; height: auto;" /></div>`;
+  
+  html = html.replace('{{header_image_block}}', headerImageBlock);
+  html = html.replace('{{footer_image_block}}', footerImageBlock);
+  html = html.replace('{{custom_content_block}}', ''); // Klaviyo templates don't use custom content
+  
+  // Inject config values (headline, intro, etc.) for templates that use them
+  html = html.replace('{{headline}}', config.headline);
+  html = html.replace('{{intro}}', config.intro);
+  
+  // Inject highlight and secondary content (convert class-based styles to inline styles)
+  let highlightContent = renderHighlight(key);
+  // Convert .highlight class to inline styles to match base template styling
+  highlightContent = highlightContent.replace(
+    'class="highlight"',
+    'style="background-color: #161f30; color: #ffffff; padding: 20px; border-radius: 10px; margin: 24px 0;"'
+  );
+  
+  const secondaryContent = renderSecondaryCopy(key);
+  
+  html = html.replace('{{highlight_content}}', highlightContent);
+  html = html.replace('{{secondary_content}}', secondaryContent ? `<div style="margin-top:16px;">${secondaryContent}</div>` : '');
+  
+  // For templates that need dynamic content sections, inject them
+  if (key === 'MONTHLY_STATUS_PROMO') {
+    // Replace upgrade_message with promotional content
+    const promoContent = renderSecondaryCopy(key);
+    html = html.replace('{{upgrade_message}}', promoContent ? `<div style="margin-top:24px; padding:16px; background-color:#f8f9fa; border-left:4px solid #0066cc;">${promoContent}</div>` : '');
+  } else if (key === 'MONTHLY_STATUS') {
+    // Replace upgrade_message with upgrade opportunity if available
+    const upgradeContent = renderSecondaryCopy(key);
+    html = html.replace('{{upgrade_message}}', upgradeContent ? `<div style="margin-top:24px; padding:16px; background-color:#f8f9fa; border-left:4px solid #0066cc;">${upgradeContent}</div>` : '');
+  } else if (key === 'CLUB_SIGNUP') {
+    // Replace upgrade_message with upgrade opportunity
+    const upgradeContent = renderSecondaryCopy(key);
+    html = html.replace('{{upgrade_message}}', upgradeContent ? `<div style="margin-top:24px; padding:16px; background-color:#f8f9fa; border-left:4px solid #0066cc;">${upgradeContent}</div>` : '');
+  } else {
+    html = html.replace('{{upgrade_message}}', '');
+  }
+  
+  // Convert {{variable}} to {{person.variable}} for Klaviyo
+  html = convertTemplateForKlaviyo(html);
+  
+  return html;
 }
 
 function renderHighlight(key: KlaviyoTemplateKey): string {

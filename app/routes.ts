@@ -38,6 +38,7 @@ export default [
   route("sitemap.xml", "routes/sitemap[.]xml.tsx"),
   route("docs", "routes/docs.tsx", [
     route("sms-opt-in", "routes/docs.sms-opt-in.tsx"),
+    route("sms-opt-in-demo", "routes/docs.sms-opt-in-demo.tsx"),
   ]),
   // API resource routes
   route("api/products", "routes/api.products.ts"),

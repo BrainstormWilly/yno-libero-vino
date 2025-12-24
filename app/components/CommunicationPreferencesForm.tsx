@@ -110,14 +110,23 @@ export function CommunicationPreferencesForm({
                 </Text>
               )}
 
+              {!readOnly && (
+                <Banner tone="info">
+                  <Text variant="bodySm" as="p">
+                    <strong>SMS Communications:</strong> By checking the boxes below, you agree to receive SMS text messages. 
+                    Message frequency varies. Message and data rates may apply. Reply STOP to opt-out at any time. Reply HELP for help.
+                  </Text>
+                </Banner>
+              )}
+
               <Checkbox
-                label="Transactional"
+                label="I agree to receive SMS text messages for account notifications (monthly membership status updates, expiration warnings, and tier upgrade notifications)"
                 checked={formState.smsTransactional}
                 disabled={readOnly || formState.unsubscribedAll || smsDisabled}
                 onChange={(checked) =>
                   setFormState({ ...formState, smsTransactional: checked })
                 }
-                helpText="Monthly status updates and expiration warnings via SMS."
+                helpText="Message and data rates may apply. Reply STOP to opt out anytime."
               />
               <input
                 type="hidden"
@@ -126,13 +135,13 @@ export function CommunicationPreferencesForm({
               />
 
               <Checkbox
-                label="Marketing"
+                label="I agree to receive SMS text messages for marketing (promotions, product suggestions, and special offers)"
                 checked={formState.smsMarketing}
                 disabled={readOnly || formState.unsubscribedAll || smsDisabled}
                 onChange={(checked) =>
                   setFormState({ ...formState, smsMarketing: checked })
                 }
-                helpText="Promotions and product suggestions via SMS."
+                helpText="Message and data rates may apply. Reply STOP to opt out anytime."
               />
               <input
                 type="hidden"

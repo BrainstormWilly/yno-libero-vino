@@ -25,10 +25,11 @@ DECLARE
   v_request_body JSONB;
 BEGIN
   -- Get API base URL from environment (our API endpoint)
-  -- PRODUCTION: Override with ALTER DATABASE postgres SET app.api_base_url = 'https://your-production-domain.com';
+  -- PRODUCTION: Override with ALTER DATABASE postgres SET app.api_base_url = 'https://liberovino.wine';
+  -- LOCAL: Uses http://localhost:3000 as fallback (Supabase local → local app)
   v_api_base_url := COALESCE(
     current_setting('app.api_base_url', true),
-    'https://c7-kindly-balanced-macaw.ngrok-free.app'  -- Static Ngrok URL for dev (paid plan)
+    'http://localhost:3000'  -- Local dev default (Supabase local → local app)
   );
 
   -- Process up to 50 pending jobs

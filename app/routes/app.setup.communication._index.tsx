@@ -120,12 +120,14 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
 
+      console.log('[Communication Setup] Provider saved successfully:', { emailProvider, smsProvider });
       return {
         success: true,
         emailProvider,
         smsProvider,
       };
     } catch (error) {
+      console.error('[Communication Setup] Error saving provider selection:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to save provider selection.',
@@ -202,7 +204,11 @@ export default function CommunicationProviderSelection() {
   // Navigate after successful save
   useEffect(() => {
     if (actionData?.success && actionData.emailProvider) {
-      navigate(addSessionToUrl(`/app/setup/communication/${actionData.emailProvider}`, session.id));
+      const targetUrl = addSessionToUrl(`/app/setup/communication/${actionData.emailProvider}`, session.id);
+      console.log('[Communication Setup] Navigating to provider setup:', targetUrl);
+      navigate(targetUrl);
+    } else if (actionData && !actionData.success) {
+      console.error('[Communication Setup] Action failed:', actionData.message || 'Unknown error');
     }
   }, [actionData, navigate, session.id]);
 
@@ -226,6 +232,13 @@ export default function CommunicationProviderSelection() {
               size="large"
               submit
               disabled={!emailProvider}
+              onClick={() => {
+                if (!emailProvider) {
+                  console.warn('[Communication Setup] Button clicked but no email provider selected');
+                  return;
+                }
+                console.log('[Communication Setup] Submitting form with provider:', emailProvider);
+              }}
             >
               {emailProvider 
                 ? `Continue to ${emailProvider === 'klaviyo' ? 'Klaviyo' : emailProvider === 'mailchimp' ? 'Mailchimp' : 'LiberoVino Managed'}` 
@@ -234,6 +247,11 @@ export default function CommunicationProviderSelection() {
           </Form>
         </InlineStack>
       </Box>
+
+      {/* Error Banner */}
+      {actionData && !actionData.success && actionData.message && (
+        <Banner tone="critical" title={actionData.message} />
+      )}
 
       {/* Instructions */}
       <Card>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6; margin: 0; padding: 0;">
+    {{header_image_block}}
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="font-size:22px;">Your {{client_name}} Membership Status</h1>
+      <p>Hi {{customer_first_name}},</p>
+      <p>Here's your monthly membership update:</p>
+      <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
+        <h2 style="margin-top:0; color:#202124;">{{tier_name}} Member</h2>
+        <p><strong>Status:</strong> {{status_message}}</p>
+        <ul style="margin:16px 0; padding-left:20px;">
+          <li><strong>Tier duration:</strong> {{tier_duration_months}} months</li>
+          <li><strong>Minimum purchase commitment:</strong> ${{tier_min_purchase_amount}}</li>
+          <li><strong>Days remaining:</strong> {{days_remaining}}</li>
+        </ul>
+      </div>
+      {{upgrade_message}}
+      <div style="margin-top:24px; padding:16px; background-color:#fff3cd; border-left:4px solid #ffc107;">
+        <p style="margin:0;"><strong>Renewal reminder:</strong> To keep your discount active, purchase at least ${{tier_min_purchase_amount}} before {{expiration_formatted}}.</p>
+      </div>
+      {{custom_content_block}}
+      <p style="margin-top:24px;">You're in control—shop when you're ready.</p>
+      <p style="margin-top:24px;">Cheers,<br/>{{client_name}}</p>
+    </div>
+    {{footer_image_block}}
+  </body>
+</html>

@@ -88,6 +88,8 @@ export class CommunicationManager {
           undefined,
         marketingAccessToken: marketingToken,
         audienceId,
+        smsApiKey: config?.sms_api_key ?? null,
+        defaultFromNumber: config?.sms_from_number ?? null,
       });
     }
 
@@ -147,6 +149,43 @@ export class CommunicationManager {
         });
       }
       throw new Error('Klaviyo SMS provider selected but no API key is configured.');
+    }
+
+    // If SMS provider is explicitly set to Mailchimp, or if email provider is Mailchimp (integrated)
+    if (smsProvider === 'mailchimp' || emailProvider === 'mailchimp') {
+      const providerData = MailchimpProvider.parseProviderData(config?.provider_data ?? null);
+      const serverPrefix =
+        providerData.serverPrefix ??
+        this.options.defaultMailchimpServerPrefix ??
+        process.env.MAILCHIMP_SERVER_PREFIX ??
+        null;
+      const smsApiKey = config?.sms_api_key ?? null;
+
+      if (!serverPrefix) {
+        throw new Error('Mailchimp SMS provider selected but no data center/server prefix is configured.');
+      }
+
+      if (!smsApiKey) {
+        throw new Error('Mailchimp SMS provider selected but no SMS API key is configured.');
+      }
+
+      return new MailchimpProvider({
+        serverPrefix,
+        defaultFromEmail:
+          config?.email_from_address ??
+          this.options.defaultMailchimpFromEmail ??
+          this.options.defaultSendgridFromEmail ??
+          '',
+        defaultFromName:
+          config?.email_from_name ??
+          this.options.defaultMailchimpFromName ??
+          this.options.defaultSendgridFromName ??
+          undefined,
+        marketingAccessToken: providerData.marketingAccessToken ?? null,
+        audienceId: config?.email_list_id ?? providerData.audienceId ?? null,
+        smsApiKey,
+        defaultFromNumber: config?.sms_from_number ?? null,
+      });
     }
 
     // Otherwise, fall back to Twilio using LiberoVino's account (automatic)

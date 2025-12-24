@@ -31,23 +31,27 @@ type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfi
 
 /**
  * Get the shop/store URL for a client based on their CRM type
- * TODO: Update to use customer-facing website URL instead of CRM admin URL
- * For Commerce7: Should use the actual storefront URL (may be custom domain)
- * For Shopify: Should use the customer-facing store URL (not admin)
+ * Uses stored website_url if available, otherwise constructs from tenant_shop
+ * For Commerce7: Uses organization-website from install payload if stored, otherwise constructs URL
+ * For Shopify: Uses tenant_shop directly (which is the shop domain)
  */
-function getShopUrl(client: { crm_type: string; tenant_shop: string } | null): string {
+function getShopUrl(client: { crm_type: string; tenant_shop: string; website_url?: string | null } | null): string {
   if (!client) {
     return 'https://example.com'; // Fallback
   }
 
+  // If website_url is stored, use it (this comes from organization-website for Commerce7)
+  if (client.website_url) {
+    return client.website_url;
+  }
+
+  // Fallback to constructed URLs if website_url is not stored
   if (client.crm_type === 'commerce7') {
     // Commerce7: tenant_shop is the tenant identifier
     // Customer-facing storefront is typically at: https://{tenant}.commerce7.com
-    // TODO: Check if client has a custom domain or organization-website stored
     return `https://${client.tenant_shop}.commerce7.com`;
   } else if (client.crm_type === 'shopify') {
     // Shopify: tenant_shop is the shop domain (e.g., "mystore.myshopify.com")
-    // TODO: Convert myshopify.com domain to customer-facing store URL if custom domain exists
     return `https://${client.tenant_shop}`;
   }
 

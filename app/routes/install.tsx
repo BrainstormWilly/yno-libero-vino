@@ -111,6 +111,11 @@ async function handleC7Install(request: Request) {
     console.log('Organization name from payload:', payload['organization-name']);
     console.log('Using org_name:', orgName);
     
+    // Extract website URL if provided
+    const websiteUrl = payload['organization-website'] || null;
+    console.log('Organization website from payload:', payload['organization-website']);
+    console.log('Using website_url:', websiteUrl);
+    
     // Create new client
     const { data: newClient, error: insertError } = await supabase
       .from('clients')
@@ -121,6 +126,7 @@ async function handleC7Install(request: Request) {
         org_contact: `${payload.user.firstName} ${payload.user.lastName}`.trim(),
         user_id: payload.user.id,
         user_email: payload.user.email,
+        website_url: websiteUrl,
       })
       .select()
       .single();
