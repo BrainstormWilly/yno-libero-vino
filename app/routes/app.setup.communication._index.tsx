@@ -79,14 +79,33 @@ export async function action({ request }: ActionFunctionArgs) {
       const emailProviderChanged = previousEmailProvider !== newEmailProvider;
       const smsProviderChanged = previousSmsProvider !== finalSmsProvider?.toLowerCase();
 
+      // Clear provider-specific data when switching providers
+      const updateData: Parameters<typeof db.updateCommunicationConfig>[1] = {
+        emailProvider,
+        smsProvider: finalSmsProvider,
+        emailProviderConfirmed: emailProviderChanged ? false : undefined,
+        smsProviderConfirmed: smsProviderChanged ? false : undefined,
+      };
+
+      // Clear email_api_key when switching to SendGrid (uses env var)
+      if (newEmailProvider === 'sendgrid') {
+        updateData.emailApiKey = null;
+      }
+      
+      // Clear provider_data when switching away from Klaviyo or Mailchimp
+      if (emailProviderChanged) {
+        if (previousEmailProvider === 'klaviyo' || previousEmailProvider === 'mailchimp') {
+          updateData.providerData = {}; // provider_data is NOT NULL, use empty object
+        }
+        // Clear email_list_id when switching away from Mailchimp/Klaviyo
+        if (previousEmailProvider === 'mailchimp' || previousEmailProvider === 'klaviyo') {
+          updateData.emailListId = null;
+        }
+      }
+
       if (existingConfig) {
         // Update existing config
-        await db.updateCommunicationConfig(session.clientId, {
-          emailProvider,
-          smsProvider: finalSmsProvider,
-          emailProviderConfirmed: emailProviderChanged ? false : undefined,
-          smsProviderConfirmed: smsProviderChanged ? false : undefined,
-        });
+        await db.updateCommunicationConfig(session.clientId, updateData);
       } else {
         // Create new config
         await db.createCommunicationConfig(
@@ -101,12 +120,14 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
 
+      console.log('[Communication Setup] Provider saved successfully:', { emailProvider, smsProvider });
       return {
         success: true,
         emailProvider,
         smsProvider,
       };
     } catch (error) {
+      console.error('[Communication Setup] Error saving provider selection:', error);
       return {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to save provider selection.',
@@ -183,7 +204,11 @@ export default function CommunicationProviderSelection() {
   // Navigate after successful save
   useEffect(() => {
     if (actionData?.success && actionData.emailProvider) {
-      navigate(addSessionToUrl(`/app/setup/communication/${actionData.emailProvider}`, session.id));
+      const targetUrl = addSessionToUrl(`/app/setup/communication/${actionData.emailProvider}`, session.id);
+      console.log('[Communication Setup] Navigating to provider setup:', targetUrl);
+      navigate(targetUrl);
+    } else if (actionData && !actionData.success) {
+      console.error('[Communication Setup] Action failed:', actionData.message || 'Unknown error');
     }
   }, [actionData, navigate, session.id]);
 
@@ -207,6 +232,13 @@ export default function CommunicationProviderSelection() {
               size="large"
               submit
               disabled={!emailProvider}
+              onClick={() => {
+                if (!emailProvider) {
+                  console.warn('[Communication Setup] Button clicked but no email provider selected');
+                  return;
+                }
+                console.log('[Communication Setup] Submitting form with provider:', emailProvider);
+              }}
             >
               {emailProvider 
                 ? `Continue to ${emailProvider === 'klaviyo' ? 'Klaviyo' : emailProvider === 'mailchimp' ? 'Mailchimp' : 'LiberoVino Managed'}` 
@@ -215,6 +247,11 @@ export default function CommunicationProviderSelection() {
           </Form>
         </InlineStack>
       </Box>
+
+      {/* Error Banner */}
+      {actionData && !actionData.success && actionData.message && (
+        <Banner tone="critical" title={actionData.message} />
+      )}
 
       {/* Instructions */}
       <Card>

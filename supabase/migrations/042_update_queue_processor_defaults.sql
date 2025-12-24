@@ -3,15 +3,15 @@
 -- ============================================
 -- This migration documents the URL configuration for queue processor functions.
 -- 
--- DEFAULT: Static Ngrok URL for local development (paid plan with static domain)
---   https://c7-kindly-balanced-macaw.ngrok-free.app
+-- DEFAULT: Localhost URL for local development (Supabase local → local app)
+--   http://localhost:3000
 -- 
 -- PRODUCTION: Override by setting the database parameter:
 --   ALTER DATABASE postgres SET app.api_base_url = 'https://your-production-domain.com';
 --
 -- This allows:
--- - Local dev: Works out-of-the-box with static Ngrok URL
--- - Production: Explicitly configured, prevents accidental use of dev URLs
+-- - Local dev: Works out-of-the-box with localhost:3000 (Supabase local → local app)
+-- - Production: Explicitly configured via ALTER DATABASE, prevents accidental use of dev URLs
 --
 -- Note: This migration adds helper functions and comments.
 -- The actual queue processor functions are in migrations 028, 033, and 037.

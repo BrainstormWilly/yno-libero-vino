@@ -4,7 +4,7 @@ import type { WebhookPayload } from '~/types/crm';
 
 /**
  * Shopify webhook endpoint
- * POST /webhooks/shp
+ * POST /api/webhooks/shp
  */
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -70,6 +70,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 // Loader to handle GET requests (Shopify may send verification requests)
 export async function loader() {
-  return Response.json({ message: 'Shopify webhook endpoint at /webhooks/shp' }, { status: 200 });
+  return Response.json({ message: 'Shopify webhook endpoint at /api/webhooks/shp' }, { status: 200 });
 }
 

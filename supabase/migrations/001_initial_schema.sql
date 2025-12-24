@@ -292,7 +292,7 @@ CREATE TABLE IF NOT EXISTS communication_configs (
   email_list_id VARCHAR(255),
   
   -- SMS provider
-  sms_provider VARCHAR(50) CHECK (sms_provider IN ('redchirp', 'twilio', 'klaviyo')),
+  sms_provider VARCHAR(50) CHECK (sms_provider IN ('mailchimp', 'twilio', 'klaviyo')),
   sms_api_key TEXT,
   sms_from_number VARCHAR(50),
   

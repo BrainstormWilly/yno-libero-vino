@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6; margin: 0; padding: 0;">
+    {{header_image_block}}
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="font-size:22px;">⚠️ Your Membership Expires in {{days_remaining_text}}</h1>
+      <p>Hi {{customer_first_name}},</p>
+      <p>Your {{tier_name}} membership expires on {{expiration_formatted}} ({{days_remaining_text}} from now).</p>
+      {{highlight_content}}
+      <div style="margin:20px 0; padding:16px; background-color:#fff3cd; border-left:4px solid #ffc107; border-radius:4px;">
+        <h3 style="margin-top:0; color:#856404;">Renewal Reminder</h3>
+        <p>To keep your member benefits active, make a qualifying purchase before your membership expires:</p>
+        <ul style="margin:16px 0; padding-left:20px;">
+          <li><strong>Tier:</strong> {{tier_name}}</li>
+          <li><strong>Minimum purchase to renew:</strong> ${{tier_min_purchase_amount}}</li>
+          <li><strong>Expires on:</strong> {{expiration_formatted}}</li>
+        </ul>
+      </div>
+      {{secondary_content}}
+      {{custom_content_block}}
+      <p>Don't let your benefits expire—shop now to renew your membership!</p>
+      <p style="margin-top:24px;">Cheers,<br/>{{client_name}}</p>
+    </div>
+    {{footer_image_block}}
+  </body>
+</html>
+

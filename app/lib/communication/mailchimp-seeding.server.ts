@@ -78,7 +78,7 @@ export async function seedMailchimpResources(options: SeedMailchimpOptions): Pro
 
   for (const sequenceKey of templateKeys) {
     const templateKey = sequenceKey as MailchimpTemplateKey;
-    const templateSeed = buildTemplateSeed(templateKey);
+    const templateSeed = await buildTemplateSeed(templateKey);
     const payload: MailchimpTemplatePayload = {
       name: MAILCHIMP_TEMPLATE_NAMES[templateKey],
       html: convertMergeTags(templateSeed.html),
@@ -291,7 +291,7 @@ class MailchimpSeedClient {
   }
 }
 
-function convertMergeTags(content: string): string {
+export function convertMergeTags(content: string): string {
   return content.replace(/\{\{\s*([^}]+)\s*\}\}/g, (_, token) => {
     const cleaned = token.replace(/['"]/g, '').trim();
     const mapped = mapMergeTag(cleaned);

@@ -12,9 +12,9 @@ Automated monthly notifications to wine club members about their status, with cu
 - **SendGrid** - Transactional email (backup/alternative)
 
 ### SMS Providers
-- **RedChirp** - Wine industry focused SMS
-- **Twilio** - General SMS platform
+- **Mailchimp SMS** - Integrated with email
 - **Klaviyo SMS** - Integrated with email
+- **Twilio** - General SMS platform (LiberoVino-managed fallback)
 
 ## Architecture: Provider Pattern
 
@@ -95,7 +95,7 @@ CREATE TABLE communication_configs (
   provider_data JSONB DEFAULT '{}'::jsonb,
   
   -- SMS Provider
-  sms_provider VARCHAR(50) CHECK (sms_provider IN ('redchirp', 'twilio', 'klaviyo')),
+  sms_provider VARCHAR(50) CHECK (sms_provider IN ('mailchimp', 'twilio', 'klaviyo')),
   sms_api_key TEXT,
   sms_from_number VARCHAR(50),
   
@@ -690,44 +690,6 @@ export class KlaviyoProvider implements CommunicationProvider {
 }
 ```
 
-### RedChirp Provider
-
-```typescript
-export class RedChirpProvider implements CommunicationProvider {
-  name = 'RedChirp';
-  type = 'sms' as const;
-  
-  async sendSMS(params: SMSParams): Promise<SMSResult> {
-    // RedChirp SMS API (wine industry specific)
-    const response = await fetch('https://api.redchirp.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${params.config.sms_api_key}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        to: params.to,
-        from: params.from,
-        body: params.message,
-        tags: params.tags
-      })
-    });
-    
-    const result = await response.json();
-    
-    return {
-      success: true,
-      messageId: result.message_id,
-      provider: 'redchirp'
-    };
-  }
-  
-  async sendEmail(): Promise<EmailResult> {
-    throw new Error('RedChirp does not support email');
-  }
-}
-```
-
 ## Communication Manager
 
 ```typescript
@@ -738,7 +700,6 @@ export class CommunicationManager {
     this.providers.set('mailchimp', new MailchimpProvider());
     this.providers.set('klaviyo', new KlaviyoProvider());
     this.providers.set('sendgrid', new SendGridProvider());
-    this.providers.set('redchirp', new RedChirpProvider());
     this.providers.set('twilio', new TwilioProvider());
   }
   
@@ -1029,9 +990,6 @@ SENDGRID_API_KEY=your_sendgrid_api_key
 SENDGRID_FROM_EMAIL=noreply@liberovino.com
 SENDGRID_FROM_NAME=LiberoVino
 
-# RedChirp
-REDCHIRP_API_KEY=your_redchirp_api_key
-REDCHIRP_FROM_NUMBER=+15551234567
 
 # Twilio (alternative SMS)
 TWILIO_ACCOUNT_SID=your_account_sid
@@ -1070,7 +1028,7 @@ Features:
 ```
 Configure per winery:
 ├─ Choose email provider (Mailchimp/Klaviyo/SendGrid)
-├─ Choose SMS provider (RedChirp/Twilio/Klaviyo)
+├─ Choose SMS provider (Mailchimp/Klaviyo/Twilio)
 ├─ Set API keys
 ├─ Configure from addresses/numbers
 ├─ Enable/disable monthly sends

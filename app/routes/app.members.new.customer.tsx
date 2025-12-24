@@ -13,6 +13,7 @@ import {
   Checkbox,
   Modal,
   Box,
+  List,
 } from '@shopify/polaris';
 
 import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
@@ -81,6 +82,14 @@ export async function action({ request }: ActionFunctionArgs) {
     return {
       success: false,
       error: 'Email, name, birthdate, and complete billing address are required',
+    };
+  }
+  
+  // Validate phone number is provided if SMS preferences are selected
+  if ((preferences.smsTransactional || preferences.smsMarketing) && !phone?.trim()) {
+    return {
+      success: false,
+      error: 'Phone number is required when opting into SMS communications',
     };
   }
   
@@ -278,11 +287,17 @@ export default function CustomerDetails() {
               </InlineStack>
               
               <TextField
-                label="Phone"
+                label="Phone Number"
                 type="tel"
                 value={phone}
                 onChange={setPhone}
                 autoComplete="tel"
+                requiredIndicator={smsTransactional || smsMarketing}
+                helpText={
+                  (smsTransactional || smsMarketing)
+                    ? "Required to receive SMS messages"
+                    : "Optional, but required if you opt into SMS communications"
+                }
               />
               
               <TextField
@@ -320,18 +335,42 @@ export default function CustomerDetails() {
               
               <Divider />
               
+              <Text variant="headingMd" as="h3">
+                SMS Communications
+              </Text>
+              
+              <Banner tone="warning">
+                <BlockStack gap="200">
+                  <Text variant="bodySm" as="p" fontWeight="semibold">
+                    By opting into SMS, you agree to receive automated text messages:
+                  </Text>
+                  <List type="bullet">
+                    <List.Item>
+                      <strong>Transactional SMS:</strong> Monthly membership status updates and expiration warnings
+                    </List.Item>
+                    <List.Item>
+                      <strong>Marketing SMS:</strong> Promotional offers and product suggestions
+                    </List.Item>
+                  </List>
+                  <Text variant="bodySm" as="p" tone="subdued">
+                    Message frequency varies. Message and data rates may apply. Reply STOP to opt-out at any time. 
+                    Reply HELP for help. Carriers are not liable for delayed or undelivered messages.
+                  </Text>
+                </BlockStack>
+              </Banner>
+              
               <Checkbox
-                label="SMS transactional"
+                label="I agree to receive SMS transactional messages (monthly status updates and expiration warnings)"
                 checked={smsTransactional}
                 onChange={handlePreferenceChange(setSmsTransactional)}
-                helpText="Monthly status updates and expiration warnings via SMS."
+                helpText="You must provide a phone number above to receive SMS messages."
                 disabled={unsubscribedAll}
               />
               <Checkbox
-                label="SMS marketing"
+                label="I agree to receive SMS marketing messages (promotions and product suggestions)"
                 checked={smsMarketing}
                 onChange={handlePreferenceChange(setSmsMarketing)}
-                helpText="Promotions and product suggestions via SMS."
+                helpText="You must provide a phone number above to receive SMS messages."
                 disabled={unsubscribedAll}
               />
               
@@ -431,7 +470,17 @@ export default function CustomerDetails() {
                 <Button
                   variant="primary"
                   submit
-                  disabled={!email || !firstName || !lastName || !birthdate || !address1 || !city || !state || !zip}
+                  disabled={
+                    !email || 
+                    !firstName || 
+                    !lastName || 
+                    !birthdate || 
+                    !address1 || 
+                    !city || 
+                    !state || 
+                    !zip ||
+                    ((smsTransactional || smsMarketing) && !phone?.trim())
+                  }
                   size="large"
                 >
                   Continue to Additional Addresses →

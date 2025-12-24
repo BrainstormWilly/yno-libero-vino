@@ -5,11 +5,14 @@ import type {
   CommunicationProvider,
   EmailParams,
   EmailResult,
+  SMSParams,
+  SMSResult,
   TestEmailContent,
   TrackEventParams,
   TrackEventResult,
   UpdateProfileParams,
 } from '~/types/communication';
+import { normalizePhoneNumber } from '~/util/phone.utils';
 
 interface MailchimpProviderOptions {
   serverPrefix: string;
@@ -17,6 +20,8 @@ interface MailchimpProviderOptions {
   defaultFromName?: string;
   marketingAccessToken?: string | null;
   audienceId?: string | null;
+  smsApiKey?: string | null;
+  defaultFromNumber?: string | null;
 }
 
 interface MailchimpProviderData {
@@ -29,13 +34,15 @@ interface MailchimpProviderData {
 export class MailchimpProvider implements CommunicationProvider {
   public readonly name = 'Mailchimp';
   public readonly supportsEmail = true;
-  public readonly supportsSMS = false;
+  public readonly supportsSMS = true;
 
   private readonly serverPrefix: string;
   private readonly defaultFromEmail: string;
   private readonly defaultFromName?: string;
   private readonly marketingAccessToken?: string | null;
   private readonly audienceId?: string | null;
+  private readonly smsApiKey?: string | null;
+  private readonly defaultFromNumber?: string | null;
 
   constructor(options: MailchimpProviderOptions) {
     if (!options.serverPrefix) {
@@ -51,6 +58,8 @@ export class MailchimpProvider implements CommunicationProvider {
     this.defaultFromName = options.defaultFromName;
     this.marketingAccessToken = options.marketingAccessToken;
     this.audienceId = options.audienceId;
+    this.smsApiKey = options.smsApiKey;
+    this.defaultFromNumber = options.defaultFromNumber;
   }
 
   static parseProviderData(data: unknown): MailchimpProviderData {
@@ -70,6 +79,73 @@ export class MailchimpProvider implements CommunicationProvider {
     );
   }
 
+  async sendSMS(params: SMSParams): Promise<SMSResult> {
+    if (!this.smsApiKey) {
+      throw new Error('Mailchimp SMS requires an API key. Configure it in your communication settings.');
+    }
+
+    const fromNumber = params.fromNumber ?? this.defaultFromNumber;
+
+    if (!fromNumber) {
+      throw new Error('Mailchimp sendSMS requires a fromNumber value.');
+    }
+
+    if (!params.to) {
+      throw new Error('Mailchimp sendSMS requires a phone number (to).');
+    }
+
+    // Mailchimp SMS API endpoint
+    // Note: Mailchimp SMS uses their Transactional API
+    // The exact endpoint may vary - this is a placeholder based on typical Mailchimp API patterns
+    const url = `https://${this.serverPrefix}.api.mailchimp.com/3.0/sms/messages`;
+    
+    // Normalize phone numbers to E.164 format
+    const to = normalizePhoneNumber(params.to);
+    const from = normalizePhoneNumber(fromNumber);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.smsApiKey}`,
+      },
+      body: JSON.stringify({
+        to,
+        from,
+        message: params.message,
+      }),
+    });
+
+    const responseBody = await response.text();
+
+    if (!response.ok) {
+      let errorMessage = `Mailchimp SMS API error (${response.status} ${response.statusText})`;
+      try {
+        const errorJson = JSON.parse(responseBody);
+        errorMessage += `: ${errorJson.title || errorJson.detail || responseBody}`;
+        if (errorJson.errors) {
+          errorMessage += ` Errors: ${JSON.stringify(errorJson.errors)}`;
+        }
+      } catch {
+        errorMessage += `: ${responseBody}`;
+      }
+      throw new Error(errorMessage);
+    }
+
+    let data: Record<string, unknown> = {};
+    try {
+      data = JSON.parse(responseBody);
+    } catch {
+      // If response is not JSON, that's okay
+    }
+
+    return {
+      success: true,
+      messageId: (data.id as string) || (data.message_id as string) || undefined,
+      response: data,
+    };
+  }
+
   async trackEvent(params: TrackEventParams): Promise<TrackEventResult> {
     if (!params.customer.email) {
       throw new Error('Mailchimp trackEvent requires customer.email');
@@ -83,14 +159,20 @@ export class MailchimpProvider implements CommunicationProvider {
       throw new Error('Mailchimp audience/list ID not configured.');
     }
 
-    const email = params.customer.email;
+    const email = params.customer.email?.trim().toLowerCase() || '';
+    if (!email) {
+      throw new Error('Mailchimp trackEvent requires a valid customer.email address');
+    }
+    
     const emailHash = this.hashEmail(email);
     
     console.log('[Mailchimp trackEvent] Starting:', {
       email,
+      emailHash,
       event: params.event,
       audienceId: this.audienceId,
       serverPrefix: this.serverPrefix,
+      originalEmail: params.customer.email, // Log original for debugging
     });
 
     // Build merge fields including event-specific date field

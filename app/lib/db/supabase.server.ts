@@ -138,6 +138,36 @@ export async function markSetupComplete(clientId: string) {
     .eq('id', clientId);
 }
 
+export async function updateClientEmailImages(
+  clientId: string,
+  images: {
+    emailHeaderImageUrl?: string | null;
+    emailFooterImageUrl?: string | null;
+  }
+) {
+  const supabase = getSupabaseClient();
+  
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+  
+  if (images.emailHeaderImageUrl !== undefined) {
+    updateData.email_header_image_url = images.emailHeaderImageUrl;
+  }
+  if (images.emailFooterImageUrl !== undefined) {
+    updateData.email_footer_image_url = images.emailFooterImageUrl;
+  }
+  
+  const { error } = await supabase
+    .from('clients')
+    .update(updateData)
+    .eq('id', clientId);
+  
+  if (error) {
+    throw new Error(`Failed to update client email images: ${error.message}`);
+  }
+}
+
 // ============================================
 // CLUB PROGRAM OPERATIONS
 // ============================================
@@ -1185,7 +1215,7 @@ export async function createCommunicationConfig(
       send_monthly_status: config.sendMonthlyStatus !== undefined ? config.sendMonthlyStatus : true,
       send_expiration_warnings: config.sendExpirationWarnings !== undefined ? config.sendExpirationWarnings : true,
       warning_days_before: config.warningDaysBefore || 7,
-      provider_data: config.providerData ?? null,
+      provider_data: config.providerData ?? ({} as Database['public']['Tables']['communication_configs']['Insert']['provider_data']),
     })
     .select()
     .single();
@@ -1249,5 +1279,115 @@ export async function updateCommunicationConfig(
   }
   
   return commConfig;
+}
+
+// ============================================
+// COMMUNICATION TEMPLATE OPERATIONS
+// ============================================
+
+type CommunicationTemplate = Database['public']['Tables']['communication_templates']['Row'];
+type CommunicationTemplateInsert = Database['public']['Tables']['communication_templates']['Insert'];
+
+/**
+ * Get a communication template for a client
+ */
+export async function getCommunicationTemplate(
+  clientId: string,
+  templateType: string,
+  channel: 'email' | 'sms' = 'email'
+): Promise<CommunicationTemplate | null> {
+  const supabase = getSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from('communication_templates')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('template_type', templateType)
+    .eq('channel', channel)
+    .maybeSingle();
+  
+  if (error) {
+    console.error('Error fetching communication template:', error);
+    return null;
+  }
+  
+  return data;
+}
+
+/**
+ * Upsert a communication template (create or update)
+ */
+export async function upsertCommunicationTemplate(
+  clientId: string,
+  templateType: string,
+  channel: 'email' | 'sms',
+  templateData: {
+    subject?: string | null;
+    htmlBody?: string | null;
+    textBody?: string | null;
+    customContent?: string | null;
+    providerTemplateId?: string | null;
+    availableVariables?: Record<string, unknown> | null;
+    isActive?: boolean;
+  }
+): Promise<CommunicationTemplate> {
+  const supabase = getSupabaseClient();
+  
+  const insertData: CommunicationTemplateInsert = {
+    client_id: clientId,
+    template_type: templateType,
+    channel,
+    subject: templateData.subject ?? null,
+    html_body: templateData.htmlBody ?? null,
+    text_body: templateData.textBody ?? null,
+    custom_content: templateData.customContent ?? null,
+    provider_template_id: templateData.providerTemplateId ?? null,
+    available_variables: (templateData.availableVariables ?? null) as Database['public']['Tables']['communication_templates']['Insert']['available_variables'],
+    is_active: templateData.isActive ?? true,
+    updated_at: new Date().toISOString(),
+  };
+  
+  const { data, error } = await supabase
+    .from('communication_templates')
+    .upsert(insertData, {
+      onConflict: 'client_id,template_type,channel',
+    })
+    .select()
+    .single();
+  
+  if (error || !data) {
+    throw new Error(`Failed to upsert communication template: ${error?.message}`);
+  }
+  
+  return data;
+}
+
+/**
+ * Initialize default SendGrid templates from base files for a client
+ * This should be called when a client first sets up SendGrid
+ */
+export async function initializeSendGridTemplates(clientId: string): Promise<void> {
+  const { loadBaseTemplate } = await import('~/lib/communication/templates.server');
+  
+  const templateTypes: Array<{ fileType: string; dbType: string }> = [
+    { fileType: 'monthly-status', dbType: 'monthly_status' },
+    { fileType: 'expiration-warning', dbType: 'expiration_warning' },
+    { fileType: 'expiration', dbType: 'expiration' },
+    { fileType: 'upgrade', dbType: 'upgrade_available' },
+  ];
+  
+  for (const { fileType, dbType } of templateTypes) {
+    try {
+      const baseTemplate = loadBaseTemplate(fileType as any);
+      
+      await upsertCommunicationTemplate(clientId, dbType, 'email', {
+        htmlBody: baseTemplate,
+        isActive: true,
+      });
+    } catch (error) {
+      console.error(`Failed to initialize template ${dbType} for client ${clientId}:`, error);
+      // Continue with other templates even if one fails
+    }
+  }
 }
 

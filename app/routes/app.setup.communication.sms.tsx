@@ -250,7 +250,7 @@ export default function SMSSetup() {
   const smsProvider = existingConfig?.sms_provider || 'twilio';
 
   // Get the provider-specific component
-  const ProviderComponent = getSMSProviderComponent(smsProvider as 'klaviyo' | 'mailchimp' | 'redchirp' | 'twilio');
+  const ProviderComponent = getSMSProviderComponent(smsProvider as 'klaviyo' | 'mailchimp' | 'twilio');
 
   return (
     <>

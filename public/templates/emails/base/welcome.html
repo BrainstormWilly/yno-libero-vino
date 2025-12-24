@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6; margin: 0; padding: 0;">
+    {{header_image_block}}
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="font-size:22px;">Welcome to {{client_name}}!</h1>
+      <p>Hi {{customer_first_name}},</p>
+      <p>Your LiberoVino membership is live! You choose what ships and when. Jump in with these need-to-know details and stay liberated.</p>
+      <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
+        <h2 style="margin-top:0; color:#202124;">{{tier_name}} Member</h2>
+        <ul style="margin:16px 0; padding-left:20px;">
+          <li><strong>Tier:</strong> {{tier_name}}</li>
+          <li><strong>Discount:</strong> {{discount_percentage}}% off</li>
+          <li><strong>Duration remaining:</strong> {{days_remaining}} days</li>
+          <li><strong>Loyalty balance:</strong> {{points_balance}} points</li>
+        </ul>
+      </div>
+      {{upgrade_message}}
+      {{custom_content_block}}
+      <p style="margin-top:24px;">You're in control—shop when you're ready.</p>
+      <p style="margin-top:24px;">Cheers,<br/>{{client_name}}</p>
+    </div>
+    {{footer_image_block}}
+  </body>
+</html>
+

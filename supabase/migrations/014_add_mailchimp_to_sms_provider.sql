@@ -26,14 +26,14 @@ BEGIN
     END IF;
 END $$;
 
--- Add the updated CHECK constraint that includes 'mailchimp'
+-- Add the updated CHECK constraint that includes 'mailchimp' and removes 'redchirp'
 ALTER TABLE communication_configs
 ADD CONSTRAINT communication_configs_sms_provider_check CHECK (
-  sms_provider IN ('redchirp', 'twilio', 'klaviyo', 'mailchimp')
+  sms_provider IN ('mailchimp', 'twilio', 'klaviyo')
 );
 
 COMMENT ON CONSTRAINT communication_configs_sms_provider_check ON communication_configs IS 
-  'SMS provider values: redchirp, twilio, klaviyo, mailchimp';
+  'SMS provider values: mailchimp, twilio, klaviyo';
 
 COMMIT;
 

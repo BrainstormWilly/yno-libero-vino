@@ -3,7 +3,6 @@ import MailchimpEmailProvider from './MailchimpEmailProvider';
 import LiberoVinoManagedEmailProvider from './LiberoVinoManagedEmailProvider';
 import KlaviyoSMSProvider from './KlaviyoSMSProvider';
 import MailchimpSMSProvider from './MailchimpSMSProvider';
-import RedChirpSMSProvider from './RedChirpSMSProvider';
 import LiberoVinoManagedSMSProvider from './LiberoVinoManagedSMSProvider';
 import type { EmailProvider, SMSProvider } from './types';
 
@@ -28,8 +27,6 @@ export function getSMSProviderComponent(provider: SMSProvider) {
       return KlaviyoSMSProvider;
     case 'mailchimp':
       return MailchimpSMSProvider;
-    case 'redchirp':
-      return RedChirpSMSProvider;
     case 'twilio':
       return LiberoVinoManagedSMSProvider;
     default:

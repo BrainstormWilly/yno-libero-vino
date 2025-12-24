@@ -4,7 +4,7 @@ import { Card, BlockStack, Text, Banner, TextField, InlineStack, Button, Checkbo
 import EmailPreferencesForm from '../EmailPreferencesForm';
 import type { EmailProviderComponentProps } from './types';
 
-export default function MailchimpEmailProvider({ existingConfig, actionData }: EmailProviderComponentProps) {
+export default function MailchimpEmailProvider({ existingConfig, actionData, hasSms = false }: EmailProviderComponentProps) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
   
@@ -36,6 +36,7 @@ export default function MailchimpEmailProvider({ existingConfig, actionData }: E
     (config?.warning_days_before || 7).toString()
   );
   const [testEmail, setTestEmail] = useState('');
+  const [testPhone, setTestPhone] = useState('');
 
   // Handlers
   const handleMarketingAccessTokenChange = (value: string) => {
@@ -219,7 +220,7 @@ export default function MailchimpEmailProvider({ existingConfig, actionData }: E
               Be sure to make a live automation with a "Tag Added" trigger for tag <strong>LiberoVino::Test</strong> with a "Send Email" action prior to confirming provider.
             </Text>
             <Text variant="bodyMd" as="p" tone="subdued">
-              When you click "Confirm Provider", this will:
+              When you click "Confirm Provider", this will send a test {hasSms ? 'email and SMS' : 'email'}:
             </Text>
             <ul>
               <li>Create or update the member in your Mailchimp audience</li>
@@ -275,9 +276,25 @@ export default function MailchimpEmailProvider({ existingConfig, actionData }: E
 
               <input type="hidden" name="test_email" value={testEmail} />
 
+              {/* Always show SMS field for Mailchimp - SMS is integrated with email provider */}
+              <TextField
+                label="Recipient phone (optional)"
+                type="tel"
+                value={testPhone}
+                onChange={setTestPhone}
+                autoComplete="tel"
+                placeholder="+15551234567"
+                disabled={isSubmitting}
+                helpText="Test SMS will be sent via Mailchimp SMS (requires SMS API key to be configured)"
+              />
+
+              <input type="hidden" name="test_phone" value={testPhone} />
+
               <InlineStack gap="200">
                 <Button submit variant="primary" loading={isSubmitting} disabled={isSubmitting || !checklistAcknowledged}>
-                  {isSubmitting ? 'Sending test email...' : 'Confirm Provider'}
+                  {isSubmitting 
+                    ? (testPhone ? 'Sending test email and SMS...' : 'Sending test email...')
+                    : 'Confirm Provider'}
                 </Button>
               </InlineStack>
             </BlockStack>

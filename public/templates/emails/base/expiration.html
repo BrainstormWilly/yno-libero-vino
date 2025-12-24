@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6; margin: 0; padding: 0;">
+    {{header_image_block}}
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h1 style="font-size:22px;">Your {{tier_name}} Membership Has Expired</h1>
+      <p>Hi {{customer_first_name}},</p>
+      <p>Your {{tier_name}} membership expired on {{expiration_formatted}}.</p>
+      {{highlight_content}}
+      <div style="margin:20px 0; padding:16px; background-color:#f8f9fa; border-radius:4px;">
+        <p>To continue enjoying your member benefits, you'll need to make a qualifying purchase to renew your membership.</p>
+        <ul style="margin:16px 0; padding-left:20px;">
+          <li><strong>Tier:</strong> {{tier_name}}</li>
+          <li><strong>Minimum purchase to renew:</strong> ${{tier_min_purchase_amount}}</li>
+        </ul>
+      </div>
+      {{secondary_content}}
+      {{custom_content_block}}
+      <p>We hope to see you back soon!</p>
+      <p style="margin-top:24px;">Cheers,<br/>{{client_name}}</p>
+    </div>
+    {{footer_image_block}}
+  </body>
+</html>
+

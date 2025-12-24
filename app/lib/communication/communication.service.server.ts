@@ -105,10 +105,16 @@ export async function sendClientTestEmail(
   }
 
   if (providerKey === 'mailchimp') {
+    console.log('[sendClientTestEmail] Mailchimp test email requested:', {
+      to,
+      clientId,
+      timestamp: new Date().toISOString(),
+    });
+    
     const event: TrackEventParams = {
       event: MAILCHIMP_TAGS.TEST,
       customer: {
-        email: to,
+        email: to.trim().toLowerCase(), // Normalize email to lowercase and trim whitespace
         id: `test-${clientId}`,
         properties: {
           test_triggered_at: new Date().toISOString(),
@@ -123,6 +129,7 @@ export async function sendClientTestEmail(
       },
     };
 
+    console.log('[sendClientTestEmail] Tracking Mailchimp event with email:', event.customer.email);
     await trackClientEvent(clientId, event);
     return { success: true } satisfies TrackEventResult;
   }

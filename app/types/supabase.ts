@@ -91,6 +91,8 @@ export type Database = {
         Row: {
           created_at: string | null
           crm_type: string
+          email_footer_image_url: string | null
+          email_header_image_url: string | null
           id: string
           org_contact: string | null
           org_name: string
@@ -99,10 +101,13 @@ export type Database = {
           updated_at: string | null
           user_email: string | null
           user_id: string | null
+          website_url: string | null
         }
         Insert: {
           created_at?: string | null
           crm_type: string
+          email_footer_image_url?: string | null
+          email_header_image_url?: string | null
           id?: string
           org_contact?: string | null
           org_name: string
@@ -111,10 +116,13 @@ export type Database = {
           updated_at?: string | null
           user_email?: string | null
           user_id?: string | null
+          website_url?: string | null
         }
         Update: {
           created_at?: string | null
           crm_type?: string
+          email_footer_image_url?: string | null
+          email_header_image_url?: string | null
           id?: string
           org_contact?: string | null
           org_name?: string
@@ -123,6 +131,7 @@ export type Database = {
           updated_at?: string | null
           user_email?: string | null
           user_id?: string | null
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -626,6 +635,7 @@ export type Database = {
           channel: string
           client_id: string
           created_at: string | null
+          custom_content: string | null
           html_body: string | null
           id: string
           is_active: boolean | null
@@ -640,6 +650,7 @@ export type Database = {
           channel: string
           client_id: string
           created_at?: string | null
+          custom_content?: string | null
           html_body?: string | null
           id?: string
           is_active?: boolean | null
@@ -654,6 +665,7 @@ export type Database = {
           channel?: string
           client_id?: string
           created_at?: string | null
+          custom_content?: string | null
           html_body?: string | null
           id?: string
           is_active?: boolean | null

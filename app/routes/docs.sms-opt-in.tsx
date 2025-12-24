@@ -250,6 +250,18 @@ export default function SMSOptInDocs() {
                 <Text variant="bodyMd" as="p" tone="subdued">
                   This documentation is maintained by LiberoVino. Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </Text>
+
+                <Divider />
+
+                <Banner>
+                  <Text variant="bodyMd" as="p">
+                    <strong>Visual Demo:</strong> See a{' '}
+                    <a href="/docs/sms-opt-in-demo" target="_blank" rel="noopener noreferrer">
+                      live demonstration of the opt-in form
+                    </a>{' '}
+                    with CTIA-compliant language.
+                  </Text>
+                </Banner>
               </BlockStack>
             </BlockStack>
           </Card>

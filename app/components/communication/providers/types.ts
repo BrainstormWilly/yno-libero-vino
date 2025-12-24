@@ -1,5 +1,5 @@
 import type { Database } from '~/types/supabase';
-import type { EmailProvider, SMSProvider } from '~/types/communication';
+// import type { EmailProvider, SMSProvider } from '~/types/communication';
 
 export type { EmailProvider, SMSProvider } from '~/types/communication';
 
@@ -20,6 +20,11 @@ export interface EmailProviderComponentProps {
     id: string;
     clientId: string;
   };
+  client?: {
+    id: string;
+    email_header_image_url?: string | null;
+    email_footer_image_url?: string | null;
+  } | null;
   onBack: () => void;
   onContinue: () => void;
   hasSms: boolean;

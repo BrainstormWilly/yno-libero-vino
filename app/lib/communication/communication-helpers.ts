@@ -62,7 +62,7 @@ export function normalizeConfigForCreate(
     sendMonthlyStatus: config.sendMonthlyStatus,
     sendExpirationWarnings: config.sendExpirationWarnings,
     warningDaysBefore: config.warningDaysBefore,
-    providerData: config.providerData ?? undefined,
+    providerData: config.providerData ?? ({} as ProviderDataJson),
   };
 }
 

@@ -43,6 +43,10 @@ export class SendGridProvider implements CommunicationProvider {
     const fromEmail = params.fromEmail ?? this.defaultFromEmail;
     const fromName = params.fromName ?? this.defaultFromName;
 
+    // Debug logging for API key (first 10 chars only for security)
+    const apiKeyPreview = this.apiKey ? `${this.apiKey.substring(0, 10)}...` : 'MISSING';
+    console.info('[SendGrid.sendEmail] Using API key:', apiKeyPreview, 'Length:', this.apiKey?.length);
+
     const content: Array<{ type: string; value: string }> = [];
     if (params.text) {
       content.push({ type: 'text/plain', value: params.text });
