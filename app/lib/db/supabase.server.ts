@@ -252,29 +252,45 @@ export async function createClubStages(
     name: string;
     durationMonths: number;
     minPurchaseAmount: number;
+    minLtvAmount?: number;
     stageOrder: number;
     upgradable?: boolean;
+    tierType?: string;
   }>
 ): Promise<ClubStage[]> {
   const supabase = getSupabaseClient();
   
-  const inserts = stages.map((stage) => ({
-    club_program_id: programId,
-    name: stage.name,
-    duration_months: stage.durationMonths,
-    min_purchase_amount: stage.minPurchaseAmount,
-    stage_order: stage.stageOrder,
-    is_active: true,
-    upgradable: stage.upgradable ?? true,
-  }));
+  const inserts = stages.map((stage) => {
+    const insert: any = {
+      club_program_id: programId,
+      name: stage.name,
+      duration_months: stage.durationMonths,
+      min_purchase_amount: stage.minPurchaseAmount,
+      stage_order: stage.stageOrder,
+      is_active: true,
+      upgradable: stage.upgradable ?? true,
+      tier_type: stage.tierType || 'discount',
+    };
+    
+    // Only include min_ltv_amount if it's provided
+    if (stage.minLtvAmount !== undefined && stage.minLtvAmount !== null) {
+      insert.min_ltv_amount = stage.minLtvAmount;
+    }
+    
+    return insert;
+  });
   
   const { data, error } = await supabase
     .from('club_stages')
     .insert(inserts)
     .select();
   
-  if (error || !data) {
-    throw new Error(`Failed to create club stages: ${error?.message}`);
+  if (error) {
+    throw new Error(`Failed to create club stages: ${error.message}`);
+  }
+  
+  if (!data) {
+    throw new Error('Failed to create club stages: No data returned');
   }
   
   return data;
@@ -291,6 +307,7 @@ export async function updateClubStage(
     c7ClubId?: string;
     upgradable?: boolean;
     isActive?: boolean;
+    tierType?: string;
   }
 ) {
   const supabase = getSupabaseClient();
@@ -306,6 +323,7 @@ export async function updateClubStage(
   if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder; // Can be null
   if (data.c7ClubId) updateData.c7_club_id = data.c7ClubId;
   if (data.upgradable !== undefined) updateData.upgradable = data.upgradable;
+  if (data.tierType) updateData.tier_type = data.tierType;
   if (data.isActive !== undefined) {
     updateData.is_active = data.isActive;
     // When marking as inactive, also set stage_order to NULL to free it up

@@ -1,6 +1,6 @@
 import { type ActionFunctionArgs } from 'react-router';
 import { Form, useNavigate, useActionData, useRouteLoaderData } from 'react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Page, 
   Card, 
@@ -13,6 +13,7 @@ import {
   Checkbox,
   Divider,
   Box,
+  Select,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -69,9 +70,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (actionType === 'update_tier_details') {
       const tierName = formData.get('tier_name') as string;
       const durationMonths = parseInt(formData.get('duration_months') as string);
-      const minPurchaseAmount = parseFloat(formData.get('min_purchase_amount') as string);
       const minLtvAmount = parseFloat(formData.get('min_ltv_amount') as string) || 0;
       const upgradable = formData.get('upgradable') === 'true';
+      const tierType = formData.get('tier_type') as string || 'discount';
+      
+      // Calculate min_purchase_amount automatically from min_ltv_amount and duration_months
+      const minPurchaseAmount = minLtvAmount * (durationMonths / 12);
       
       // Update tier details in DB
       await db.updateClubStage(tierId, {
@@ -80,6 +84,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         minPurchaseAmount,
         minLtvAmount,
         upgradable,
+        tierType,
       });
       
       // Sync with CRM
@@ -200,9 +205,19 @@ export default function TierDetails() {
   
   const [tierName, setTierName] = useState(tier.name);
   const [durationMonths, setDurationMonths] = useState(tier.duration_months.toString());
-  const [minPurchaseAmount, setMinPurchaseAmount] = useState(tier.min_purchase_amount.toString());
   const [minLtvAmount, setMinLtvAmount] = useState(tier.min_ltv_amount?.toString() || '0');
   const [upgradable, setUpgradable] = useState(tier.upgradable ?? true);
+  const [tierType, setTierType] = useState((tier as any).tier_type || 'discount');
+  
+  // Calculate min_purchase_amount from min_ltv_amount and duration_months
+  const calculatedMinPurchase = useMemo(() => {
+    const minLtv = parseFloat(minLtvAmount) || 0;
+    const duration = parseFloat(durationMonths) || 0;
+    if (minLtv > 0 && duration > 0) {
+      return (minLtv * (duration / 12)).toFixed(2);
+    }
+    return '0.00';
+  }, [minLtvAmount, durationMonths]);
   
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(!!loyalty);
   const [earnRate, setEarnRate] = useState(
@@ -229,9 +244,9 @@ export default function TierDetails() {
   const tierDetailsChanged = 
     tierName !== tier.name ||
     durationMonths !== tier.duration_months.toString() ||
-    minPurchaseAmount !== tier.min_purchase_amount.toString() ||
     minLtvAmount !== (tier.min_ltv_amount?.toString() || '0') ||
-    upgradable !== (tier.upgradable ?? true);
+    upgradable !== (tier.upgradable ?? true) ||
+    tierType !== ((tier as any).tier_type || 'discount');
   
   // Track if loyalty settings have been modified
   const loyaltyChanged = 
@@ -339,27 +354,43 @@ export default function TierDetails() {
                           <div style={{ flex: 1 }}>
                             <TextField
                               label="Min Purchase ($)"
-                              value={minPurchaseAmount}
-                              onChange={setMinPurchaseAmount}
+                              value={calculatedMinPurchase}
                               name="min_purchase_amount"
                               type="number"
                               autoComplete="off"
-                              disabled={!tier.is_active}
+                              disabled={true}
+                              helpText="Automatically calculated from Min LTV and Duration"
                             />
                           </div>
                           
                           <div style={{ flex: 1 }}>
                             <TextField
-                              label="Min LTV ($)"
+                              label="Min Annual LTV ($)"
                               value={minLtvAmount}
                               onChange={setMinLtvAmount}
                               name="min_ltv_amount"
                               type="number"
                               autoComplete="off"
+                              helpText="Minimum annualized lifetime value required for this tier"
                               disabled={!tier.is_active}
                             />
                           </div>
                         </InlineStack>
+                        
+                        <Select
+                          label="Tier Type"
+                          options={[
+                            { label: 'Discount', value: 'discount' },
+                            { label: 'Allocation', value: 'allocation' },
+                          ]}
+                          value={tierType}
+                          onChange={setTierType}
+                          name="tier_type"
+                          helpText="Discount: Discount-based benefits (may have product restrictions). Allocation: Product access only (0% discount, cumulative products)."
+                          disabled={!tier.is_active}
+                        />
+                        
+                        <input type="hidden" name="tier_type" value={tierType} />
                         
                         <Checkbox
                           label="Members can upgrade to this tier"

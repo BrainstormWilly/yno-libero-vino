@@ -10,6 +10,7 @@ interface TierFormDataSerialized {
   name: string;
   durationMonths: string;
   minPurchaseAmount: string;
+  minLtvAmount?: string;
   description?: string;
   upgradable?: boolean;
   
@@ -103,13 +104,21 @@ export async function createClubTiers(
   clubProgramId: string,
   tiers: TierFormDataSerialized[]
 ) {
-  const stages = tiers.map((tier, index) => ({
-    name: tier.name,
-    durationMonths: parseInt(tier.durationMonths),
-    minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
-    stageOrder: index + 1,
-    upgradable: tier.upgradable ?? true,
-  }));
+  const stages = tiers.map((tier, index) => {
+    const durationMonths = parseInt(tier.durationMonths);
+    const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
+    // Calculate minPurchaseAmount from minLtvAmount and durationMonths
+    const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+    
+    return {
+      name: tier.name,
+      durationMonths,
+      minPurchaseAmount,
+      minLtvAmount: minLtvAmount || undefined,
+      stageOrder: index + 1,
+      upgradable: tier.upgradable ?? true,
+    };
+  });
   
   return db.createClubStages(clubProgramId, stages);
 }
@@ -137,11 +146,16 @@ export async function createTiersInC7(
     
     try {
       // Use orchestration method for atomic creation
+      const durationMonths = parseInt(tier.durationMonths);
+      const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
+      // Calculate minPurchaseAmount from minLtvAmount and durationMonths
+      const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+      
       const result = await provider.createTierWithPromotionsAndLoyalty({
         name: tier.name,
         description: tier.description,
-        durationMonths: parseInt(tier.durationMonths),
-        minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+        durationMonths,
+        minPurchaseAmount,
         promotions: tier.promotions || [],
         loyalty: tier.loyalty,
       });
@@ -250,10 +264,16 @@ export async function updateExistingTier(
   tier: TierFormDataSerialized,
   stageOrder: number
 ) {
+  const durationMonths = parseInt(tier.durationMonths);
+  const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
+  // Calculate minPurchaseAmount from minLtvAmount and durationMonths
+  const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+  
   return db.updateClubStage(tier.id, {
     name: tier.name,
-    durationMonths: parseInt(tier.durationMonths),
-    minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+    durationMonths,
+    minPurchaseAmount,
+    minLtvAmount: minLtvAmount || undefined,
     stageOrder,
     upgradable: tier.upgradable,
   });
@@ -268,10 +288,16 @@ export async function createNewTier(
   tier: TierFormDataSerialized,
   stageOrder: number
 ) {
+  const durationMonths = parseInt(tier.durationMonths);
+  const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
+  // Calculate minPurchaseAmount from minLtvAmount and durationMonths
+  const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+  
   const stages = await db.createClubStages(clubProgramId, [{
     name: tier.name,
-    durationMonths: parseInt(tier.durationMonths),
-    minPurchaseAmount: parseFloat(tier.minPurchaseAmount),
+    durationMonths,
+    minPurchaseAmount,
+    minLtvAmount: minLtvAmount || undefined,
     stageOrder,
   }]);
   

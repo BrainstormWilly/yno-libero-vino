@@ -93,12 +93,18 @@ export async function action({ request }: ActionFunctionArgs) {
     // Get current tier count for order
     const tierCount = existingProgram.club_stages?.length || 0;
     
-    // Create a new blank tier
+    // Create a new blank tier (with default minLtvAmount that calculates to minPurchaseAmount)
+    const defaultMinLtv = 600; // $600 annual LTV
+    const defaultDuration = 3; // 3 months
+    const calculatedMinPurchase = defaultMinLtv * (defaultDuration / 12); // $150
+    
     const newTiers = await db.createClubStages(existingProgram.id, [{
       name: `New Tier ${tierCount + 1}`,
-      durationMonths: 3,
-      minPurchaseAmount: 150,
+      durationMonths: defaultDuration,
+      minPurchaseAmount: calculatedMinPurchase,
+      minLtvAmount: defaultMinLtv,
       stageOrder: tierCount + 1,
+      tierType: 'discount',
     }]);
     
     // Redirect to edit the new tier with 'new' flag

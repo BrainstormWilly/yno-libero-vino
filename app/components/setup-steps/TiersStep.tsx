@@ -1,4 +1,5 @@
 import { Card, BlockStack, Text, TextField, Banner, Divider, InlineStack, Button, Box } from '@shopify/polaris';
+import { useMemo } from 'react';
 import ProductCollectionSelector from '~/components/ProductCollectionSelector';
 import type { Discount } from '~/types/discount';
 import type { CrmProduct, CrmCollection } from '~/types/crm';
@@ -66,6 +67,22 @@ export default function TiersStep({
   onLoadProducts,
   onLoadCollections,
 }: TiersStepProps) {
+  // Memoize calculated min purchase amounts for all tiers
+  const tiersWithCalculatedPurchase = useMemo(() => {
+    return tiers.map((tier) => {
+      const minLtv = parseFloat(tier.minLtvAmount || '0');
+      const duration = parseFloat(tier.durationMonths || '0');
+      const calculatedMinPurchase = minLtv > 0 && duration > 0
+        ? (minLtv * (duration / 12)).toFixed(2)
+        : '0.00';
+      
+      return {
+        ...tier,
+        calculatedMinPurchase: `$${calculatedMinPurchase}`,
+      };
+    });
+  }, [tiers]);
+
   return (
     <Card>
       <BlockStack gap="400">
@@ -85,7 +102,7 @@ export default function TiersStep({
         
         <Divider />
         
-        {tiers.map((tier, index) => (
+        {tiersWithCalculatedPurchase.map((tier, index) => (
           <Card key={tier.id}>
             <BlockStack gap="300">
               <InlineStack align="space-between" blockAlign="center">
@@ -147,21 +164,23 @@ export default function TiersStep({
                 <Box minWidth="200px">
                   <TextField
                     label="Min Purchase"
-                    type="number"
-                    value={tier.minPurchaseAmount}
-                    onChange={(value) => onUpdateTier(tier.id, 'minPurchaseAmount', value)}
-                    prefix="$"
+                    type="text"
+                    value={tier.calculatedMinPurchase}
+                    prefix=""
                     autoComplete="off"
+                    disabled={true}
+                    helpText="Calculated from Min LTV and Duration"
                   />
                 </Box>
                 <Box minWidth="200px">
                   <TextField
-                    label="Min LTV"
+                    label="Min Annual LTV"
                     type="number"
                     value={tier.minLtvAmount || '0'}
                     onChange={(value) => onUpdateTier(tier.id, 'minLtvAmount', value)}
                     prefix="$"
                     autoComplete="off"
+                    helpText="Minimum annualized lifetime value"
                   />
                 </Box>
               </InlineStack>
