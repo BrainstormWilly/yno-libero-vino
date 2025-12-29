@@ -64,8 +64,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let headerUrl: string | null = null;
   let footerUrl: string | null = null;
   
-  if (templateType === 'club-signup') {
-    // For welcome template, use client's header image if available, otherwise null to show text fallback
+  if (templateType === 'club-signup' || templateType === 'monthly-status') {
+    // For club-signup and monthly-status templates, use client's header image if available, otherwise null to show text fallback
     // Footer will use powered-by-dark.png automatically via renderSendGridTemplate
     headerUrl = client.email_header_image_url || null;
     footerUrl = null; // Will use powered-by-dark.png via the render function

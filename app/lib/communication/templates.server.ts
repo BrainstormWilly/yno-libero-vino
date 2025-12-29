@@ -98,6 +98,7 @@ export async function renderSendGridTemplate(
   // Check if template uses new header_block pattern (conditional header image/text)
   const usesHeaderBlock = template.includes('{{header_block}}');
   const usesNewTemplateFormat = usesHeaderBlock && template.includes('{{footer_image_block}}');
+  const isMonthlyStatus = template.includes('{{extension_status_block}}');
   
   // Convert image URLs to proxy URLs if needed (for CORS)
   const proxiedHeaderUrl = convertImageUrlToProxy(headerUrl, requestUrl, sessionId);
@@ -121,11 +122,11 @@ export async function renderSendGridTemplate(
   
   // Build footer image block
   let footerImageBlock = '';
-  if (usesNewTemplateFormat) {
-    // Use powered-by-dark.png for club-signup template format
+  if (usesNewTemplateFormat || isMonthlyStatus) {
+    // Use powered-by-dark.png for club-signup and monthly-status template formats
     const poweredByUrl = await getPoweredByDarkImageUrl();
     const proxiedPoweredByUrl = convertImageUrlToProxy(poweredByUrl, requestUrl, sessionId);
-    footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${proxiedPoweredByUrl}" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" /></div>`;
+    footerImageBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 0;"><img src="${proxiedPoweredByUrl}" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" /></div>`;
   } else if (proxiedFooterUrl) {
     footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${proxiedFooterUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; height: auto;" /></div>`;
   }
@@ -134,6 +135,57 @@ export async function renderSendGridTemplate(
   const customContentBlock = customContent
     ? `<div style="margin: 20px 0; padding: 16px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;"><p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">${escapeHtml(customContent)}</p></div>`
     : '';
+  
+  // Check if this is a monthly-status template and build conditional blocks
+  let extensionStatusBlock = '';
+  let upgradeOfferBlock = '';
+  let marketingProductsBlock = '';
+  let statusBodyMessage = '';
+  
+  if (isMonthlyStatus) {
+    // Build extension status block
+    const isExtended = variables.is_extended === 'true' || variables.is_extended === 1 || variables.is_extended === '1';
+    extensionStatusBlock = buildExtensionStatusBlock(
+      isExtended,
+      String(variables.client_name || 'Winery'),
+      String(variables.expiration_formatted || ''),
+      variables.extension_amount_needed ? Number(variables.extension_amount_needed) : undefined,
+      variables.current_expiration ? String(variables.current_expiration) : undefined
+    );
+    
+    // Build upgrade offer block (only if upgrade is available)
+    const hasUpgrade = variables.has_upgrade === 'true' || variables.has_upgrade === 1 || variables.has_upgrade === '1';
+    if (hasUpgrade && variables.upgrade_amount_needed && variables.upgrade_deadline && variables.upgrade_discount_percentage && variables.upgrade_expiration) {
+      upgradeOfferBlock = buildUpgradeOfferBlock(
+        Number(variables.upgrade_amount_needed),
+        String(variables.upgrade_deadline),
+        Number(variables.upgrade_discount_percentage),
+        String(variables.upgrade_expiration)
+      );
+    }
+    
+    // Build marketing products block (if products provided)
+    if (variables.marketing_products) {
+      try {
+        const products = typeof variables.marketing_products === 'string' 
+          ? JSON.parse(variables.marketing_products) 
+          : variables.marketing_products;
+        marketingProductsBlock = buildMarketingProductsBlock(products);
+      } catch (e) {
+        // If parsing fails, skip products block
+      }
+    }
+    
+    // Build status body message
+    statusBodyMessage = buildStatusBodyMessage(
+      isExtended,
+      hasUpgrade,
+      variables.days_remaining ? Number(variables.days_remaining) : 0,
+      variables.current_discount_percentage ? Number(variables.current_discount_percentage) : 0,
+      variables.extension_amount_needed ? Number(variables.extension_amount_needed) : undefined,
+      variables.extension_deadline ? String(variables.extension_deadline) : undefined
+    );
+  }
   
   // Remove Klaviyo-specific placeholders (not used in SendGrid) before rendering
   const processedTemplate = template
@@ -147,6 +199,10 @@ export async function renderSendGridTemplate(
     header_image_block: headerBlock, // Keep for backward compatibility
     footer_image_block: footerImageBlock,
     custom_content_block: customContentBlock,
+    extension_status_block: extensionStatusBlock,
+    upgrade_offer_block: upgradeOfferBlock,
+    marketing_products_block: marketingProductsBlock,
+    status_body_message: statusBodyMessage,
   };
   
   return renderTemplate(processedTemplate, allVariables);
@@ -231,7 +287,125 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Build upgrade message HTML block for monthly status template
+ * Build extension status block for monthly status template
+ * Shows different messages based on whether customer has extended or not
+ */
+function buildExtensionStatusBlock(
+  isExtended: boolean,
+  clientName: string,
+  expirationFormatted: string,
+  extensionAmountNeeded?: number,
+  currentExpiration?: string
+): string {
+  const safeClientName = escapeHtml(clientName);
+  const safeExpiration = escapeHtml(expirationFormatted);
+  
+  if (isExtended) {
+    return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Way to go!</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">You&apos;ve extended your ${safeClientName} benefits until</h3>
+      <h3 style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #202124; text-align: center;">${safeExpiration}</h3>`;
+  } else {
+    const amountText = extensionAmountNeeded ? `$${extensionAmountNeeded}` : 'the minimum amount';
+    const expirationText = escapeHtml(currentExpiration || expirationFormatted);
+    return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Don&apos;t miss out!</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Extend your ${safeClientName} benefits by spending ${amountText}</h3>
+      <h3 style="margin: 10px 0 0 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">before ${expirationText}</h3>`;
+  }
+}
+
+/**
+ * Build upgrade offer block for monthly status template
+ * Black box with white border showing upgrade opportunity
+ */
+function buildUpgradeOfferBlock(
+  upgradeAmountNeeded: number,
+  upgradeDeadline: string,
+  upgradeDiscountPercentage: number,
+  upgradeExpiration: string
+): string {
+  const safeDeadline = escapeHtml(upgradeDeadline);
+  const safeExpiration = escapeHtml(upgradeExpiration);
+  
+  return `<div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000000; border: 1px solid #ffffff;">
+    <div style="height: 100%; width: 100%; border: 2px solid #ffffff; border-radius: 8px;">
+      <div style="padding: 40px 10px;">
+        <p style="margin: 0 0 10px 0; font-size: 18px; font-weight: bold; color: #ffffff; text-align: center;">But wait. Spend</p>
+        <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">$${upgradeAmountNeeded}</p>
+        <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">by</p>
+        <p style="margin: 0; font-size: 32px; font-weight: bold; color: #ffffff; text-align: center;">${safeDeadline}</p>
+        <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">and upgrade your benefits to</p>
+        <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">${upgradeDiscountPercentage}% off</p>
+        <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">off the store until</p>
+        <p style="margin: 0; font-size: 32px; font-weight: bold; color: #ffffff; text-align: center;">${safeExpiration}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * Build marketing products block for monthly status template
+ * Shows product suggestions if provided
+ */
+function buildMarketingProductsBlock(products?: Array<{ name: string; price: number; imageUrl: string; productUrl?: string }>): string {
+  if (!products || products.length === 0) {
+    return '';
+  }
+  
+  const productItems = products.map(product => {
+    const productLink = product.productUrl || '#';
+    const priceText = `$${product.price.toFixed(2)}`;
+    
+    return `<div style="margin: 20px 0; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px;">
+      <div style="display: table; width: 100%;">
+        <div style="display: table-cell; width: 120px; vertical-align: top; padding-right: 16px;">
+          <a href="${productLink}" style="display: block;">
+            <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" style="max-width: 120px; width: 100%; height: auto; border-radius: 4px;" />
+          </a>
+        </div>
+        <div style="display: table-cell; vertical-align: top;">
+          <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold; color: #202124;">
+            <a href="${productLink}" style="color: #202124; text-decoration: none;">${escapeHtml(product.name)}</a>
+          </h3>
+          <p style="margin: 0; font-size: 16px; font-weight: bold; color: #0066cc;">${priceText}</p>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  
+  return `<div style="margin: 30px 0;">
+    <h2 style="margin: 0 0 20px 0; font-size: 24px; font-weight: bold; color: #202124;">Featured Wines</h2>
+    ${productItems}
+  </div>`;
+}
+
+/**
+ * Build status body message for monthly status template
+ * Dynamic message based on extension and upgrade status
+ */
+function buildStatusBodyMessage(
+  isExtended: boolean,
+  hasUpgrade: boolean,
+  daysRemaining: number,
+  discountPercentage: number,
+  extensionAmountNeeded?: number,
+  extensionDeadline?: string
+): string {
+  const safeDeadline = extensionDeadline ? escapeHtml(extensionDeadline) : '';
+  
+  if (isExtended && hasUpgrade) {
+    return `This is your monthly reminder of your ${discountPercentage}% off discount. You still have ${daysRemaining} days remaining on your current benefits.`;
+  } else if (isExtended && !hasUpgrade) {
+    return `This is your monthly reminder of your ${discountPercentage}% off discount. You still have ${daysRemaining} days to enjoy your current benefits.`;
+  } else {
+    const amountText = extensionAmountNeeded ? `$${extensionAmountNeeded}` : 'the minimum amount';
+    const deadlineText = extensionDeadline ? `by ${safeDeadline}` : 'before your benefits expire';
+    return `This is your monthly reminder of your ${discountPercentage}% off discount. You still have ${daysRemaining} days to extend your discount by spending at least ${amountText} ${deadlineText}.`;
+  }
+}
+
+/**
+ * Build upgrade message HTML block for monthly status template (legacy)
+ * @deprecated Use buildUpgradeOfferBlock instead
  */
 export function buildUpgradeMessage(nextTier: { name: string; minPurchaseAmount: number } | null): string {
   if (!nextTier) {
