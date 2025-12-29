@@ -3,7 +3,7 @@
  * Returns rendered HTML with sample data for preview
  */
 
-import { type LoaderFunctionArgs, json } from 'react-router';
+import { type LoaderFunctionArgs } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import type { TemplateType } from '~/lib/communication/template-variables';
@@ -13,7 +13,10 @@ import { getDefaultHeaderImageUrl, getDefaultFooterImageUrl } from '~/lib/storag
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
   if (!session) {
-    throw new Response('Unauthorized', { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const url = new URL(request.url);
@@ -21,18 +24,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const customContent = url.searchParams.get('customContent');
 
   if (!templateType) {
-    throw new Response('Missing templateType parameter', { status: 400 });
+    return new Response(JSON.stringify({ error: 'Missing templateType parameter' }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   // Get client and check if they use SendGrid
   const client = await db.getClient(session.clientId);
   if (!client) {
-    throw new Response('Client not found', { status: 404 });
+    return new Response(JSON.stringify({ error: 'Client not found' }), { 
+      status: 404,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   const config = await db.getCommunicationConfig(session.clientId);
   if (config?.email_provider?.toLowerCase() !== 'sendgrid') {
-    throw new Response('Preview only available for SendGrid clients', { status: 400 });
+    return new Response(JSON.stringify({ error: 'Preview only available for LiberoVino managed clients' }), { 
+      status: 400,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   // Load template from DB or base file
@@ -47,20 +59,35 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Get sample data
   const sampleData = getSampleDataForPreview(templateType);
   
-  // Get default image URLs for preview
-  const headerUrl = await getDefaultHeaderImageUrl();
-  const footerUrl = await getDefaultFooterImageUrl();
+  // Get image URLs for preview
+  // Use client's images if available, otherwise use defaults
+  let headerUrl: string | null = null;
+  let footerUrl: string | null = null;
+  
+  if (templateType === 'club-signup') {
+    // For welcome template, use client's header image if available, otherwise null to show text fallback
+    // Footer will use powered-by-dark.png automatically via renderSendGridTemplate
+    headerUrl = client.email_header_image_url || null;
+    footerUrl = null; // Will use powered-by-dark.png via the render function
+  } else {
+    // For other templates, use client's images or defaults
+    headerUrl = client.email_header_image_url || await getDefaultHeaderImageUrl();
+    footerUrl = client.email_footer_image_url || await getDefaultFooterImageUrl();
+  }
 
   // Render template with sample data
+  // Pass request URL and session ID to convert localhost image URLs to proxy URLs
   const html = await renderSendGridTemplate(
     template,
     sampleData,
     customContent || null,
     headerUrl,
-    footerUrl
+    footerUrl,
+    request.url,
+    session.id
   );
 
-  return json({ html });
+  return { html };
 }
 
 /**
@@ -72,6 +99,7 @@ function mapTemplateTypeToDbType(templateType: TemplateType): string {
     'expiration-warning': 'expiration_warning',
     'expiration': 'expiration',
     'upgrade': 'upgrade_available',
+    'club-signup': 'welcome',
   };
   return mapping[templateType];
 }

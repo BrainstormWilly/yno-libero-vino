@@ -50,6 +50,10 @@ export default [
   route("api/cron/monthly-status", "routes/api.cron.monthly-status.ts"),
   route("api/cron/monthly-status/queue", "routes/api.cron.monthly-status.queue.ts"),
   route("api/cron/expiration-warning/queue", "routes/api.cron.expiration-warning.queue.ts"),
+  route("api/templates/preview", "routes/api.templates.preview.ts"),
+  route("api/templates/download/:templateType", "routes/api.templates.download.$templateType.ts"),
+  route("api/upload-sendgrid-image", "routes/api.upload-sendgrid-image.ts"),
+  route("api/images/proxy", "routes/api.images.proxy.ts"),
   // API webhook routes (flat structure, matching api/cron pattern)
   route("api/webhooks", "routes/api.webhooks._index.tsx"), // UI page for webhook management
   route("api/webhooks/c7", "routes/api.webhooks.c7.tsx"),

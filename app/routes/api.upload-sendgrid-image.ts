@@ -33,15 +33,44 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   
   const formData = await request.formData();
-  const file = formData.get('image') as File;
+  const file = formData.get('image') as File | null;
   const imageType = formData.get('imageType') as 'header' | 'footer';
-  
-  if (!file) {
-    return { success: false, error: 'No file provided' };
-  }
+  const remove = formData.get('remove') === 'true';
   
   if (!imageType || !['header', 'footer'].includes(imageType)) {
     return { success: false, error: 'Invalid imageType. Must be "header" or "footer"' };
+  }
+  
+  // Handle removal (set to null)
+  if (remove) {
+    try {
+      // Update client email image URL to null in database
+      await updateClientEmailImages(clientId, {
+        [imageType === 'header' ? 'emailHeaderImageUrl' : 'emailFooterImageUrl']: null,
+      });
+      
+      // Optionally delete the file from storage (if exists)
+      const { deleteSendGridClientImage } = await import('~/lib/storage/sendgrid-images.server');
+      try {
+        await deleteSendGridClientImage(clientId, imageType);
+      } catch (deleteError) {
+        // Ignore deletion errors - file might not exist
+        console.log('Note: Could not delete image file from storage (may not exist)', deleteError);
+      }
+      
+      return { success: true, url: null };
+    } catch (error) {
+      console.error('Image removal error:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to remove image' 
+      };
+    }
+  }
+  
+  // File is required for upload
+  if (!file) {
+    return { success: false, error: 'No file provided' };
   }
   
   // Validate file type

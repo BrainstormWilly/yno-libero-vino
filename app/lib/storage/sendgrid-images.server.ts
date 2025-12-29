@@ -8,6 +8,7 @@ import { getSupabaseClient } from '~/lib/db/supabase.server';
 
 const BUCKET_NAME = 'sendgrid-email-images';
 const DEFAULT_IMAGES_FOLDER = '_defaults';
+const DEFAULT_FOOTER_IMAGE_NAME = 'powered-by-dark.png';
 
 /**
  * Get default LiberoVino header image URL
@@ -30,6 +31,18 @@ export async function getDefaultFooterImageUrl(): Promise<string> {
   const { data: { publicUrl } } = supabase.storage
     .from(BUCKET_NAME)
     .getPublicUrl(`${DEFAULT_IMAGES_FOLDER}/footer.png`);
+  
+  return publicUrl;
+}
+
+/**
+ * Get default LiberoVino powered-by-dark.png image URL
+ */
+export async function getPoweredByDarkImageUrl(): Promise<string> {
+  const supabase = getSupabaseClient();
+  const { data: { publicUrl } } = supabase.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(DEFAULT_FOOTER_IMAGE_NAME);
   
   return publicUrl;
 }

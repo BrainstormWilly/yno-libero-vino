@@ -8,7 +8,7 @@ import { join } from 'path';
 import type { TemplateType } from './template-variables';
 import { getTemplateVariables as getTemplateVars, getTemplateSampleData } from './template-variables';
 import { convertMergeTags } from './mailchimp-seeding.server';
-import { getDefaultHeaderImageUrl, getDefaultFooterImageUrl } from '~/lib/storage/sendgrid-images.server';
+import { getDefaultHeaderImageUrl, getDefaultFooterImageUrl, getPoweredByDarkImageUrl } from '~/lib/storage/sendgrid-images.server';
 
 const TEMPLATES_BASE_PATH = join(process.cwd(), 'public', 'templates', 'emails', 'base');
 
@@ -51,30 +51,88 @@ export function renderTemplate(
  * Render SendGrid template with variables, custom content, and image URLs
  * @param templateOrType - Either a template string (from DB) or template type (to load base template)
  */
+/**
+ * Convert localhost image URLs to proxy URLs to avoid CORS issues
+ */
+function convertImageUrlToProxy(imageUrl: string | null | undefined, requestUrl?: string, sessionId?: string): string | null {
+  if (!imageUrl) return null;
+  
+  // Check if URL is localhost (development/local Supabase)
+  if (imageUrl.includes('127.0.0.1') || imageUrl.includes('localhost')) {
+    // Extract base URL from request if available
+    let baseUrl = 'http://localhost:3000';
+    if (requestUrl) {
+      try {
+        const url = new URL(requestUrl);
+        baseUrl = `${url.protocol}//${url.host}`;
+      } catch (e) {
+        // Fallback to default
+      }
+    }
+    
+    // Build proxy URL with session if available
+    const proxyUrl = sessionId 
+      ? `${baseUrl}/api/images/proxy?session=${sessionId}&url=${encodeURIComponent(imageUrl)}`
+      : `${baseUrl}/api/images/proxy?url=${encodeURIComponent(imageUrl)}`;
+    
+    return proxyUrl;
+  }
+  
+  return imageUrl;
+}
+
 export async function renderSendGridTemplate(
   templateOrType: TemplateType | string,
   variables: Record<string, string | number>,
   customContent: string | null | undefined,
   headerUrl: string | null | undefined,
-  footerUrl: string | null | undefined
+  footerUrl: string | null | undefined,
+  requestUrl?: string,
+  sessionId?: string
 ): Promise<string> {
   // Load template - if it's a string, use it directly (from DB), otherwise load from file
   const template = typeof templateOrType === 'string' && templateOrType.includes('<!doctype html>')
     ? templateOrType
     : loadBaseTemplate(templateOrType as TemplateType);
   
-  // Build image blocks
-  const headerImageBlock = headerUrl
-    ? `<div style="width: 100%; text-align: center; margin-bottom: 20px;"><img src="${headerUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; height: auto;" /></div>`
-    : '';
+  // Check if template uses new header_block pattern (conditional header image/text)
+  const usesHeaderBlock = template.includes('{{header_block}}');
+  const usesNewTemplateFormat = usesHeaderBlock && template.includes('{{footer_image_block}}');
   
-  const footerImageBlock = footerUrl
-    ? `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${footerUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; height: auto;" /></div>`
-    : '';
+  // Convert image URLs to proxy URLs if needed (for CORS)
+  const proxiedHeaderUrl = convertImageUrlToProxy(headerUrl, requestUrl, sessionId);
+  const proxiedFooterUrl = convertImageUrlToProxy(footerUrl, requestUrl, sessionId);
+  
+  // Build header block - conditional image or text fallback
+  let headerBlock = '';
+  if (usesHeaderBlock) {
+    if (proxiedHeaderUrl) {
+      headerBlock = `<div style="width: 100%; max-width: 600px; margin: 0 auto;"><img src="${proxiedHeaderUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; width: 100%; height: auto; display: block;" /></div>`;
+    } else {
+      // Fallback to client name text
+      headerBlock = `<div style="width: 100%; max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: center; background-color: #ffffff;"><h1 style="margin: 0; font-family: 'Brush Script MT', 'Lucida Handwriting', cursive; font-size: 48px; font-weight: normal; color: #202124;">${variables.client_name || 'Winery'}</h1></div>`;
+    }
+  } else {
+    // Legacy header_image_block behavior
+    headerBlock = proxiedHeaderUrl
+      ? `<div style="width: 100%; text-align: center; margin-bottom: 20px;"><img src="${proxiedHeaderUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; height: auto;" /></div>`
+      : '';
+  }
+  
+  // Build footer image block
+  let footerImageBlock = '';
+  if (usesNewTemplateFormat) {
+    // Use powered-by-dark.png for club-signup template format
+    const poweredByUrl = await getPoweredByDarkImageUrl();
+    const proxiedPoweredByUrl = convertImageUrlToProxy(poweredByUrl, requestUrl, sessionId);
+    footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${proxiedPoweredByUrl}" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" /></div>`;
+  } else if (proxiedFooterUrl) {
+    footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${proxiedFooterUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; height: auto;" /></div>`;
+  }
   
   // Build custom content block
   const customContentBlock = customContent
-    ? `<div style="margin-top:24px; padding:16px; background-color:#f8f9fa; border-radius:4px;"><p>${escapeHtml(customContent)}</p></div>`
+    ? `<div style="margin: 20px 0; padding: 16px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;"><p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">${escapeHtml(customContent)}</p></div>`
     : '';
   
   // Remove Klaviyo-specific placeholders (not used in SendGrid) before rendering
@@ -85,7 +143,8 @@ export async function renderSendGridTemplate(
   // Add blocks to variables
   const allVariables = {
     ...variables,
-    header_image_block: headerImageBlock,
+    header_block: headerBlock,
+    header_image_block: headerBlock, // Keep for backward compatibility
     footer_image_block: footerImageBlock,
     custom_content_block: customContentBlock,
   };

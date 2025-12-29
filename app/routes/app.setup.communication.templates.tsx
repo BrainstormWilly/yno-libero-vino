@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs, Form, useLoaderData, useNavigation, useNavigate } from 'react-router';
-import { useState, useEffect, useCallback } from 'react';
-import { Card, BlockStack, Text, Button, InlineStack, Box, TextField, Banner, Tabs } from '@shopify/polaris';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Card, BlockStack, Text, Button, InlineStack, Box, TextField, Tabs, Thumbnail } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
@@ -15,6 +15,7 @@ const TEMPLATE_TYPES: Array<{ key: TemplateType; label: string; dbType: string }
   { key: 'expiration-warning', label: 'Expiration Warning', dbType: 'expiration_warning' },
   { key: 'expiration', label: 'Expiration Notice', dbType: 'expiration' },
   { key: 'upgrade', label: 'Tier Upgrade', dbType: 'upgrade_available' },
+  { key: 'club-signup', label: 'Club Signup', dbType: 'welcome' },
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -100,7 +101,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function ProviderTemplates() {
-  const { session, provider, templates } = useLoaderData<typeof loader>();
+  const { session, provider, templates, client } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
@@ -109,6 +110,13 @@ export default function ProviderTemplates() {
   const [customContent, setCustomContent] = useState<string>('');
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [imagesCollapsed, setImagesCollapsed] = useState(true);
+  const [headerImageUrl, setHeaderImageUrl] = useState(client?.email_header_image_url || '');
+  const [footerImageUrl, setFooterImageUrl] = useState(client?.email_footer_image_url || '');
+  const [uploading, setUploading] = useState<'header' | 'footer' | null>(null);
+  
+  const headerInputRef = useRef<HTMLInputElement>(null);
+  const footerInputRef = useRef<HTMLInputElement>(null);
 
   const selectedTemplate = TEMPLATE_TYPES[selectedTemplateIndex];
   const templateData = provider === 'sendgrid' ? templates.find(t => t.templateType === selectedTemplate.key) : null;
@@ -120,32 +128,153 @@ export default function ProviderTemplates() {
     }
   }, [selectedTemplateIndex, templateData]);
 
-  // Load preview when template or custom content changes (for SendGrid)
-  const loadPreview = useCallback(async () => {
+  // Track the custom content that is currently previewed (saved content from DB)
+  const [previewedCustomContent, setPreviewedCustomContent] = useState<string>('');
+
+  // Load preview with specific custom content (for SendGrid)
+  const loadPreview = useCallback(async (contentToPreview: string) => {
     if (!selectedTemplate || provider !== 'sendgrid') return;
     
     setPreviewLoading(true);
     try {
-      const url = `/api/templates/preview?templateType=${selectedTemplate.key}&customContent=${encodeURIComponent(customContent || '')}`;
+      // Include session ID in URL (sessions are passed via URL, not cookies)
+      const url = `/api/templates/preview?session=${session.id}&templateType=${selectedTemplate.key}&customContent=${encodeURIComponent(contentToPreview || '')}`;
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to load preview' }));
+        console.error('Error loading preview:', errorData.error || `HTTP ${response.status}`);
+        setPreviewHtml('');
+        return;
+      }
+      
       const data = await response.json();
       if (data.html) {
         setPreviewHtml(data.html);
+        setPreviewedCustomContent(contentToPreview);
       }
     } catch (error) {
       console.error('Error loading preview:', error);
+      setPreviewHtml('');
     } finally {
       setPreviewLoading(false);
     }
-  }, [selectedTemplate, provider, customContent]);
+  }, [selectedTemplate, provider, session.id]);
 
+  // Load preview when template changes (using saved content)
   useEffect(() => {
-    if (provider === 'sendgrid' && selectedTemplate) {
-      loadPreview();
+    if (provider === 'sendgrid' && selectedTemplate && templateData) {
+      loadPreview(templateData.customContent || '');
     }
-  }, [selectedTemplate, provider, loadPreview]);
+  }, [selectedTemplateIndex, provider, loadPreview, templateData, selectedTemplate]);
 
-  const tabs = TEMPLATE_TYPES.map((template, index) => ({
+  // Handle manual preview button click
+  const handlePreviewClick = () => {
+    loadPreview(customContent);
+  };
+
+  const handleImageUpload = async (imageType: 'header' | 'footer', file: File) => {
+    setUploading(imageType);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('imageType', imageType);
+      
+      const response = await fetch(`/api/upload-sendgrid-image?session=${session.id}`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        if (imageType === 'header') {
+          setHeaderImageUrl(result.url || '');
+        } else {
+          setFooterImageUrl(result.url || '');
+        }
+        // Reload preview to show updated images (using currently previewed content)
+        if (provider === 'sendgrid' && selectedTemplate) {
+          loadPreview(previewedCustomContent);
+        }
+      } else {
+        console.error('Upload failed:', result.error);
+        alert(result.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleRemoveImage = async (imageType: 'header' | 'footer') => {
+    setUploading(imageType);
+    try {
+      const formData = new FormData();
+      formData.append('imageType', imageType);
+      formData.append('remove', 'true');
+      
+      const response = await fetch(`/api/upload-sendgrid-image?session=${session.id}`, {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      if (result.success) {
+        if (imageType === 'header') {
+          setHeaderImageUrl('');
+        } else {
+          setFooterImageUrl('');
+        }
+        // Reload preview to show default images (using currently previewed content)
+        if (provider === 'sendgrid' && selectedTemplate) {
+          loadPreview(previewedCustomContent);
+        }
+      } else {
+        console.error('Remove failed:', result.error);
+        alert(result.error || 'Failed to remove image');
+      }
+    } catch (error) {
+      console.error('Remove error:', error);
+      alert('Failed to remove image. Please try again.');
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  // Convert image URLs to proxy URLs for thumbnails (fix CORS)
+  const getProxiedImageUrl = (imageUrl: string | null | undefined): string | undefined => {
+    if (!imageUrl) return undefined;
+    if (imageUrl.includes('127.0.0.1') || imageUrl.includes('localhost')) {
+      const baseUrl = window.location.origin;
+      return `${baseUrl}/api/images/proxy?session=${session.id}&url=${encodeURIComponent(imageUrl)}`;
+    }
+    return imageUrl;
+  };
+  
+  const handleImageFileSelect = (imageType: 'header' | 'footer', event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please select a JPEG, PNG, GIF, or WebP image');
+      return;
+    }
+    
+    // Validate file size (5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+    
+    handleImageUpload(imageType, file);
+  };
+
+  const tabs = TEMPLATE_TYPES.map((template) => ({
     id: template.key,
     content: template.label,
     panelID: template.key,
@@ -173,6 +302,116 @@ export default function ProviderTemplates() {
           </InlineStack>
         </Box>
 
+        {/* Email Images - Collapsible */}
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center">
+              <BlockStack gap="100">
+                <Text variant="headingMd" as="h2">
+                  Email Images
+                </Text>
+                <Text variant="bodySm" tone="subdued" as="p">
+                  Applies to all email templates
+                </Text>
+              </BlockStack>
+              <Button
+                onClick={() => setImagesCollapsed(!imagesCollapsed)}
+                variant="plain"
+              >
+                {imagesCollapsed ? 'Show' : 'Hide'}
+              </Button>
+            </InlineStack>
+            
+            {!imagesCollapsed && (
+              <BlockStack gap="400">
+                <Text variant="bodySm" tone="subdued" as="p">
+                  Upload custom header and footer images for your email templates. If not provided, default LiberoVino images will be used.
+                </Text>
+                
+                {/* Header Image */}
+                <BlockStack gap="200">
+                  <Text variant="bodyMd" fontWeight="semibold" as="p">
+                    Header Image (Recommended: 600x300px)
+                  </Text>
+                  {headerImageUrl && getProxiedImageUrl(headerImageUrl) && (
+                    <Thumbnail
+                      source={getProxiedImageUrl(headerImageUrl)!}
+                      alt="Email header image"
+                      size="large"
+                    />
+                  )}
+                  <input
+                    ref={headerInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={(e) => handleImageFileSelect('header', e)}
+                    style={{ display: 'none' }}
+                  />
+                  <InlineStack gap="200">
+                    <Button
+                      onClick={() => headerInputRef.current?.click()}
+                      loading={uploading === 'header'}
+                      disabled={uploading !== null}
+                    >
+                      {headerImageUrl ? 'Replace' : 'Upload Header Image'}
+                    </Button>
+                    {headerImageUrl && (
+                      <Button
+                        onClick={() => handleRemoveImage('header')}
+                        loading={uploading === 'header'}
+                        disabled={uploading !== null}
+                        variant="plain"
+                      >
+                        Use Default
+                      </Button>
+                    )}
+                  </InlineStack>
+                </BlockStack>
+                
+                {/* Footer Image */}
+                <BlockStack gap="200">
+                  <Text variant="bodyMd" fontWeight="semibold" as="p">
+                    Footer Image (Recommended: 600x80px)
+                  </Text>
+                  {footerImageUrl && getProxiedImageUrl(footerImageUrl) && (
+                    <Thumbnail
+                      source={getProxiedImageUrl(footerImageUrl)!}
+                      alt="Email footer image"
+                      size="large"
+                    />
+                  )}
+                  <input
+                    ref={footerInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    onChange={(e) => handleImageFileSelect('footer', e)}
+                    style={{ display: 'none' }}
+                  />
+                  <InlineStack gap="200">
+                    <Button
+                      onClick={() => footerInputRef.current?.click()}
+                      loading={uploading === 'footer'}
+                      disabled={uploading !== null}
+                    >
+                      {footerImageUrl ? 'Replace' : 'Upload Footer Image'}
+                    </Button>
+                    {footerImageUrl && (
+                      <Button
+                        onClick={() => handleRemoveImage('footer')}
+                        loading={uploading === 'footer'}
+                        disabled={uploading !== null}
+                        variant="plain"
+                      >
+                        Use Default
+                      </Button>
+                    )}
+                  </InlineStack>
+                </BlockStack>
+              </BlockStack>
+            )}
+          </BlockStack>
+        </Card>
+
         {/* Template Tabs */}
         <Card>
           <Tabs
@@ -180,29 +419,25 @@ export default function ProviderTemplates() {
             selected={selectedTemplateIndex}
             onSelect={setSelectedTemplateIndex}
           >
-            <Card>
-              <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">
-                  {selectedTemplate?.label} Template
-                </Text>
-
-                {/* Custom Content Editor */}
-                <Card>
-                  <BlockStack gap="300">
-                    <Text variant="headingSm" as="h3">
-                      Custom Content (Optional)
-                    </Text>
-                    <Text variant="bodySm" tone="subdued" as="p">
-                      Add optional text-only content that will appear in your email templates. This content is inserted into a dedicated section of the template.
-                    </Text>
-                    <TextField
-                      label="Custom Content"
-                      value={customContent}
-                      onChange={setCustomContent}
-                      multiline={4}
-                      placeholder="Enter custom text content here (plain text only)..."
-                      autoComplete="off"
-                    />
+            <BlockStack gap="400">
+              {/* Custom Content Editor */}
+              <Card>
+                <BlockStack gap="300">
+                  <Text variant="headingSm" as="h3">
+                    Custom Content (Optional)
+                  </Text>
+                  <Text variant="bodySm" tone="subdued" as="p">
+                    Add optional text-only content that will appear in your email templates. This content is inserted into a dedicated section of the template.
+                  </Text>
+                  <TextField
+                    label="Custom Content"
+                    value={customContent}
+                    onChange={setCustomContent}
+                    multiline={4}
+                    placeholder="Enter custom text content here (plain text only)..."
+                    autoComplete="off"
+                  />
+                  <InlineStack gap="200">
                     <Form method="post">
                       <input type="hidden" name="intent" value="save_custom_content" />
                       <input type="hidden" name="templateType" value={selectedTemplate?.key} />
@@ -211,40 +446,47 @@ export default function ProviderTemplates() {
                         Save Custom Content
                       </Button>
                     </Form>
-                  </BlockStack>
-                </Card>
-
-                {/* Preview */}
-                <Card>
-                  <BlockStack gap="300">
-                    <Text variant="headingSm" as="h3">
+                    <Button 
+                      onClick={handlePreviewClick}
+                      loading={previewLoading}
+                      disabled={!selectedTemplate || provider !== 'sendgrid'}
+                    >
                       Preview
-                    </Text>
-                    {previewLoading ? (
-                      <Text>Loading preview...</Text>
-                    ) : (
-                      <Box
-                        padding="400"
-                        background="bg-surface-secondary"
-                        borderRadius="200"
-                        borderWidth="025"
-                        borderColor="border"
-                      >
-                        <div
-                          dangerouslySetInnerHTML={{ __html: previewHtml }}
-                          style={{
-                            maxWidth: '600px',
-                            margin: '0 auto',
-                            backgroundColor: '#ffffff',
-                            padding: '20px',
-                          }}
-                        />
-                      </Box>
-                    )}
-                  </BlockStack>
-                </Card>
-              </BlockStack>
-            </Card>
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Card>
+
+              {/* Preview */}
+              <Card>
+                <BlockStack gap="300">
+                  <Text variant="headingSm" as="h3">
+                    Preview
+                  </Text>
+                  {previewLoading ? (
+                    <Text as="p">Loading preview...</Text>
+                  ) : (
+                    <Box
+                      padding="400"
+                      background="bg-surface-secondary"
+                      borderRadius="200"
+                      borderWidth="025"
+                      borderColor="border"
+                    >
+                      <div
+                        dangerouslySetInnerHTML={{ __html: previewHtml }}
+                        style={{
+                          maxWidth: '600px',
+                          margin: '0 auto',
+                          backgroundColor: '#ffffff',
+                          padding: '20px',
+                        }}
+                      />
+                    </Box>
+                  )}
+                </BlockStack>
+              </Card>
+            </BlockStack>
           </Tabs>
         </Card>
       </BlockStack>

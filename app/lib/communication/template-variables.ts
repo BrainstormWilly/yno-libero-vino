@@ -3,7 +3,7 @@
  * All templates use base {{variable}} syntax, which is then converted to provider-specific formats
  */
 
-export type TemplateType = 'monthly-status' | 'expiration-warning' | 'expiration' | 'upgrade';
+export type TemplateType = 'monthly-status' | 'expiration-warning' | 'expiration' | 'upgrade' | 'club-signup';
 
 export interface TemplateVariable {
   key: string;
@@ -136,11 +136,42 @@ const UPGRADE_VARIABLES: TemplateVariableSet = {
   },
 };
 
+const CLUB_SIGNUP_VARIABLES: TemplateVariableSet = {
+  templateType: 'club-signup',
+  variables: [
+    { key: 'client_name', description: 'Winery/client organization name', sampleValue: 'Liberty Wines' },
+    { key: 'customer_first_name', description: 'Customer first name', sampleValue: 'John' },
+    { key: 'discount_percentage', description: 'Discount percentage offered', sampleValue: 10 },
+    { key: 'expiration_formatted', description: 'Formatted expiration date (e.g., "Oct 23, 2026")', sampleValue: 'Oct 23, 2026' },
+    { key: 'tier_upgrade_min_purchase', description: 'Minimum purchase amount to reach next tier', sampleValue: 500 },
+    { key: 'next_tier_name', description: 'Next tier name (e.g., "Tier 2")', sampleValue: 'Tier 2' },
+    { key: 'next_tier_discount_percentage', description: 'Next tier discount percentage', sampleValue: 15 },
+    { key: 'shop_url', description: 'URL to the winery shop', sampleValue: 'https://example.com/shop' },
+    { key: 'header_block', description: 'HTML block for header (image or client name text fallback)', sampleValue: '' },
+    { key: 'footer_image_block', description: 'HTML block for powered-by footer image', sampleValue: '' },
+    { key: 'custom_content_block', description: 'HTML block for custom text content (optional)', sampleValue: '' },
+  ],
+  sampleData: {
+    client_name: 'Liberty Wines',
+    customer_first_name: 'John',
+    discount_percentage: 10,
+    expiration_formatted: 'Oct 23, 2026',
+    tier_upgrade_min_purchase: 500,
+    next_tier_name: 'Tier 2',
+    next_tier_discount_percentage: 15,
+    shop_url: 'https://example.com/shop',
+    header_block: '',
+    footer_image_block: '',
+    custom_content_block: '',
+  },
+};
+
 export const TEMPLATE_VARIABLE_SETS: Record<TemplateType, TemplateVariableSet> = {
   'monthly-status': MONTHLY_STATUS_VARIABLES,
   'expiration-warning': EXPIRATION_WARNING_VARIABLES,
   'expiration': EXPIRATION_VARIABLES,
   'upgrade': UPGRADE_VARIABLES,
+  'club-signup': CLUB_SIGNUP_VARIABLES,
 };
 
 /**
