@@ -812,6 +812,28 @@ export async function sendMonthlyStatusNotification(
       return;
     }
 
+    // Reconcile LTV before sending monthly status (ensures fresh data)
+    if (customer.crm_id) {
+      try {
+        const { reconcileCustomerLTV } = await import('~/lib/db/customer-ltv.server');
+        const client = await db.getClient(clientId);
+        if (client) {
+          // Reconcile LTV (Commerce7 uses env vars, not access tokens)
+          await reconcileCustomerLTV(
+            clientId,
+            customerId,
+            customer.crm_id,
+            client.crm_type,
+            client.tenant_shop,
+            undefined // Access token not needed for Commerce7 (uses env vars)
+          );
+        }
+      } catch (ltvError) {
+        // Log but don't fail monthly status notification if LTV reconciliation fails
+        console.warn(`Failed to reconcile LTV for customer ${customerId} during monthly status:`, ltvError);
+      }
+    }
+
     // Get preferences
     const preferences = await db.getCommunicationPreferences(customer.id);
     if (preferences.unsubscribedAll) {

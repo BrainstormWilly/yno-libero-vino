@@ -114,12 +114,16 @@ export default function ProviderTemplates() {
   const [headerImageUrl, setHeaderImageUrl] = useState(client?.email_header_image_url || '');
   const [footerImageUrl, setFooterImageUrl] = useState(client?.email_footer_image_url || '');
   const [uploading, setUploading] = useState<'header' | 'footer' | null>(null);
+  const [monthlyStatusVariation, setMonthlyStatusVariation] = useState<
+    'not-extended' | 'extended-no-upgrade' | 'extended-upgradable' | 'expiring-soon' | 'post-expired'
+  >('not-extended');
   
   const headerInputRef = useRef<HTMLInputElement>(null);
   const footerInputRef = useRef<HTMLInputElement>(null);
 
   const selectedTemplate = TEMPLATE_TYPES[selectedTemplateIndex];
   const templateData = provider === 'sendgrid' ? templates.find(t => t.templateType === selectedTemplate.key) : null;
+  const isMonthlyStatus = selectedTemplate?.key === 'monthly-status';
 
   // Load custom content when template changes
   useEffect(() => {
@@ -137,8 +141,14 @@ export default function ProviderTemplates() {
     
     setPreviewLoading(true);
     try {
+      // Determine template type: use expiration-warning for expiring-soon variation, otherwise use selected template
+      const previewTemplateType: TemplateType = 
+        (selectedTemplate.key === 'monthly-status' && monthlyStatusVariation === 'expiring-soon')
+          ? 'expiration-warning'
+          : (selectedTemplate.key || 'monthly-status');
+      
       // Include session ID in URL (sessions are passed via URL, not cookies)
-      const url = `/api/templates/preview?session=${session.id}&templateType=${selectedTemplate.key}&customContent=${encodeURIComponent(contentToPreview || '')}`;
+      const url = `/api/templates/preview?session=${session.id}&templateType=${previewTemplateType}&customContent=${encodeURIComponent(contentToPreview || '')}&variation=${monthlyStatusVariation}`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -159,14 +169,14 @@ export default function ProviderTemplates() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [selectedTemplate, provider, session.id]);
+  }, [selectedTemplate, provider, session.id, monthlyStatusVariation]);
 
-  // Load preview when template changes (using saved content)
+  // Load preview when template or variation changes (using saved content)
   useEffect(() => {
     if (provider === 'sendgrid' && selectedTemplate && templateData) {
       loadPreview(templateData.customContent || '');
     }
-  }, [selectedTemplateIndex, provider, loadPreview, templateData, selectedTemplate]);
+  }, [selectedTemplateIndex, monthlyStatusVariation, provider, loadPreview, templateData, selectedTemplate]);
 
   // Handle manual preview button click
   const handlePreviewClick = () => {
@@ -420,6 +430,57 @@ export default function ProviderTemplates() {
             onSelect={setSelectedTemplateIndex}
           >
             <BlockStack gap="400">
+              {/* Monthly Status Variation Selector */}
+              {isMonthlyStatus && (
+                <Card>
+                  <BlockStack gap="300">
+                    <Text variant="headingSm" as="h3">
+                      Status Variation
+                    </Text>
+                    <Text variant="bodySm" tone="subdued" as="p">
+                      Preview different customer status scenarios for the monthly status email
+                    </Text>
+                    <InlineStack gap="200" wrap>
+                      <Button
+                        pressed={monthlyStatusVariation === 'not-extended'}
+                        onClick={() => setMonthlyStatusVariation('not-extended')}
+                        variant={monthlyStatusVariation === 'not-extended' ? 'primary' : 'secondary'}
+                      >
+                        Not Extended (Plenty of Time)
+                      </Button>
+                      <Button
+                        pressed={monthlyStatusVariation === 'extended-no-upgrade'}
+                        onClick={() => setMonthlyStatusVariation('extended-no-upgrade')}
+                        variant={monthlyStatusVariation === 'extended-no-upgrade' ? 'primary' : 'secondary'}
+                      >
+                        Extended (No Upgrade)
+                      </Button>
+                      <Button
+                        pressed={monthlyStatusVariation === 'extended-upgradable'}
+                        onClick={() => setMonthlyStatusVariation('extended-upgradable')}
+                        variant={monthlyStatusVariation === 'extended-upgradable' ? 'primary' : 'secondary'}
+                      >
+                        Extended (Upgradable)
+                      </Button>
+                      <Button
+                        pressed={monthlyStatusVariation === 'expiring-soon'}
+                        onClick={() => setMonthlyStatusVariation('expiring-soon')}
+                        variant={monthlyStatusVariation === 'expiring-soon' ? 'primary' : 'secondary'}
+                      >
+                        Expiring Soon
+                      </Button>
+                      <Button
+                        pressed={monthlyStatusVariation === 'post-expired'}
+                        onClick={() => setMonthlyStatusVariation('post-expired')}
+                        variant={monthlyStatusVariation === 'post-expired' ? 'primary' : 'secondary'}
+                      >
+                        Post-Expired
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </Card>
+              )}
+
               {/* Custom Content Editor */}
               <Card>
                 <BlockStack gap="300">

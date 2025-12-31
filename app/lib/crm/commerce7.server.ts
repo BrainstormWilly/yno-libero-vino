@@ -1165,6 +1165,17 @@ export class Commerce7Provider implements CrmProvider {
           phone: c7Customer.phone || null,
           crmId: c7CustomerId,
         });
+        
+        // Initialize LTV for new customer by fetching from C7
+        const { initializeCustomerLTV } = await import('~/lib/db/customer-ltv.server');
+        await initializeCustomerLTV(
+          clientId,
+          customer.id,
+          c7CustomerId,
+          'commerce7',
+          this.tenantId,
+          undefined // Access token not needed for C7 API calls (uses env vars)
+        );
 
         // Create communication preferences - respect C7's marketing status
         const defaultPrefs = db.getDefaultCommunicationPreferences();

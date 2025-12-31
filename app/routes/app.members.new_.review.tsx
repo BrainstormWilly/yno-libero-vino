@@ -140,6 +140,17 @@ export async function action({ request }: ActionFunctionArgs) {
         phone: draft.customer.phone || null,
         crmId: draft.customer.crmId,
       });
+      
+      // Initialize LTV for new customer by fetching from CRM
+      const { initializeCustomerLTV } = await import('~/lib/db/customer-ltv.server');
+      await initializeCustomerLTV(
+        session.clientId,
+        lvCustomer.id,
+        draft.customer.crmId,
+        session.crmType,
+        session.tenantShop,
+        session.accessToken
+      );
     }
     
     // Mark SMS opt-in via signup form (form checkbox is sufficient TCPA consent)
@@ -365,13 +376,12 @@ async function triggerKlaviyoClubSignup(options: {
   const supabase = db.getSupabaseClient();
   const client = await db.getClient(options.clientId);
   
-  const [customerData, tierDetails, promotions, nextTier] = await Promise.all([
+  const [customerData, promotions, nextTier] = await Promise.all([
     supabase
       .from('customers')
       .select('loyalty_points_balance')
       .eq('id', options.lvCustomerId)
       .maybeSingle(),
-    db.getClubStageWithDetails(options.tier.id),
     db.getStagePromotions(options.tier.id),
     // Get next tier if current tier has stage_order
     (async () => {

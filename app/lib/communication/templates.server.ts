@@ -99,6 +99,9 @@ export async function renderSendGridTemplate(
   const usesHeaderBlock = template.includes('{{header_block}}');
   const usesNewTemplateFormat = usesHeaderBlock && template.includes('{{footer_image_block}}');
   const isMonthlyStatus = template.includes('{{extension_status_block}}');
+  const isExpirationWarning = template.includes('{{upgrade_message_block}}') && usesHeaderBlock;
+  const isUpgradeTemplate = usesHeaderBlock && template.includes('{{new_tier_discount_percentage}}') && template.includes('have been upgraded');
+  const isExpirationTemplate = usesHeaderBlock && template.includes('Don&apos;t Panic!') && template.includes('{{rejoin_amount}}');
   
   // Convert image URLs to proxy URLs if needed (for CORS)
   const proxiedHeaderUrl = convertImageUrlToProxy(headerUrl, requestUrl, sessionId);
@@ -122,8 +125,8 @@ export async function renderSendGridTemplate(
   
   // Build footer image block
   let footerImageBlock = '';
-  if (usesNewTemplateFormat || isMonthlyStatus) {
-    // Use powered-by-dark.png for club-signup and monthly-status template formats
+  if (usesNewTemplateFormat || isMonthlyStatus || isExpirationWarning || isUpgradeTemplate || isExpirationTemplate) {
+    // Use powered-by-dark.png for club-signup, monthly-status, expiration-warning, upgrade, and expiration template formats
     const poweredByUrl = await getPoweredByDarkImageUrl();
     const proxiedPoweredByUrl = convertImageUrlToProxy(poweredByUrl, requestUrl, sessionId);
     footerImageBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 0;"><img src="${proxiedPoweredByUrl}" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" /></div>`;
@@ -141,27 +144,41 @@ export async function renderSendGridTemplate(
   let upgradeOfferBlock = '';
   let marketingProductsBlock = '';
   let statusBodyMessage = '';
+  let upgradeMessageBlock = '';
   
   if (isMonthlyStatus) {
     // Build extension status block
     const isExtended = variables.is_extended === 'true' || variables.is_extended === 1 || variables.is_extended === '1';
+    const isExpired = variables.is_expired === 'true' || variables.is_expired === 1 || variables.is_expired === '1';
     extensionStatusBlock = buildExtensionStatusBlock(
       isExtended,
       String(variables.client_name || 'Winery'),
       String(variables.expiration_formatted || ''),
       variables.extension_amount_needed ? Number(variables.extension_amount_needed) : undefined,
-      variables.current_expiration ? String(variables.current_expiration) : undefined
+      variables.current_expiration ? String(variables.current_expiration) : undefined,
+      isExpired,
+      variables.elapsed_time ? String(variables.elapsed_time) : undefined
     );
     
     // Build upgrade offer block (only if upgrade is available)
-    const hasUpgrade = variables.has_upgrade === 'true' || variables.has_upgrade === 1 || variables.has_upgrade === '1';
-    if (hasUpgrade && variables.upgrade_amount_needed && variables.upgrade_deadline && variables.upgrade_discount_percentage && variables.upgrade_expiration) {
-      upgradeOfferBlock = buildUpgradeOfferBlock(
-        Number(variables.upgrade_amount_needed),
-        String(variables.upgrade_deadline),
-        Number(variables.upgrade_discount_percentage),
-        String(variables.upgrade_expiration)
+    // For expired customers, show rejoin offer instead of upgrade offer
+    let hasUpgrade = false;
+    if (isExpired && variables.rejoin_amount && variables.discount_percentage && variables.duration_months) {
+      upgradeOfferBlock = buildRejoinOfferBlock(
+        Number(variables.rejoin_amount),
+        Number(variables.discount_percentage),
+        Number(variables.duration_months)
       );
+    } else {
+      hasUpgrade = variables.has_upgrade === 'true' || variables.has_upgrade === 1 || variables.has_upgrade === '1';
+      if (hasUpgrade && variables.upgrade_amount_needed && variables.upgrade_deadline && variables.upgrade_discount_percentage && variables.upgrade_expiration) {
+        upgradeOfferBlock = buildUpgradeOfferBlock(
+          Number(variables.upgrade_amount_needed),
+          String(variables.upgrade_deadline),
+          Number(variables.upgrade_discount_percentage),
+          String(variables.upgrade_expiration)
+        );
+      }
     }
     
     // Build marketing products block (if products provided)
@@ -183,8 +200,19 @@ export async function renderSendGridTemplate(
       variables.days_remaining ? Number(variables.days_remaining) : 0,
       variables.current_discount_percentage ? Number(variables.current_discount_percentage) : 0,
       variables.extension_amount_needed ? Number(variables.extension_amount_needed) : undefined,
-      variables.extension_deadline ? String(variables.extension_deadline) : undefined
+      variables.extension_deadline ? String(variables.extension_deadline) : undefined,
+      isExpired,
+      variables.rejoin_amount ? Number(variables.rejoin_amount) : undefined
     );
+  }
+  
+  // Build upgrade message block for expiration-warning template
+  if (isExpirationWarning && variables.upgrade_amount && variables.upgrade_discount_percentage && variables.upgrade_months) {
+    upgradeMessageBlock = `<div style="margin: 20px 0; padding: 16px; background-color: #f8f9fa; border-left: 4px solid #0066cc; border-radius: 4px;">
+      <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">
+        <strong style="color: #0066cc;">Or upgrade for more:</strong> Spend $${variables.upgrade_amount} to unlock ${variables.upgrade_discount_percentage}% off for ${variables.upgrade_months} months instead.
+      </p>
+    </div>`;
   }
   
   // Remove Klaviyo-specific placeholders (not used in SendGrid) before rendering
@@ -203,6 +231,7 @@ export async function renderSendGridTemplate(
     upgrade_offer_block: upgradeOfferBlock,
     marketing_products_block: marketingProductsBlock,
     status_body_message: statusBodyMessage,
+    upgrade_message_block: upgradeMessageBlock,
   };
   
   return renderTemplate(processedTemplate, allVariables);
@@ -295,10 +324,19 @@ function buildExtensionStatusBlock(
   clientName: string,
   expirationFormatted: string,
   extensionAmountNeeded?: number,
-  currentExpiration?: string
+  currentExpiration?: string,
+  isExpired?: boolean,
+  elapsedTime?: string
 ): string {
   const safeClientName = escapeHtml(clientName);
   const safeExpiration = escapeHtml(expirationFormatted);
+  
+  // Post-expiration message (for expired customers)
+  if (isExpired && elapsedTime) {
+    const safeElapsed = escapeHtml(elapsedTime);
+    return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">We Miss You.</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Your ${safeClientName} benefits expired ${safeElapsed} ago.</h3>`;
+  }
   
   if (isExtended) {
     return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Way to go!</h2>
@@ -311,6 +349,29 @@ function buildExtensionStatusBlock(
       <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Extend your ${safeClientName} benefits by spending ${amountText}</h3>
       <h3 style="margin: 10px 0 0 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">before ${expirationText}</h3>`;
   }
+}
+
+/**
+ * Build rejoin offer block for expired customers
+ * Black box with white border showing rejoin opportunity
+ */
+function buildRejoinOfferBlock(
+  rejoinAmount: number,
+  discountPercentage: number,
+  durationMonths: number
+): string {
+  return `<div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000000; border: 1px solid #ffffff;">
+    <div style="height: 100%; width: 100%; border: 2px solid #ffffff; border-radius: 8px;">
+      <div style="padding: 40px 10px;">
+        <p style="margin: 0 0 10px 0; font-size: 18px; font-weight: bold; color: #ffffff; text-align: center;">Get back in by spending just</p>
+        <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">$${rejoinAmount}</p>
+        <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">on the store to unlock</p>
+        <p style="margin: 0; font-size: 48px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">${discountPercentage}% off</p>
+        <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">any future purchases for another</p>
+        <p style="margin: 0; font-size: 48px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">${durationMonths} months</p>
+      </div>
+    </div>
+  </div>`;
 }
 
 /**
@@ -388,9 +449,16 @@ function buildStatusBodyMessage(
   daysRemaining: number,
   discountPercentage: number,
   extensionAmountNeeded?: number,
-  extensionDeadline?: string
+  extensionDeadline?: string,
+  isExpired?: boolean,
+  rejoinAmount?: number
 ): string {
   const safeDeadline = extensionDeadline ? escapeHtml(extensionDeadline) : '';
+  
+  // Post-expiration message (for expired customers)
+  if (isExpired && rejoinAmount) {
+    return `There&apos;s no judgement here. We understand that life has its twists and turns. We just want you to know we&apos;re thinking about you and ready to deliver more delicious wines when you&apos;re ready for them. Just one purchase of $${rejoinAmount} gets you on track for future discounts.`;
+  }
   
   if (isExtended && hasUpgrade) {
     return `This is your monthly reminder of your ${discountPercentage}% off discount. You still have ${daysRemaining} days remaining on your current benefits.`;

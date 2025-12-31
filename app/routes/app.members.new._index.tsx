@@ -115,12 +115,16 @@ export async function action({ request }: ActionFunctionArgs) {
       // New customer with manual purchase amount
       const purchaseAmount = parseFloat(manualPurchaseAmount || '0');
       
+      // Check if customer qualifies by purchase amount OR LTV
+      // For now, we only have purchase amount here (LTV will be checked on enrollment completion)
+      const qualified = purchaseAmount >= tier.min_purchase_amount;
+      
       // Save to draft (clear previous enrollment data when selecting a new tier)
       await db.updateEnrollmentDraft(session.id, {
         tier: {
           id: tier.id,
           name: tier.name,
-          qualified: purchaseAmount >= tier.min_purchase_amount,
+          qualified,
           purchaseAmount,
           durationMonths: tier.duration_months,
           minPurchaseAmount: tier.min_purchase_amount,

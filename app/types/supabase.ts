@@ -368,6 +368,7 @@ export type Database = {
           platform_discount_id: string | null
           platform_tag_id: string | null
           stage_order: number | null
+          tier_type: string | null
           updated_at: string | null
           upgradable: boolean
         }
@@ -384,6 +385,7 @@ export type Database = {
           platform_discount_id?: string | null
           platform_tag_id?: string | null
           stage_order?: number | null
+          tier_type?: string | null
           updated_at?: string | null
           upgradable?: boolean
         }
@@ -400,6 +402,7 @@ export type Database = {
           platform_discount_id?: string | null
           platform_tag_id?: string | null
           stage_order?: number | null
+          tier_type?: string | null
           updated_at?: string | null
           upgradable?: boolean
         }
@@ -787,6 +790,7 @@ export type Database = {
           id: string
           is_club_member: boolean | null
           last_name: string | null
+          lifetime_value: number
           loyalty_earning_active: boolean
           loyalty_eligible_since: string | null
           loyalty_points_balance: number
@@ -805,6 +809,7 @@ export type Database = {
           id?: string
           is_club_member?: boolean | null
           last_name?: string | null
+          lifetime_value?: number
           loyalty_earning_active?: boolean
           loyalty_eligible_since?: string | null
           loyalty_points_balance?: number
@@ -823,6 +828,7 @@ export type Database = {
           id?: string
           is_club_member?: boolean | null
           last_name?: string | null
+          lifetime_value?: number
           loyalty_earning_active?: boolean
           loyalty_eligible_since?: string | null
           loyalty_points_balance?: number
@@ -1674,6 +1680,10 @@ export type Database = {
           error_count: number
           processed_count: number
         }[]
+      }
+      update_customer_ltv: {
+        Args: { amount_change: number; customer_id: string }
+        Returns: undefined
       }
     }
     Enums: {

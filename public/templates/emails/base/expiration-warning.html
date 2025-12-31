@@ -1,27 +1,56 @@
 <!doctype html>
 <html lang="en">
-  <body style="font-family: Helvetica, Arial, sans-serif; color: #202124; line-height: 1.6; margin: 0; padding: 0;">
-    {{header_image_block}}
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h1 style="font-size:22px;">⚠️ Your Membership Expires in {{days_remaining_text}}</h1>
-      <p>Hi {{customer_first_name}},</p>
-      <p>Your {{tier_name}} membership expires on {{expiration_formatted}} ({{days_remaining_text}} from now).</p>
-      {{highlight_content}}
-      <div style="margin:20px 0; padding:16px; background-color:#fff3cd; border-left:4px solid #ffc107; border-radius:4px;">
-        <h3 style="margin-top:0; color:#856404;">Renewal Reminder</h3>
-        <p>To keep your member benefits active, make a qualifying purchase before your membership expires:</p>
-        <ul style="margin:16px 0; padding-left:20px;">
-          <li><strong>Tier:</strong> {{tier_name}}</li>
-          <li><strong>Minimum purchase to renew:</strong> ${{tier_min_purchase_amount}}</li>
-          <li><strong>Expires on:</strong> {{expiration_formatted}}</li>
-        </ul>
-      </div>
-      {{secondary_content}}
-      {{custom_content_block}}
-      <p>Don't let your benefits expire—shop now to renew your membership!</p>
-      <p style="margin-top:24px;">Cheers,<br/>{{client_name}}</p>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your {{client_name}} Benefits Expiring Soon</title>
+  </head>
+  <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff;">
+    <!-- Header Banner with Vineyard Image or Client Name -->
+    {{header_block}}
+
+    <!-- Code Red Alert Section (Grey Background) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f5f5f5;">
+      <h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #dc3545; text-align: center;">Code Red!</h2>
+      <h3 style="margin: 0 0 10px 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Your {{client_name}} benefits expire in</h3>
+      <h2 style="margin: 0; font-size: 48px; font-weight: bold; color: #202124; text-align: center;">{{days}} Days!</h2>
     </div>
-    {{footer_image_block}}
+
+    <!-- Discount Offer Box (Black Background with Gray Border) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000000; border: 1px solid #e0e0e0;">
+      <div style="height: 100%; width: 100%; border: 2px solid #808080; border-radius: 8px;">
+        <div style="padding: 40px 10px;">
+          <p style="margin: 0 0 10px 0; font-size: 18px; font-weight: bold; color: #ffffff; text-align: center;">Spend</p>
+          <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">${{extension_amount}}</p>
+          <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">to extend</p>
+          <p style="margin: 0; font-size: 48px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">{{discount_percentage}}% off</p>
+          <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">the store until</p>
+          <p style="margin: 0; font-size: 32px; font-weight: bold; color: #ffffff; text-align: center;">{{extension_expiration}}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body Text Section (White Background) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #202124;">Hi {{customer_first_name}},</p>
+      
+      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #202124;">
+        Your {{client_name}} membership is about to expire. As a reminder, our no obligation memberships are not renewable after expiration. So, act now to preserve your {{discount_percentage}}% discount another {{extension_months}} months. Or better yet, spend ${{upgrade_amount}} to raise your discount to {{upgrade_discount_percentage}}% for {{upgrade_months}} months.
+      </p>
+
+      {{custom_content_block}}
+
+      {{upgrade_message_block}}
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="{{shop_url}}" style="display: inline-block; padding: 16px 40px; background-color: #0066cc; color: #ffffff; text-decoration: none; font-size: 18px; font-weight: bold; border-radius: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Shop Now!</a>
+      </div>
+    </div>
+
+    <!-- Footer (Powered by LiberoVino image) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 0;">
+      {{footer_image_block}}
+    </div>
   </body>
 </html>
-
