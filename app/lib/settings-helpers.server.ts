@@ -67,7 +67,8 @@ export async function getDevModeClient(clientId: string) {
 export async function updateOrganization(
   clientId: string,
   orgName: string,
-  orgContact: string
+  orgContact: string,
+  shopUrl: string | null
 ) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
@@ -76,6 +77,7 @@ export async function updateOrganization(
     .update({ 
       org_name: orgName,
       org_contact: orgContact,
+      shop_url: shopUrl,
       updated_at: new Date().toISOString()
     })
     .eq('id', clientId);

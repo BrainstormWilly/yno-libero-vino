@@ -35,27 +35,37 @@ type CommunicationConfigRow = Awaited<ReturnType<typeof db.getCommunicationConfi
  * For Commerce7: Uses organization-website from install payload if stored, otherwise constructs URL
  * For Shopify: Uses tenant_shop directly (which is the shop domain)
  */
-function getShopUrl(client: { crm_type: string; tenant_shop: string; website_url?: string | null } | null): string {
+function getShopUrl(client: { 
+  crm_type: string; 
+  tenant_shop: string; 
+  website_url?: string | null;
+  shop_url?: string | null;
+} | null): string {
   if (!client) {
-    return 'https://example.com'; // Fallback
+    return 'https://example.com/shop'; // Fallback
   }
 
-  // If website_url is stored, use it (this comes from organization-website for Commerce7)
+  // Use shop_url if explicitly set
+  if (client.shop_url) {
+    return client.shop_url;
+  }
+
+  // Default to (website_url)/shop if website_url is available
   if (client.website_url) {
-    return client.website_url;
+    return `${client.website_url}/shop`;
   }
 
   // Fallback to constructed URLs if website_url is not stored
   if (client.crm_type === 'commerce7') {
     // Commerce7: tenant_shop is the tenant identifier
     // Customer-facing storefront is typically at: https://{tenant}.commerce7.com
-    return `https://${client.tenant_shop}.commerce7.com`;
+    return `https://${client.tenant_shop}.commerce7.com/shop`;
   } else if (client.crm_type === 'shopify') {
     // Shopify: tenant_shop is the shop domain (e.g., "mystore.myshopify.com")
-    return `https://${client.tenant_shop}`;
+    return `https://${client.tenant_shop}/shop`;
   }
 
-  return 'https://example.com'; // Fallback
+  return 'https://example.com/shop'; // Fallback
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {

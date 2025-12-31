@@ -69,6 +69,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (action === 'update_organization') {
     const orgName = formData.get('org_name') as string;
     const orgContact = formData.get('org_contact') as string;
+    const shopUrl = formData.get('shop_url') as string | null;
 
     if (!orgName || !orgContact) {
       return { 
@@ -78,7 +79,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
 
     try {
-      await updateOrganization(session.clientId, orgName, orgContact);
+      await updateOrganization(session.clientId, orgName, orgContact, shopUrl || null);
       
       return { 
         success: true, 
@@ -221,6 +222,30 @@ export default function Settings() {
                           fontSize: '14px'
                         }}
                       />
+                    </div>
+
+                    {/* Shop URL */}
+                    <div>
+                      <label htmlFor="shop_url" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>
+                        Shop URL
+                      </label>
+                      <input
+                        type="url"
+                        id="shop_url"
+                        name="shop_url"
+                        defaultValue={client.shop_url || (client.website_url ? `${client.website_url}/shop` : '')}
+                        placeholder={client.website_url ? `${client.website_url}/shop` : 'https://example.com/shop'}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #c9cccf',
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                      <p style={{ marginTop: '4px', fontSize: '12px', color: '#6d7175' }}>
+                        URL for &quot;Shop Now&quot; buttons in email templates. Defaults to your website URL + /shop
+                      </p>
                     </div>
 
                     {/* Read-only Email */}

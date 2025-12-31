@@ -115,8 +115,8 @@ export default function ProviderTemplates() {
   const [footerImageUrl, setFooterImageUrl] = useState(client?.email_footer_image_url || '');
   const [uploading, setUploading] = useState<'header' | 'footer' | null>(null);
   const [monthlyStatusVariation, setMonthlyStatusVariation] = useState<
-    'not-extended' | 'extended-no-upgrade' | 'extended-upgradable' | 'expiring-soon' | 'post-expired'
-  >('not-extended');
+    'active-no-upgrade' | 'active-with-upgrade' | 'expiring-soon' | 'expired'
+  >('active-no-upgrade');
   
   const headerInputRef = useRef<HTMLInputElement>(null);
   const footerInputRef = useRef<HTMLInputElement>(null);
@@ -442,25 +442,18 @@ export default function ProviderTemplates() {
                     </Text>
                     <InlineStack gap="200" wrap>
                       <Button
-                        pressed={monthlyStatusVariation === 'not-extended'}
-                        onClick={() => setMonthlyStatusVariation('not-extended')}
-                        variant={monthlyStatusVariation === 'not-extended' ? 'primary' : 'secondary'}
+                        pressed={monthlyStatusVariation === 'active-no-upgrade'}
+                        onClick={() => setMonthlyStatusVariation('active-no-upgrade')}
+                        variant={monthlyStatusVariation === 'active-no-upgrade' ? 'primary' : 'secondary'}
                       >
-                        Not Extended (Plenty of Time)
+                        Active (No Upgrade Available)
                       </Button>
                       <Button
-                        pressed={monthlyStatusVariation === 'extended-no-upgrade'}
-                        onClick={() => setMonthlyStatusVariation('extended-no-upgrade')}
-                        variant={monthlyStatusVariation === 'extended-no-upgrade' ? 'primary' : 'secondary'}
+                        pressed={monthlyStatusVariation === 'active-with-upgrade'}
+                        onClick={() => setMonthlyStatusVariation('active-with-upgrade')}
+                        variant={monthlyStatusVariation === 'active-with-upgrade' ? 'primary' : 'secondary'}
                       >
-                        Extended (No Upgrade)
-                      </Button>
-                      <Button
-                        pressed={monthlyStatusVariation === 'extended-upgradable'}
-                        onClick={() => setMonthlyStatusVariation('extended-upgradable')}
-                        variant={monthlyStatusVariation === 'extended-upgradable' ? 'primary' : 'secondary'}
-                      >
-                        Extended (Upgradable)
+                        Active (Upgrade Available)
                       </Button>
                       <Button
                         pressed={monthlyStatusVariation === 'expiring-soon'}
@@ -470,11 +463,11 @@ export default function ProviderTemplates() {
                         Expiring Soon
                       </Button>
                       <Button
-                        pressed={monthlyStatusVariation === 'post-expired'}
-                        onClick={() => setMonthlyStatusVariation('post-expired')}
-                        variant={monthlyStatusVariation === 'post-expired' ? 'primary' : 'secondary'}
+                        pressed={monthlyStatusVariation === 'expired'}
+                        onClick={() => setMonthlyStatusVariation('expired')}
+                        variant={monthlyStatusVariation === 'expired' ? 'primary' : 'secondary'}
                       >
-                        Post-Expired
+                        Expired
                       </Button>
                     </InlineStack>
                   </BlockStack>

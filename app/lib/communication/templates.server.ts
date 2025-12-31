@@ -142,6 +142,7 @@ export async function renderSendGridTemplate(
   // Check if this is a monthly-status template and build conditional blocks
   let extensionStatusBlock = '';
   let upgradeOfferBlock = '';
+  let upgradeInfoBlock = '';
   let marketingProductsBlock = '';
   let statusBodyMessage = '';
   let upgradeMessageBlock = '';
@@ -160,21 +161,28 @@ export async function renderSendGridTemplate(
       variables.elapsed_time ? String(variables.elapsed_time) : undefined
     );
     
-    // Build upgrade offer block (only if upgrade is available)
-    // For expired customers, show rejoin offer instead of upgrade offer
+    // Build current offer block (black box) - ALWAYS shown with current discount and expiration
+    // For expired customers, show rejoin offer instead
     let hasUpgrade = false;
+    const currentDiscount = variables.current_discount_percentage ? Number(variables.current_discount_percentage) : 0;
+    const expirationFormatted = String(variables.expiration_formatted || '');
+    
     if (isExpired && variables.rejoin_amount && variables.discount_percentage && variables.duration_months) {
+      // Expired: show rejoin offer in black box
       upgradeOfferBlock = buildRejoinOfferBlock(
         Number(variables.rejoin_amount),
         Number(variables.discount_percentage),
         Number(variables.duration_months)
       );
     } else {
+      // Active: show current offer in black box
+      upgradeOfferBlock = buildCurrentOfferBlock(currentDiscount, expirationFormatted);
+      
+      // Check if upgrade is available and build upgrade info block (blue box)
       hasUpgrade = variables.has_upgrade === 'true' || variables.has_upgrade === 1 || variables.has_upgrade === '1';
-      if (hasUpgrade && variables.upgrade_amount_needed && variables.upgrade_deadline && variables.upgrade_discount_percentage && variables.upgrade_expiration) {
-        upgradeOfferBlock = buildUpgradeOfferBlock(
+      if (hasUpgrade && variables.upgrade_amount_needed && variables.upgrade_discount_percentage && variables.upgrade_expiration) {
+        upgradeInfoBlock = buildUpgradeInfoBlock(
           Number(variables.upgrade_amount_needed),
-          String(variables.upgrade_deadline),
           Number(variables.upgrade_discount_percentage),
           String(variables.upgrade_expiration)
         );
@@ -229,6 +237,7 @@ export async function renderSendGridTemplate(
     custom_content_block: customContentBlock,
     extension_status_block: extensionStatusBlock,
     upgrade_offer_block: upgradeOfferBlock,
+    upgrade_info_block: upgradeInfoBlock,
     marketing_products_block: marketingProductsBlock,
     status_body_message: statusBodyMessage,
     upgrade_message_block: upgradeMessageBlock,
@@ -334,20 +343,19 @@ function buildExtensionStatusBlock(
   // Post-expiration message (for expired customers)
   if (isExpired && elapsedTime) {
     const safeElapsed = escapeHtml(elapsedTime);
-    return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">We Miss You.</h2>
+    return `<h2 style="margin: 0 0 20px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">We Miss You.</h2>
       <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Your ${safeClientName} benefits expired ${safeElapsed} ago.</h3>`;
   }
   
   if (isExtended) {
-    return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Way to go!</h2>
-      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">You&apos;ve extended your ${safeClientName} benefits until</h3>
-      <h3 style="margin: 10px 0 0 0; font-size: 24px; font-weight: bold; color: #202124; text-align: center;">${safeExpiration}</h3>`;
+    return `<h2 style="margin: 0 0 40px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Way to go!</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">You&apos;ve extended your ${safeClientName} benefits</h3>
+      <h3 style="margin: 10px 0 0 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">until ${safeExpiration}</h3>`;
   } else {
     const amountText = extensionAmountNeeded ? `$${extensionAmountNeeded}` : 'the minimum amount';
     const expirationText = escapeHtml(currentExpiration || expirationFormatted);
-    return `<h2 style="margin: 0 0 10px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Don&apos;t miss out!</h2>
-      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Extend your ${safeClientName} benefits by spending ${amountText}</h3>
-      <h3 style="margin: 10px 0 0 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">before ${expirationText}</h3>`;
+    return `<h2 style="margin: 0 0 20px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Keep the good wines coming!</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Every purchase counts.</h3>`;
   }
 }
 
@@ -375,9 +383,50 @@ function buildRejoinOfferBlock(
 }
 
 /**
- * Build upgrade offer block for monthly status template
- * Black box with white border showing upgrade opportunity
+ * Build current offer block for monthly status template
+ * Black box with gray border showing current discount and expiration (always shown)
  */
+function buildCurrentOfferBlock(
+  discountPercentage: number,
+  expirationFormatted: string
+): string {
+  const safeExpiration = escapeHtml(expirationFormatted);
+  
+  return `<div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000000; border: 1px solid #e0e0e0;">
+    <div style="height: 100%; width: 100%; border: 2px solid #808080; border-radius: 8px;">
+      <div style="padding: 40px 10px;">
+        <p style="margin: 0 0 20px 0; font-size: 18px; font-weight: bold; color: #ffffff; text-align: center; text-transform: uppercase;">Your current benefits</p>
+        <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">${discountPercentage}% off</p>
+        <p style="margin: 0 0 20px 0; font-size: 16px; color: #ffffff; text-align: center;">the store until</p>
+        <p style="margin: 0; font-size: 32px; font-weight: bold; color: #ffffff; text-align: center;">${safeExpiration}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+/**
+ * Build upgrade info block for monthly status template
+ * Blue info box showing upgrade opportunity (shown only when upgrade is available)
+ */
+function buildUpgradeInfoBlock(
+  upgradeAmountNeeded: number,
+  upgradeDiscountPercentage: number,
+  upgradeExpiration: string
+): string {
+  const safeExpiration = escapeHtml(upgradeExpiration);
+  
+  return `<div style="margin: 20px 0; padding: 16px; background-color: #f8f9fa; border-left: 4px solid #0066cc; border-radius: 4px;">
+    <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">
+      <strong style="color: #0066cc;">Level up your membership:</strong> Spend $${upgradeAmountNeeded} to unlock ${upgradeDiscountPercentage}% off the store until ${safeExpiration}.
+    </p>
+  </div>`;
+}
+
+/**
+ * Build upgrade offer block for monthly status template
+ * @deprecated Use buildCurrentOfferBlock and buildUpgradeInfoBlock instead
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildUpgradeOfferBlock(
   upgradeAmountNeeded: number,
   upgradeDeadline: string,

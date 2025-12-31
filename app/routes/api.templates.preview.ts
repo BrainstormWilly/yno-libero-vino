@@ -139,39 +139,28 @@ function getMonthlyStatusVariationData(variation: string): Record<string, string
     custom_content_block: '',
     extension_status_block: '',
     upgrade_offer_block: '',
+    upgrade_info_block: '',
     marketing_products_block: '',
     status_body_message: '',
   };
 
   switch (variation) {
-    case 'not-extended':
+    case 'active-no-upgrade':
       return {
         ...baseData,
-        is_extended: 'false',
+        is_extended: 'false', // Could be true or false - doesn't matter, we just care about time remaining
         expiration_formatted: 'May 23, 2026',
         current_expiration: 'May 23, 2026',
         extension_amount_needed: 150,
         extension_deadline: 'May 23, 2026',
         has_upgrade: 'false',
         current_discount_percentage: 10,
-        days_remaining: 45,
+        days_remaining: 45, // More than expire threshold (e.g., 7 days)
       };
-    case 'extended-no-upgrade':
+    case 'active-with-upgrade':
       return {
         ...baseData,
-        is_extended: 'true',
-        expiration_formatted: 'Aug 23, 2026',
-        current_expiration: 'May 23, 2026',
-        extension_amount_needed: 150,
-        extension_deadline: 'May 23, 2026',
-        has_upgrade: 'false',
-        current_discount_percentage: 10,
-        days_remaining: 90,
-      };
-    case 'extended-upgradable':
-      return {
-        ...baseData,
-        is_extended: 'true',
+        is_extended: 'false', // Could be true or false - doesn't matter
         expiration_formatted: 'Jun 23, 2026',
         current_expiration: 'May 23, 2026',
         extension_amount_needed: 150,
@@ -182,9 +171,9 @@ function getMonthlyStatusVariationData(variation: string): Record<string, string
         upgrade_discount_percentage: 15,
         upgrade_expiration: 'Oct 23, 2026',
         current_discount_percentage: 10,
-        days_remaining: 60,
+        days_remaining: 60, // More than expire threshold
       };
-    case 'post-expired':
+    case 'expired':
       return {
         ...baseData,
         is_extended: 'false',
