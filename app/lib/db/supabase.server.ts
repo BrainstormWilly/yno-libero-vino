@@ -23,6 +23,7 @@ type TierLoyalty = Database['public']['Tables']['tier_loyalty_config']['Row'];
 type LoyaltyRules = Database['public']['Tables']['loyalty_point_rules']['Row'];
 type CommunicationConfig = Database['public']['Tables']['communication_configs']['Row'];
 type CommunicationConfigInsert = Database['public']['Tables']['communication_configs']['Insert'];
+type ShowcaseProduct = Database['public']['Tables']['showcase_products']['Row'];
 
 /**
  * Get a Supabase client with service role (typed)
@@ -1405,6 +1406,193 @@ export async function initializeSendGridTemplates(clientId: string): Promise<voi
     } catch (error) {
       console.error(`Failed to initialize template ${dbType} for client ${clientId}:`, error);
       // Continue with other templates even if one fails
+    }
+  }
+}
+
+// ============================================
+// SHOWCASE PRODUCTS OPERATIONS
+// ============================================
+
+/**
+ * Get showcase products for a client
+ */
+export async function getShowcaseProducts(
+  clientId: string,
+  options?: {
+    activeOnly?: boolean;
+    limit?: number;
+  }
+): Promise<ShowcaseProduct[]> {
+  const supabase = getSupabaseClient();
+  
+  let query = supabase
+    .from('showcase_products')
+    .select('*')
+    .eq('client_id', clientId);
+  
+  if (options?.activeOnly) {
+    query = query.eq('is_active', true);
+  }
+  
+  query = query.order('display_order', { ascending: true });
+  
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+  
+  const { data: products, error } = await query;
+  
+  if (error) {
+    console.error('Error fetching showcase products:', error);
+    return [];
+  }
+  
+  return products || [];
+}
+
+/**
+ * Create a showcase product
+ * Auto-increments display_order based on max existing order
+ */
+export async function createShowcaseProduct(
+  clientId: string,
+  data: {
+    crmProductId?: string | null;
+    crmVariantId?: string | null;
+    title: string;
+    imageUrl: string;
+    price?: number | null;
+    productUrl: string;
+    displayOrder?: number; // Optional, will auto-increment if not provided
+    isActive?: boolean;
+  }
+): Promise<ShowcaseProduct> {
+  const supabase = getSupabaseClient();
+  
+  // If displayOrder not provided, get max order and increment
+  let displayOrder = data.displayOrder;
+  if (displayOrder === undefined) {
+    const { data: maxOrderData } = await supabase
+      .from('showcase_products')
+      .select('display_order')
+      .eq('client_id', clientId)
+      .order('display_order', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    displayOrder = (maxOrderData?.display_order ?? -1) + 1;
+  }
+  
+  const { data: product, error } = await supabase
+    .from('showcase_products')
+    .insert({
+      client_id: clientId,
+      crm_product_id: data.crmProductId || null,
+      crm_variant_id: data.crmVariantId || null,
+      title: data.title,
+      image_url: data.imageUrl,
+      price: data.price || null,
+      product_url: data.productUrl,
+      display_order: displayOrder,
+      is_active: data.isActive ?? true,
+    })
+    .select()
+    .single();
+  
+  if (error || !product) {
+    throw new Error(`Failed to create showcase product: ${error?.message}`);
+  }
+  
+  return product;
+}
+
+/**
+ * Update a showcase product
+ */
+export async function updateShowcaseProduct(
+  productId: string,
+  clientId: string,
+  data: {
+    title?: string;
+    imageUrl?: string;
+    price?: number | null;
+    productUrl?: string;
+    displayOrder?: number;
+    isActive?: boolean;
+  }
+): Promise<ShowcaseProduct> {
+  const supabase = getSupabaseClient();
+  
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+  
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl;
+  if (data.price !== undefined) updateData.price = data.price;
+  if (data.productUrl !== undefined) updateData.product_url = data.productUrl;
+  if (data.displayOrder !== undefined) updateData.display_order = data.displayOrder;
+  if (data.isActive !== undefined) updateData.is_active = data.isActive;
+  
+  const { data: product, error } = await supabase
+    .from('showcase_products')
+    .update(updateData)
+    .eq('id', productId)
+    .eq('client_id', clientId) // Ensure client owns this product
+    .select()
+    .single();
+  
+  if (error || !product) {
+    throw new Error(`Failed to update showcase product: ${error?.message}`);
+  }
+  
+  return product;
+}
+
+/**
+ * Delete a showcase product
+ */
+export async function deleteShowcaseProduct(
+  productId: string,
+  clientId: string
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  
+  const { error } = await supabase
+    .from('showcase_products')
+    .delete()
+    .eq('id', productId)
+    .eq('client_id', clientId); // Ensure client owns this product
+  
+  if (error) {
+    throw new Error(`Failed to delete showcase product: ${error.message}`);
+  }
+}
+
+/**
+ * Reorder showcase products
+ * Updates display_order for multiple products at once
+ */
+export async function reorderShowcaseProducts(
+  clientId: string,
+  productOrders: Array<{ id: string; displayOrder: number }>
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  
+  // Update each product's display_order
+  for (const { id, displayOrder } of productOrders) {
+    const { error } = await supabase
+      .from('showcase_products')
+      .update({
+        display_order: displayOrder,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('client_id', clientId); // Ensure client owns this product
+    
+    if (error) {
+      throw new Error(`Failed to reorder showcase product ${id}: ${error.message}`);
     }
   }
 }

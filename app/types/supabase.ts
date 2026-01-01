@@ -97,6 +97,7 @@ export type Database = {
           org_contact: string | null
           org_name: string
           setup_complete: boolean
+          shop_url: string | null
           tenant_shop: string
           updated_at: string | null
           user_email: string | null
@@ -112,6 +113,7 @@ export type Database = {
           org_contact?: string | null
           org_name: string
           setup_complete?: boolean
+          shop_url?: string | null
           tenant_shop: string
           updated_at?: string | null
           user_email?: string | null
@@ -127,6 +129,7 @@ export type Database = {
           org_contact?: string | null
           org_name?: string
           setup_complete?: boolean
+          shop_url?: string | null
           tenant_shop?: string
           updated_at?: string | null
           user_email?: string | null
@@ -1525,6 +1528,59 @@ export type Database = {
             columns: ["reward_id"]
             isOneToOne: false
             referencedRelation: "loyalty_rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      showcase_products: {
+        Row: {
+          client_id: string
+          created_at: string | null
+          crm_product_id: string | null
+          crm_variant_id: string | null
+          display_order: number
+          id: string
+          image_url: string
+          is_active: boolean
+          price: number | null
+          product_url: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string | null
+          crm_product_id?: string | null
+          crm_variant_id?: string | null
+          display_order?: number
+          id?: string
+          image_url: string
+          is_active?: boolean
+          price?: number | null
+          product_url: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string | null
+          crm_product_id?: string | null
+          crm_variant_id?: string | null
+          display_order?: number
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          price?: number | null
+          product_url?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "showcase_products_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]

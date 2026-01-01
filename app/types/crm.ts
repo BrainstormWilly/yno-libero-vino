@@ -49,8 +49,18 @@ export interface CrmProduct {
   price: number;
   image?: string;
   description?: string;
+  slug?: string; // Product slug for URL construction (e.g., Commerce7 product slug)
+  variantTitle?: string; // Title of the first variant (e.g., "750ml", "1.5L") - used for display instead of SKU
+  variants?: CrmProductVariant[]; // Full variants array for products with multiple variants
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CrmProductVariant {
+  id: string;
+  title: string;
+  sku: string;
+  price: number;
 }
 
 export interface CrmCollection {

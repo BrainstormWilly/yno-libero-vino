@@ -23,6 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const templateType = url.searchParams.get('templateType') as TemplateType | null;
   const customContent = url.searchParams.get('customContent');
   const variation = url.searchParams.get('variation');
+  const includeMarketing = url.searchParams.get('includeMarketing') === 'true';
 
   if (!templateType) {
     return new Response(JSON.stringify({ error: 'Missing templateType parameter' }), { 
@@ -69,6 +70,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
     sampleData = getMonthlyStatusVariationData(variation);
   } else if (templateType === 'expiration-warning' && variation === 'expiring-soon') {
     sampleData = getExpiringSoonData();
+  }
+  
+  // If includeMarketing is true, fetch showcase products and add to sample data
+  if (includeMarketing && (templateType === 'monthly-status' || templateType === 'expiration-warning')) {
+    const showcaseProducts = await db.getShowcaseProducts(session.clientId, { activeOnly: true, limit: 3 });
+    if (showcaseProducts.length > 0) {
+      // Get discount percentage from sample data for price calculations
+      const discountPercentage = sampleData.current_discount_percentage ? Number(sampleData.current_discount_percentage) : 0;
+      
+      // Format products for marketing products block
+      const formattedProducts = showcaseProducts.map(product => ({
+        name: product.title,
+        price: product.price ? product.price / 100 : 0, // Convert cents to dollars
+        imageUrl: product.image_url,
+        productUrl: product.product_url,
+        description: 'A dense, mid-palate richness, complexity and a delicious finish. Dark red cherry fruit and sinfully deep mocha flavors that finish with a spicy note of black pepper.', // Sample description for preview
+      }));
+      sampleData.marketing_products = JSON.stringify(formattedProducts);
+    }
   }
   
   // Get image URLs for preview

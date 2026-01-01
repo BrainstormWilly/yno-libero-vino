@@ -218,9 +218,9 @@ export default function CommunicationProviderSelection() {
       <Box paddingBlockEnd="400">
         <InlineStack align="space-between">
           <Button
-            onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
+            onClick={() => navigate(addSessionToUrl('/app/setup/marketing', session.id))}
           >
-            ← Back to Tiers
+            ← Back to Marketing
           </Button>
           
           <Form method="post">

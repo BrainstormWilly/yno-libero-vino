@@ -1427,6 +1427,23 @@ async function triggerSendGridMonthlyStatus(options: {
   // Build upgrade message HTML
   const upgradeMessageHtml = buildUpgradeMessage(options.nextTier);
   
+  // Fetch showcase products if customer has opted into marketing
+  let marketingProducts: string | undefined = undefined;
+  if (options.preferences.emailMarketing) {
+    const { getShowcaseProducts } = await import('~/lib/db/supabase.server');
+    const showcaseProducts = await getShowcaseProducts(options.clientId, { activeOnly: true, limit: 3 });
+    if (showcaseProducts.length > 0) {
+      // Format products for marketing products block
+      const formattedProducts = showcaseProducts.map(product => ({
+        name: product.title,
+        price: product.price ? product.price / 100 : 0, // Convert cents to dollars
+        imageUrl: product.image_url,
+        productUrl: product.product_url,
+      }));
+      marketingProducts = JSON.stringify(formattedProducts);
+    }
+  }
+  
   // Prepare variables for template
   const variables = {
     client_name: clientName,
@@ -1438,6 +1455,7 @@ async function triggerSendGridMonthlyStatus(options: {
     days_remaining: options.daysRemaining,
     expiration_formatted: expirationFormatted,
     upgrade_message: upgradeMessageHtml,
+    ...(marketingProducts && { marketing_products: marketingProducts }),
   };
   
   // Render template (use DB template if available, otherwise use template type to load base)

@@ -146,6 +146,25 @@ export default function Settings() {
             </Card>
           </Layout.Section>
 
+          {/* Marketing Products Link */}
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">
+                  Marketing Products
+                </Text>
+                <Text variant="bodyMd" as="p" tone="subdued">
+                  Manage showcase products for email marketing recommendations. These products will be included in monthly status emails for customers who have opted into marketing communications.
+                </Text>
+                <InlineStack gap="200">
+                  <Button url={addSessionToUrl("/app/setup/marketing", session.id)}>
+                    Manage Showcase Products
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+
           {/* Communication Settings Link */}
           <Layout.Section>
             <Card>

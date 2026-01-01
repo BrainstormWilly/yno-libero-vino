@@ -195,7 +195,8 @@ export async function renderSendGridTemplate(
         const products = typeof variables.marketing_products === 'string' 
           ? JSON.parse(variables.marketing_products) 
           : variables.marketing_products;
-        marketingProductsBlock = buildMarketingProductsBlock(products);
+        const discountPercentage = currentDiscount || 0; // Use current discount percentage
+        marketingProductsBlock = buildMarketingProductsBlock(products, discountPercentage);
       } catch (e) {
         // If parsing fails, skip products block
       }
@@ -456,34 +457,58 @@ function buildUpgradeOfferBlock(
  * Build marketing products block for monthly status template
  * Shows product suggestions if provided
  */
-function buildMarketingProductsBlock(products?: Array<{ name: string; price: number; imageUrl: string; productUrl?: string }>): string {
+function buildMarketingProductsBlock(
+  products?: Array<{ name: string; price: number; imageUrl: string; productUrl?: string; description?: string }>,
+  discountPercentage: number = 0
+): string {
   if (!products || products.length === 0) {
     return '';
   }
   
   const productItems = products.map(product => {
     const productLink = product.productUrl || '#';
-    const priceText = `$${product.price.toFixed(2)}`;
+    const originalPrice = product.price;
+    const discountedPrice = discountPercentage > 0 
+      ? originalPrice * (1 - discountPercentage / 100) 
+      : originalPrice;
     
-    return `<div style="margin: 20px 0; padding: 16px; border: 1px solid #e0e0e0; border-radius: 8px;">
+    // Price display with before/after if discount applies
+    let priceHtml = '';
+    if (discountPercentage > 0 && originalPrice > 0) {
+      priceHtml = `
+        <p style="margin: 0; font-size: 14px; line-height: 1.4;">
+          <span style="text-decoration: line-through; color: #6d7175; margin-right: 8px;">$${originalPrice.toFixed(2)}</span>
+          <span style="font-size: 16px; font-weight: bold; color: #0066cc;">$${discountedPrice.toFixed(2)}</span>
+        </p>`;
+    } else {
+      priceHtml = `<p style="margin: 0; font-size: 16px; font-weight: bold; color: #0066cc;">$${originalPrice.toFixed(2)}</p>`;
+    }
+    
+    // Description (if available)
+    const descriptionHtml = product.description 
+      ? `<p style="margin: 8px 0 0 0; font-size: 14px; line-height: 1.5; color: #202124;">${escapeHtml(product.description)}</p>`
+      : '';
+    
+    return `<div style="margin: 12px 0; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px;">
       <div style="display: table; width: 100%;">
-        <div style="display: table-cell; width: 120px; vertical-align: top; padding-right: 16px;">
+        <div style="display: table-cell; width: 60px; vertical-align: top; padding-right: 12px;">
           <a href="${productLink}" style="display: block;">
-            <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" style="max-width: 120px; width: 100%; height: auto; border-radius: 4px;" />
+            <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" style="max-width: 60px; width: 100%; height: auto; border-radius: 4px;" />
           </a>
         </div>
         <div style="display: table-cell; vertical-align: top;">
-          <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: bold; color: #202124;">
+          <h3 style="margin: 0 0 4px 0; font-size: 16px; font-weight: bold; color: #202124; line-height: 1.3;">
             <a href="${productLink}" style="color: #202124; text-decoration: none;">${escapeHtml(product.name)}</a>
           </h3>
-          <p style="margin: 0; font-size: 16px; font-weight: bold; color: #0066cc;">${priceText}</p>
+          ${priceHtml}
+          ${descriptionHtml}
         </div>
       </div>
     </div>`;
   }).join('');
   
   return `<div style="margin: 30px 0;">
-    <h2 style="margin: 0 0 20px 0; font-size: 24px; font-weight: bold; color: #202124;">Featured Wines</h2>
+    <h2 style="margin: 0 0 16px 0; font-size: 24px; font-weight: bold; color: #202124;">Featured Products</h2>
     ${productItems}
   </div>`;
 }

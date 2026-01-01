@@ -25,6 +25,7 @@ export default [
         route("promotions/:promoId", "routes/app.setup.tiers.$id.promotions.$promoId.tsx"),
       ]),
       route("review", "routes/app.setup.review.tsx"),
+      route("marketing", "routes/app.setup.marketing.tsx"),
       route("communication", "routes/app.setup.communication.tsx", [
         index("routes/app.setup.communication._index.tsx"),
         route(":provider", "routes/app.setup.communication.$provider.tsx"),

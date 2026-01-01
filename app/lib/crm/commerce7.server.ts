@@ -443,16 +443,40 @@ export class Commerce7Provider implements CrmProvider {
       );
     }
 
-    return data.products.map((product: any) => ({
-      id: product.id,
-      title: product.title,
-      sku: product.sku,
-      price: product.price,
-      image: product.image,
-      description: product.description,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-    }));
+    return data.products.map((product: any) => {
+      // For products with variants, use the first variant's price and title
+      // Commerce7 stores prices in cents, so we keep it as-is
+      let price = product.price;
+      let variantTitle: string | undefined = undefined;
+      let variants: Array<{ id: string; title: string; sku: string; price: number }> | undefined = undefined;
+      
+      if (product.variants && product.variants.length > 0) {
+        price = product.variants[0].price;
+        variantTitle = product.variants[0].title;
+        
+        // Include full variants array for future variant selection
+        variants = product.variants.map((v: any) => ({
+          id: v.id,
+          title: v.title,
+          sku: v.sku,
+          price: v.price,
+        }));
+      }
+      
+      return {
+        id: product.id,
+        title: product.title,
+        sku: product.sku,
+        price: price,
+        image: product.image,
+        description: product.description,
+        slug: product.slug, // Commerce7 product slug for URL construction
+        variantTitle: variantTitle, // First variant title (e.g., "750ml", "1.5L")
+        variants: variants, // Full variants array
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+      };
+    });
   }
 
   async getCollections(params?: any): Promise<CrmCollection[]> {
@@ -530,13 +554,35 @@ export class Commerce7Provider implements CrmProvider {
       );
     }
 
+    // For products with variants, use the first variant's price and title
+    // Commerce7 stores prices in cents, so we keep it as-is
+    let price = data.price;
+    let variantTitle: string | undefined = undefined;
+    let variants: Array<{ id: string; title: string; sku: string; price: number }> | undefined = undefined;
+    
+    if (data.variants && data.variants.length > 0) {
+      price = data.variants[0].price;
+      variantTitle = data.variants[0].title;
+      
+      // Include full variants array for future variant selection
+      variants = data.variants.map((v: any) => ({
+        id: v.id,
+        title: v.title,
+        sku: v.sku,
+        price: v.price,
+      }));
+    }
+
     return {
       id: data.id,
       title: data.title,
       sku: data.sku,
-      price: data.price,
+      price: price,
       image: data.image,
       description: data.description,
+      slug: data.slug, // Commerce7 product slug for URL construction
+      variantTitle: variantTitle, // First variant title (e.g., "750ml", "1.5L")
+      variants: variants, // Full variants array
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
     };

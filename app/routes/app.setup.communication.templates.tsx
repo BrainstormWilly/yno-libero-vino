@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs, Form, useLoaderData, useNavigation, useNavigate } from 'react-router';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, BlockStack, Text, Button, InlineStack, Box, TextField, Tabs, Thumbnail } from '@shopify/polaris';
+import { Card, BlockStack, Text, Button, InlineStack, Box, TextField, Tabs, Thumbnail, Checkbox } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
@@ -117,6 +117,7 @@ export default function ProviderTemplates() {
   const [monthlyStatusVariation, setMonthlyStatusVariation] = useState<
     'active-no-upgrade' | 'active-with-upgrade' | 'expiring-soon' | 'expired'
   >('active-no-upgrade');
+  const [includeMarketingProducts, setIncludeMarketingProducts] = useState(false);
   
   const headerInputRef = useRef<HTMLInputElement>(null);
   const footerInputRef = useRef<HTMLInputElement>(null);
@@ -148,7 +149,7 @@ export default function ProviderTemplates() {
           : (selectedTemplate.key || 'monthly-status');
       
       // Include session ID in URL (sessions are passed via URL, not cookies)
-      const url = `/api/templates/preview?session=${session.id}&templateType=${previewTemplateType}&customContent=${encodeURIComponent(contentToPreview || '')}&variation=${monthlyStatusVariation}`;
+      const url = `/api/templates/preview?session=${session.id}&templateType=${previewTemplateType}&customContent=${encodeURIComponent(contentToPreview || '')}&variation=${monthlyStatusVariation}&includeMarketing=${includeMarketingProducts ? 'true' : 'false'}`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -169,7 +170,7 @@ export default function ProviderTemplates() {
     } finally {
       setPreviewLoading(false);
     }
-  }, [selectedTemplate, provider, session.id, monthlyStatusVariation]);
+  }, [selectedTemplate, provider, session.id, monthlyStatusVariation, includeMarketingProducts]);
 
   // Load preview when template or variation changes (using saved content)
   useEffect(() => {
@@ -470,6 +471,14 @@ export default function ProviderTemplates() {
                         Expired
                       </Button>
                     </InlineStack>
+                    <Box paddingBlockStart="300">
+                      <Checkbox
+                        label="Include marketing products in preview"
+                        checked={includeMarketingProducts}
+                        onChange={setIncludeMarketingProducts}
+                        helpText="Show showcase products in the preview (only displayed for customers who have opted into marketing)"
+                      />
+                    </Box>
                   </BlockStack>
                 </Card>
               )}
