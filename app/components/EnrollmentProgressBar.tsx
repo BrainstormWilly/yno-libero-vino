@@ -25,8 +25,9 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
   const currentStepOrder = STEPS.find(s => s.key === currentStep)?.order || 1;
   
   return (
-    <Box padding="400" background="bg-surface-secondary" className="enrollment-progress-bar">
-      <InlineStack gap="400" align="center" blockAlign="center">
+    <div className="enrollment-progress-bar">
+      <Box padding="400" background="bg-surface-secondary">
+        <InlineStack gap="400" align="center" blockAlign="center">
         {STEPS.map((step, index) => {
           const isCompleted = step.order < currentStepOrder;
           const isCurrent = step.key === currentStep;
@@ -91,8 +92,9 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
             </InlineStack>
           );
         })}
-      </InlineStack>
-    </Box>
+        </InlineStack>
+      </Box>
+    </div>
   );
 }
 

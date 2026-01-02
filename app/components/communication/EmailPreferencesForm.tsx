@@ -24,15 +24,10 @@ export default function EmailPreferencesForm({
 
       <TextField
         label="Warning days before duration end"
-        type="text"
+        type="number"
         value={warningDays}
         onChange={(value) => {
-          // Only allow digits
-          const digitsOnly = value.replace(/\D/g, '');
-          // Limit to 2 digits (max 30)
-          const limited = digitsOnly.slice(0, 2);
-          // Always update - allow empty for editing, validation happens on blur/submit
-          onWarningDaysChange(limited);
+          onWarningDaysChange(value);
         }}
         onBlur={() => {
           // Validate on blur - ensure value is between 1-30
@@ -43,6 +38,8 @@ export default function EmailPreferencesForm({
             onWarningDaysChange('30'); // Cap at 30
           }
         }}
+        min={1}
+        max={30}
         autoComplete="off"
         helpText="How many days before duration ends to send warning email (1-30 days)"
       />
