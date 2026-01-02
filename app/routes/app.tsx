@@ -143,6 +143,16 @@ export default function AppLayout() {
   const { client, session, setupProgress } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupIncomplete = !client.setup_complete;
+  const theme = session?.theme || 'light';
+  
+  // Apply theme class to HTML element for dark mode
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    // Cache in localStorage for next page load to prevent flash
+    localStorage.setItem('adminUITheme', theme);
+  }, [theme]);
   
   // Handle toast notifications from URL params (for route-changing feedback)
   useEffect(() => {
@@ -173,9 +183,17 @@ export default function AppLayout() {
   return (
     <>
       <Toaster position="top-center" richColors />
-      <div className="embedded-app-wrapper min-h-screen bg-gradient-to-br from-purple-50 to-violet-100">
+      <div className={`embedded-app-wrapper min-h-screen ${
+        theme === 'dark' 
+          ? 'bg-[#161C27]' 
+          : 'bg-gradient-to-br from-purple-50 to-violet-100'
+      }`}>
       {/* Simple header */}
-      <div className="bg-white shadow-sm border-b border-gray-200 mb-6">
+      <div className={`${
+        theme === 'dark' 
+          ? 'bg-gray-900 border-gray-800' 
+          : 'bg-white border-gray-200'
+      } shadow-sm border-b mb-6`}>
         <div className="container mx-auto px-4 py-4">
           <InlineStack align="space-between" blockAlign="center">
             <div>

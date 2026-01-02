@@ -304,8 +304,6 @@ export default function ProviderTemplates() {
             </Button>
             
             <Button
-              variant="primary"
-              size="large"
               onClick={() => navigate(addSessionToUrl('/app/setup/review', session.id))}
             >
               Continue to Review →
@@ -316,22 +314,24 @@ export default function ProviderTemplates() {
         {/* Email Images - Collapsible */}
         <Card>
           <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <BlockStack gap="100">
-                <Text variant="headingMd" as="h2">
-                  Email Images
-                </Text>
-                <Text variant="bodySm" tone="subdued" as="p">
-                  Applies to all email templates
-                </Text>
-              </BlockStack>
-              <Button
-                onClick={() => setImagesCollapsed(!imagesCollapsed)}
-                variant="plain"
-              >
-                {imagesCollapsed ? 'Show' : 'Hide'}
-              </Button>
-            </InlineStack>
+            <Box paddingInlineEnd="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text variant="headingMd" as="h2">
+                    Email Images
+                  </Text>
+                  <Text variant="bodySm" tone="subdued" as="p">
+                    Applies to all email templates
+                  </Text>
+                </BlockStack>
+                <Button
+                  onClick={() => setImagesCollapsed(!imagesCollapsed)}
+                  variant="plain"
+                >
+                  {imagesCollapsed ? 'Show' : 'Hide'}
+                </Button>
+              </InlineStack>
+            </Box>
             
             {!imagesCollapsed && (
               <BlockStack gap="400">
@@ -371,7 +371,7 @@ export default function ProviderTemplates() {
                         onClick={() => handleRemoveImage('header')}
                         loading={uploading === 'header'}
                         disabled={uploading !== null}
-                        variant="plain"
+                        variant="primary"
                       >
                         Use Default
                       </Button>
@@ -423,134 +423,141 @@ export default function ProviderTemplates() {
           </BlockStack>
         </Card>
 
-        {/* Template Tabs */}
+        {/* Template Tabs - moved outside card */}
+        <Tabs
+          tabs={tabs}
+          selected={selectedTemplateIndex}
+          onSelect={setSelectedTemplateIndex}
+        >
+          {/* Empty panel - tabs control the selected template */}
+        </Tabs>
+
+        {/* Status Variation and Custom Content - combined in one card */}
         <Card>
-          <Tabs
-            tabs={tabs}
-            selected={selectedTemplateIndex}
-            onSelect={setSelectedTemplateIndex}
-          >
-            <BlockStack gap="400">
-              {/* Monthly Status Variation Selector */}
-              {isMonthlyStatus && (
-                <Card>
-                  <BlockStack gap="300">
-                    <Text variant="headingSm" as="h3">
-                      Status Variation
-                    </Text>
-                    <Text variant="bodySm" tone="subdued" as="p">
-                      Preview different customer status scenarios for the monthly status email
-                    </Text>
-                    <InlineStack gap="200" wrap>
-                      <Button
-                        pressed={monthlyStatusVariation === 'active-no-upgrade'}
-                        onClick={() => setMonthlyStatusVariation('active-no-upgrade')}
-                        variant={monthlyStatusVariation === 'active-no-upgrade' ? 'primary' : 'secondary'}
-                      >
-                        Active (No Upgrade Available)
-                      </Button>
-                      <Button
-                        pressed={monthlyStatusVariation === 'active-with-upgrade'}
-                        onClick={() => setMonthlyStatusVariation('active-with-upgrade')}
-                        variant={monthlyStatusVariation === 'active-with-upgrade' ? 'primary' : 'secondary'}
-                      >
-                        Active (Upgrade Available)
-                      </Button>
-                      <Button
-                        pressed={monthlyStatusVariation === 'expiring-soon'}
-                        onClick={() => setMonthlyStatusVariation('expiring-soon')}
-                        variant={monthlyStatusVariation === 'expiring-soon' ? 'primary' : 'secondary'}
-                      >
-                        Expiring Soon
-                      </Button>
-                      <Button
-                        pressed={monthlyStatusVariation === 'expired'}
-                        onClick={() => setMonthlyStatusVariation('expired')}
-                        variant={monthlyStatusVariation === 'expired' ? 'primary' : 'secondary'}
-                      >
-                        Expired
-                      </Button>
-                    </InlineStack>
-                    <Box paddingBlockStart="300">
-                      <Checkbox
-                        label="Include marketing products in preview"
-                        checked={includeMarketingProducts}
-                        onChange={setIncludeMarketingProducts}
-                        helpText="Show showcase products in the preview (only displayed for customers who have opted into marketing)"
-                      />
-                    </Box>
-                  </BlockStack>
-                </Card>
-              )}
-
-              {/* Custom Content Editor */}
-              <Card>
-                <BlockStack gap="300">
-                  <Text variant="headingSm" as="h3">
-                    Custom Content (Optional)
-                  </Text>
-                  <Text variant="bodySm" tone="subdued" as="p">
-                    Add optional text-only content that will appear in your email templates. This content is inserted into a dedicated section of the template.
-                  </Text>
-                  <TextField
-                    label="Custom Content"
-                    value={customContent}
-                    onChange={setCustomContent}
-                    multiline={4}
-                    placeholder="Enter custom text content here (plain text only)..."
-                    autoComplete="off"
+          <BlockStack gap="400">
+            {/* Monthly Status Variation Selector */}
+            {isMonthlyStatus && (
+              <BlockStack gap="300">
+                <Text variant="headingSm" as="h3">
+                  Status Variation
+                </Text>
+                <Text variant="bodySm" tone="subdued" as="p">
+                  Preview different customer status scenarios for the monthly status email
+                </Text>
+                <InlineStack gap="200" wrap>
+                  <Button
+                    pressed={monthlyStatusVariation === 'active-no-upgrade'}
+                    onClick={() => setMonthlyStatusVariation('active-no-upgrade')}
+                    variant={monthlyStatusVariation === 'active-no-upgrade' ? 'primary' : 'secondary'}
+                  >
+                    Active (No Upgrade Available)
+                  </Button>
+                  <Button
+                    pressed={monthlyStatusVariation === 'active-with-upgrade'}
+                    onClick={() => setMonthlyStatusVariation('active-with-upgrade')}
+                    variant={monthlyStatusVariation === 'active-with-upgrade' ? 'primary' : 'secondary'}
+                  >
+                    Active (Upgrade Available)
+                  </Button>
+                  <Button
+                    pressed={monthlyStatusVariation === 'expiring-soon'}
+                    onClick={() => setMonthlyStatusVariation('expiring-soon')}
+                    variant={monthlyStatusVariation === 'expiring-soon' ? 'primary' : 'secondary'}
+                  >
+                    Expiring Soon
+                  </Button>
+                  <Button
+                    pressed={monthlyStatusVariation === 'expired'}
+                    onClick={() => setMonthlyStatusVariation('expired')}
+                    variant={monthlyStatusVariation === 'expired' ? 'primary' : 'secondary'}
+                  >
+                    Expired
+                  </Button>
+                </InlineStack>
+                <Box paddingBlockStart="300">
+                  <Checkbox
+                    label="Include marketing products in preview"
+                    checked={includeMarketingProducts}
+                    onChange={setIncludeMarketingProducts}
+                    helpText="Show showcase products in the preview (only displayed for customers who have opted into marketing)"
                   />
-                  <InlineStack gap="200">
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="save_custom_content" />
-                      <input type="hidden" name="templateType" value={selectedTemplate?.key} />
-                      <input type="hidden" name="customContent" value={customContent} />
-                      <Button submit variant="primary" loading={isSubmitting}>
-                        Save Custom Content
-                      </Button>
-                    </Form>
-                    <Button 
-                      onClick={handlePreviewClick}
-                      loading={previewLoading}
-                      disabled={!selectedTemplate || provider !== 'sendgrid'}
-                    >
-                      Preview
-                    </Button>
-                  </InlineStack>
-                </BlockStack>
-              </Card>
+                </Box>
+              </BlockStack>
+            )}
 
-              {/* Preview */}
-              <Card>
-                <BlockStack gap="300">
-                  <Text variant="headingSm" as="h3">
-                    Preview
-                  </Text>
-                  {previewLoading ? (
-                    <Text as="p">Loading preview...</Text>
-                  ) : (
-                    <Box
-                      padding="400"
-                      background="bg-surface-secondary"
-                      borderRadius="200"
-                      borderWidth="025"
-                      borderColor="border"
-                    >
-                      <div
-                        dangerouslySetInnerHTML={{ __html: previewHtml }}
-                        style={{
-                          maxWidth: '600px',
-                          margin: '0 auto',
-                          backgroundColor: '#ffffff',
-                          padding: '20px',
-                        }}
-                      />
-                    </Box>
-                  )}
-                </BlockStack>
-              </Card>
+            {/* Horizontal divider between sections */}
+            {isMonthlyStatus && (
+              <Box paddingBlockStart="400" paddingBlockEnd="400">
+                <Box borderBlockStartWidth="025" borderColor="border" />
+              </Box>
+            )}
+
+            {/* Custom Content Editor */}
+            <BlockStack gap="300">
+              <Text variant="headingSm" as="h3">
+                Custom Content (Optional)
+              </Text>
+              <Text variant="bodySm" tone="subdued" as="p">
+                Add optional text-only content that will appear in your email templates. This content is inserted into a dedicated section of the template.
+              </Text>
+              <TextField
+                label="Custom Content"
+                value={customContent}
+                onChange={setCustomContent}
+                multiline={4}
+                placeholder="Enter custom text content here (plain text only)..."
+                autoComplete="off"
+              />
+              <InlineStack gap="200">
+                <Form method="post">
+                  <input type="hidden" name="intent" value="save_custom_content" />
+                  <input type="hidden" name="templateType" value={selectedTemplate?.key} />
+                  <input type="hidden" name="customContent" value={customContent} />
+                  <Button submit variant="primary" loading={isSubmitting}>
+                    Save Custom Content
+                  </Button>
+                </Form>
+                <Button 
+                  onClick={handlePreviewClick}
+                  loading={previewLoading}
+                  disabled={!selectedTemplate || provider !== 'sendgrid'}
+                >
+                  Preview
+                </Button>
+              </InlineStack>
             </BlockStack>
-          </Tabs>
+          </BlockStack>
+        </Card>
+
+        {/* Preview - in its own card */}
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingSm" as="h3">
+              Preview
+            </Text>
+            {previewLoading ? (
+              <Text as="p">Loading preview...</Text>
+            ) : (
+              <Box
+                padding="400"
+                background="bg-surface-secondary"
+                borderRadius="200"
+                borderWidth="025"
+                borderColor="border"
+              >
+                <div
+                  className="email-preview-content"
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                  style={{
+                    maxWidth: '600px',
+                    margin: '0 auto',
+                    backgroundColor: '#ffffff',
+                    padding: '20px',
+                  }}
+                />
+              </Box>
+            )}
+          </BlockStack>
         </Card>
       </BlockStack>
     );
@@ -570,7 +577,6 @@ export default function ProviderTemplates() {
           
           <Button
             variant="primary"
-            size="large"
             onClick={() => navigate(addSessionToUrl('/app/setup/review', session.id))}
           >
             Continue to Review →

@@ -6,11 +6,11 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
-import { AppProvider } from "@shopify/polaris";
 import "@shopify/polaris/build/esm/styles.css";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { PolarisThemeProvider } from "./components/PolarisThemeProvider";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -27,12 +27,43 @@ export const links: Route.LinksFunction = () => [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {/* Apply theme early from URL params and localStorage to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                // Priority 1: Check URL params (Commerce7 passes adminUITheme)
+                const urlParams = new URLSearchParams(window.location.search);
+                const adminUITheme = urlParams.get('adminUITheme');
+                if (adminUITheme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.setAttribute('data-theme', 'dark');
+                  localStorage.setItem('adminUITheme', 'dark');
+                  return;
+                }
+                
+                // Priority 2: Check localStorage (cached preference from previous session)
+                const cachedTheme = localStorage.getItem('adminUITheme');
+                if (cachedTheme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.setAttribute('data-theme', 'dark');
+                  return;
+                }
+                
+                // Priority 3: Default to light
+                document.documentElement.classList.add('light');
+                document.documentElement.setAttribute('data-theme', 'light');
+                localStorage.setItem('adminUITheme', 'light');
+              })();
+            `,
+          }}
+        />
         {/* Load iframe-resizer content window script for Commerce7 embedded app */}
         <script 
           type="text/javascript" 
@@ -45,7 +76,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body className="font-sans antialiased">
-        <AppProvider
+        <PolarisThemeProvider
           i18n={{
             Polaris: {
               Common: {
@@ -66,7 +97,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           }}
         >
           {children}
-        </AppProvider>
+        </PolarisThemeProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

@@ -73,9 +73,15 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
               {/* Transactional notifications are always enabled */}
               <input type="hidden" name="send_monthly_status" value="true" />
               <input type="hidden" name="send_expiration_warnings" value="true" />
-              {config?.warning_days_before !== undefined && config.warning_days_before !== null && (
-                <input type="hidden" name="warning_days_before" value={config.warning_days_before.toString()} />
-              )}
+              {/* Use warningDays state value, fallback to config or default to 7 */}
+              <input 
+                type="hidden" 
+                name="warning_days_before" 
+                value={warningDays && !isNaN(parseInt(warningDays, 10)) 
+                  ? Math.max(1, Math.min(30, parseInt(warningDays, 10))).toString()
+                  : (config?.warning_days_before || 7).toString()
+                } 
+              />
 
               <BlockStack gap="200">
                 <TextField

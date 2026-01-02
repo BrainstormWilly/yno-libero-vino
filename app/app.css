@@ -7,11 +7,21 @@
 
 html,
 body {
-  @apply bg-white dark:bg-gray-950;
+  @apply bg-white;
 
   @media (prefers-color-scheme: dark) {
     color-scheme: dark;
   }
+}
+
+html.dark,
+html[data-theme="dark"] {
+  background-color: #161C27 !important;
+}
+
+html.dark body,
+html[data-theme="dark"] body {
+  background-color: #161C27 !important;
 }
 
 /* Embedded app scrolling fixes for Commerce7 old iframe-resizer */
@@ -62,4 +72,1506 @@ body {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Polaris dark mode support */
+html.dark,
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* Override Polaris CSS variables for dark mode */
+html.dark,
+html[data-theme="dark"] {
+  --p-color-bg-surface: rgb(31 41 55); /* gray-800 */
+  --p-color-bg-surface-subdued: #161C27; /* C7 background */
+  --p-color-bg-surface-hovered: rgb(55 65 81); /* gray-700 */
+  --p-color-bg-surface-pressed: rgb(75 85 99); /* gray-600 */
+  --p-color-text: rgb(255 255 255); /* white - brighter */
+  --p-color-text-subdued: rgb(229 231 235); /* gray-200 - brighter */
+  --p-color-border: rgb(55 65 81); /* gray-700 */
+  --p-color-border-subdued: rgb(75 85 99); /* gray-600 */
+  
+  /* Banner tone colors */
+  --p-color-bg-surface-success: rgb(22 101 52) !important; /* green-800 */
+  --p-color-text-success: rgb(255 255 255) !important; /* white */
+  --p-color-bg-surface-info: rgb(30 58 138) !important; /* blue-800 */
+  --p-color-text-info: rgb(255 255 255) !important; /* white */
+  --p-color-bg-surface-warning: rgb(113 63 18) !important; /* yellow-800 */
+  --p-color-text-warning: rgb(255 255 255) !important; /* white */
+  --p-color-bg-surface-critical: rgb(153 27 27) !important; /* red-800 */
+  --p-color-text-critical: rgb(255 255 255) !important; /* white */
+}
+
+/* Badge dark mode - darker backgrounds for white text */
+html.dark .Polaris-Badge,
+html[data-theme="dark"] .Polaris-Badge {
+  color: rgb(255 255 255) !important; /* white text */
+}
+
+/* Success badge - darker green */
+html.dark .Polaris-Badge--toneSuccess,
+html[data-theme="dark"] .Polaris-Badge--toneSuccess,
+html.dark .Polaris-Badge[data-tone="success"],
+html[data-theme="dark"] .Polaris-Badge[data-tone="success"] {
+  background-color: rgb(22 101 52) !important; /* green-800 - darker */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Info badge - darker blue */
+html.dark .Polaris-Badge--toneInfo,
+html[data-theme="dark"] .Polaris-Badge--toneInfo,
+html.dark .Polaris-Badge[data-tone="info"],
+html[data-theme="dark"] .Polaris-Badge[data-tone="info"] {
+  background-color: rgb(30 58 138) !important; /* blue-800 - darker */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Warning badge - darker yellow/orange */
+html.dark .Polaris-Badge--toneWarning,
+html[data-theme="dark"] .Polaris-Badge--toneWarning,
+html.dark .Polaris-Badge[data-tone="warning"],
+html[data-theme="dark"] .Polaris-Badge[data-tone="warning"] {
+  background-color: rgb(113 63 18) !important; /* yellow-800/amber-800 - darker */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Critical badge - darker red */
+html.dark .Polaris-Badge--toneCritical,
+html[data-theme="dark"] .Polaris-Badge--toneCritical,
+html.dark .Polaris-Badge[data-tone="critical"],
+html[data-theme="dark"] .Polaris-Badge[data-tone="critical"] {
+  background-color: rgb(153 27 27) !important; /* red-800 - darker */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Attention badge - darker orange/amber */
+html.dark .Polaris-Badge--toneAttention,
+html[data-theme="dark"] .Polaris-Badge--toneAttention,
+html.dark .Polaris-Badge[data-tone="attention"],
+html[data-theme="dark"] .Polaris-Badge[data-tone="attention"] {
+  background-color: rgb(154 52 18) !important; /* orange-800 - darker */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Default badge (no tone) - subdued gray */
+html.dark .Polaris-Badge:not([data-tone]):not(.Polaris-Badge--toneSuccess):not(.Polaris-Badge--toneInfo):not(.Polaris-Badge--toneWarning):not(.Polaris-Badge--toneCritical):not(.Polaris-Badge--toneAttention),
+html[data-theme="dark"] .Polaris-Badge:not([data-tone]):not(.Polaris-Badge--toneSuccess):not(.Polaris-Badge--toneInfo):not(.Polaris-Badge--toneWarning):not(.Polaris-Badge--toneCritical):not(.Polaris-Badge--toneAttention) {
+  background-color: rgb(75 85 99) !important; /* gray-600 */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Override Polaris component colors for dark mode */
+html.dark .Polaris-Card,
+html[data-theme="dark"] .Polaris-Card {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  border-color: rgb(55 65 81) !important; /* gray-700 */
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+html.dark .Polaris-Card__Section,
+html[data-theme="dark"] .Polaris-Card__Section {
+  border-color: rgb(55 65 81) !important;
+}
+
+/* Action buttons (primary) - keep bright purple/indigo (exclude buttons with tones) */
+html.dark .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical),
+html[data-theme="dark"] .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical),
+html.dark .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical),
+html[data-theme="dark"] .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical) {
+  background-color: rgb(99 102 241) !important; /* indigo-500 - action buttons stay bright */
+  color: rgb(255 255 255) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html.dark .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled),
+html.dark .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled) {
+  background-color: rgb(79 70 229) !important; /* indigo-600 */
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Secondary buttons - more subdued, gray color for navigation */
+html.dark .Polaris-Button--variantSecondary,
+html[data-theme="dark"] .Polaris-Button--variantSecondary {
+  background-color: rgb(55 65 81) !important; /* gray-700 - subdued */
+  color: rgb(209 213 219) !important; /* gray-300 - muted text */
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html.dark .Polaris-Button--variantSecondary:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantSecondary:hover:not(:disabled) {
+  background-color: rgb(75 85 99) !important; /* gray-600 - slightly brighter on hover */
+  color: rgb(243 244 246) !important; /* gray-100 - brighter text on hover */
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html.dark .Polaris-Button:focus,
+html[data-theme="dark"] .Polaris-Button:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html.dark .Polaris-Button--disabled,
+html[data-theme="dark"] .Polaris-Button--disabled {
+  background-color: rgb(55 65 81) !important; /* gray-700 */
+  color: rgb(156 163 175) !important; /* gray-400 - brighter */
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 0.6;
+}
+
+html.dark .Polaris-Button--plain,
+html[data-theme="dark"] .Polaris-Button--plain {
+  background-color: transparent !important;
+  color: rgb(156 163 175) !important; /* gray-400 - more subdued */
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  opacity: 0.9;
+}
+
+html.dark .Polaris-Button--plain:hover,
+html[data-theme="dark"] .Polaris-Button--plain:hover {
+  background-color: rgb(55 65 81) !important; /* gray-700 - subtle hover */
+  color: rgb(209 213 219) !important; /* gray-300 - slightly brighter on hover */
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 1;
+}
+
+/* Success tone buttons - green (must override primary button styles) */
+html.dark .Polaris-Button[data-tone="success"],
+html[data-theme="dark"] .Polaris-Button[data-tone="success"],
+html.dark .Polaris-Button--toneSuccess,
+html[data-theme="dark"] .Polaris-Button--toneSuccess,
+html.dark .Polaris-Button--variantPrimary[data-tone="success"],
+html[data-theme="dark"] .Polaris-Button--variantPrimary[data-tone="success"],
+html.dark button[class*="Polaris-Button"][data-tone="success"],
+html[data-theme="dark"] button[class*="Polaris-Button"][data-tone="success"] {
+  background-color: rgb(22 163 74) !important; /* green-600 */
+  color: rgb(255 255 255) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html.dark .Polaris-Button[data-tone="success"]:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button[data-tone="success"]:hover:not(:disabled),
+html.dark .Polaris-Button--toneSuccess:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--toneSuccess:hover:not(:disabled),
+html.dark .Polaris-Button--variantPrimary[data-tone="success"]:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantPrimary[data-tone="success"]:hover:not(:disabled),
+html.dark button[class*="Polaris-Button"][data-tone="success"]:hover:not(:disabled),
+html[data-theme="dark"] button[class*="Polaris-Button"][data-tone="success"]:hover:not(:disabled) {
+  background-color: rgb(21 128 61) !important; /* green-700 */
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Critical tone buttons - red (must override primary button styles) */
+html.dark .Polaris-Button[data-tone="critical"],
+html[data-theme="dark"] .Polaris-Button[data-tone="critical"],
+html.dark .Polaris-Button--toneCritical,
+html[data-theme="dark"] .Polaris-Button--toneCritical,
+html.dark .Polaris-Button--variantPrimary[data-tone="critical"],
+html[data-theme="dark"] .Polaris-Button--variantPrimary[data-tone="critical"],
+html.dark .Polaris-Button--variantPrimary.Polaris-Button--toneCritical,
+html[data-theme="dark"] .Polaris-Button--variantPrimary.Polaris-Button--toneCritical,
+html.dark button[class*="Polaris-Button"][data-tone="critical"],
+html[data-theme="dark"] button[class*="Polaris-Button"][data-tone="critical"] {
+  background-color: rgb(220 38 38) !important; /* red-600 */
+  color: rgb(255 255 255) !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html.dark .Polaris-Button[data-tone="critical"]:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button[data-tone="critical"]:hover:not(:disabled),
+html.dark .Polaris-Button--toneCritical:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--toneCritical:hover:not(:disabled),
+html.dark .Polaris-Button--variantPrimary[data-tone="critical"]:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantPrimary[data-tone="critical"]:hover:not(:disabled),
+html.dark .Polaris-Button--variantPrimary.Polaris-Button--toneCritical:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantPrimary.Polaris-Button--toneCritical:hover:not(:disabled),
+html.dark button[class*="Polaris-Button"][data-tone="critical"]:hover:not(:disabled),
+html[data-theme="dark"] button[class*="Polaris-Button"][data-tone="critical"]:hover:not(:disabled) {
+  background-color: rgb(185 28 28) !important; /* red-700 */
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+html.dark .Polaris-Text,
+html[data-theme="dark"] .Polaris-Text {
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+/* Body text variants - make extra bright */
+html.dark .Polaris-Text[class*="body"],
+html[data-theme="dark"] .Polaris-Text[class*="body"],
+html.dark .Polaris-Text--variantBodyMd,
+html[data-theme="dark"] .Polaris-Text--variantBodyMd,
+html.dark .Polaris-Text--variantBodySm,
+html[data-theme="dark"] .Polaris-Text--variantBodySm,
+html.dark .Polaris-Text--variantBodyLg,
+html[data-theme="dark"] .Polaris-Text--variantBodyLg {
+  color: rgb(255 255 255) !important; /* white - maximum brightness */
+}
+
+html.dark .Polaris-Text--toneSubdued,
+html[data-theme="dark"] .Polaris-Text--toneSubdued,
+html.dark .Polaris-Text--subdued,
+html[data-theme="dark"] .Polaris-Text--subdued {
+  color: rgb(243 244 246) !important; /* gray-100 - very bright, almost white for better readability */
+}
+
+html.dark .Polaris-Banner,
+html[data-theme="dark"] .Polaris-Banner,
+html.dark [class*="Polaris-Banner"],
+html[data-theme="dark"] [class*="Polaris-Banner"] {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  border-color: rgb(55 65 81) !important;
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+/* Override banner Box components that use CSS variables */
+html.dark .Polaris-Banner .Polaris-Box[style*="bg-surface-success"],
+html[data-theme="dark"] .Polaris-Banner .Polaris-Box[style*="bg-surface-success"] {
+  background-color: rgb(22 101 52) !important; /* green-800 */
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner .Polaris-Box[style*="bg-surface-info"],
+html[data-theme="dark"] .Polaris-Banner .Polaris-Box[style*="bg-surface-info"] {
+  background-color: rgb(30 58 138) !important; /* blue-800 */
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner .Polaris-Box[style*="bg-surface-warning"],
+html[data-theme="dark"] .Polaris-Banner .Polaris-Box[style*="bg-surface-warning"] {
+  background-color: rgb(113 63 18) !important; /* yellow-800 */
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner .Polaris-Box[style*="bg-surface-critical"],
+html[data-theme="dark"] .Polaris-Banner .Polaris-Box[style*="bg-surface-critical"] {
+  background-color: rgb(153 27 27) !important; /* red-800 */
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner__text--success,
+html[data-theme="dark"] .Polaris-Banner__text--success {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner__text--info,
+html[data-theme="dark"] .Polaris-Banner__text--info {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner__text--warning,
+html[data-theme="dark"] .Polaris-Banner__text--warning {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner__text--critical,
+html[data-theme="dark"] .Polaris-Banner__text--critical {
+  color: rgb(255 255 255) !important;
+}
+
+/* Success tone banners - green */
+html.dark .Polaris-Banner--toneSuccess,
+html[data-theme="dark"] .Polaris-Banner--toneSuccess,
+html.dark [class*="Banner"][class*="toneSuccess"],
+html[data-theme="dark"] [class*="Banner"][class*="toneSuccess"],
+html.dark [class*="Banner"][data-tone="success"],
+html[data-theme="dark"] [class*="Banner"][data-tone="success"] {
+  background-color: rgb(22 101 52) !important; /* green-800 */
+  border-color: rgb(34 197 94) !important; /* green-500 */
+}
+
+html.dark .Polaris-Banner--toneSuccess .Polaris-Banner__Ribbon,
+html[data-theme="dark"] .Polaris-Banner--toneSuccess .Polaris-Banner__Ribbon,
+html.dark [class*="Banner"][class*="toneSuccess"] [class*="Ribbon"],
+html[data-theme="dark"] [class*="Banner"][class*="toneSuccess"] [class*="Ribbon"] {
+  background-color: rgb(34 197 94) !important; /* green-500 */
+  color: rgb(255 255 255) !important;
+}
+
+/* Info tone banners - blue */
+html.dark .Polaris-Banner--toneInfo,
+html[data-theme="dark"] .Polaris-Banner--toneInfo,
+html.dark [class*="Banner"][class*="toneInfo"],
+html[data-theme="dark"] [class*="Banner"][class*="toneInfo"],
+html.dark [class*="Banner"][data-tone="info"],
+html[data-theme="dark"] [class*="Banner"][data-tone="info"] {
+  background-color: rgb(30 58 138) !important; /* blue-800 */
+  border-color: rgb(59 130 246) !important; /* blue-500 */
+}
+
+html.dark .Polaris-Banner--toneInfo .Polaris-Banner__Ribbon,
+html[data-theme="dark"] .Polaris-Banner--toneInfo .Polaris-Banner__Ribbon,
+html.dark [class*="Banner"][class*="toneInfo"] [class*="Ribbon"],
+html[data-theme="dark"] [class*="Banner"][class*="toneInfo"] [class*="Ribbon"] {
+  background-color: rgb(59 130 246) !important; /* blue-500 */
+  color: rgb(255 255 255) !important;
+}
+
+/* Warning tone banners - yellow/orange */
+html.dark .Polaris-Banner--toneWarning,
+html[data-theme="dark"] .Polaris-Banner--toneWarning {
+  background-color: rgb(113 63 18) !important; /* yellow-800 */
+  border-color: rgb(234 179 8) !important; /* yellow-500 */
+}
+
+html.dark .Polaris-Banner--toneWarning .Polaris-Banner__Ribbon,
+html[data-theme="dark"] .Polaris-Banner--toneWarning .Polaris-Banner__Ribbon {
+  background-color: rgb(234 179 8) !important; /* yellow-500 */
+  color: rgb(0 0 0) !important; /* black text on yellow */
+}
+
+/* Critical tone banners - red */
+html.dark .Polaris-Banner--toneCritical,
+html[data-theme="dark"] .Polaris-Banner--toneCritical {
+  background-color: rgb(153 27 27) !important; /* red-800 */
+  border-color: rgb(239 68 68) !important; /* red-500 */
+}
+
+html.dark .Polaris-Banner--toneCritical .Polaris-Banner__Ribbon,
+html[data-theme="dark"] .Polaris-Banner--toneCritical .Polaris-Banner__Ribbon {
+  background-color: rgb(239 68 68) !important; /* red-500 */
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner__Ribbon,
+html[data-theme="dark"] .Polaris-Banner__Ribbon {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner__Heading,
+html[data-theme="dark"] .Polaris-Banner__Heading {
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+html.dark .Polaris-Banner__Content,
+html[data-theme="dark"] .Polaris-Banner__Content,
+html.dark .Polaris-Banner p,
+html[data-theme="dark"] .Polaris-Banner p,
+html.dark .Polaris-Banner .Polaris-Text,
+html[data-theme="dark"] .Polaris-Banner .Polaris-Text {
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+/* Ensure banner text is readable in all tones */
+html.dark .Polaris-Banner--toneSuccess .Polaris-Banner__Content,
+html[data-theme="dark"] .Polaris-Banner--toneSuccess .Polaris-Banner__Content,
+html.dark .Polaris-Banner--toneSuccess p,
+html[data-theme="dark"] .Polaris-Banner--toneSuccess p,
+html.dark .Polaris-Banner--toneSuccess .Polaris-Text,
+html[data-theme="dark"] .Polaris-Banner--toneSuccess .Polaris-Text {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner--toneInfo .Polaris-Banner__Content,
+html[data-theme="dark"] .Polaris-Banner--toneInfo .Polaris-Banner__Content,
+html.dark .Polaris-Banner--toneInfo p,
+html[data-theme="dark"] .Polaris-Banner--toneInfo p,
+html.dark .Polaris-Banner--toneInfo .Polaris-Text,
+html[data-theme="dark"] .Polaris-Banner--toneInfo .Polaris-Text {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner--toneWarning .Polaris-Banner__Content,
+html[data-theme="dark"] .Polaris-Banner--toneWarning .Polaris-Banner__Content,
+html.dark .Polaris-Banner--toneWarning p,
+html[data-theme="dark"] .Polaris-Banner--toneWarning p,
+html.dark .Polaris-Banner--toneWarning .Polaris-Text,
+html[data-theme="dark"] .Polaris-Banner--toneWarning .Polaris-Text {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Banner--toneCritical .Polaris-Banner__Content,
+html[data-theme="dark"] .Polaris-Banner--toneCritical .Polaris-Banner__Content,
+html.dark .Polaris-Banner--toneCritical p,
+html[data-theme="dark"] .Polaris-Banner--toneCritical p,
+html.dark .Polaris-Banner--toneCritical .Polaris-Text,
+html[data-theme="dark"] .Polaris-Banner--toneCritical .Polaris-Text {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Page,
+html[data-theme="dark"] .Polaris-Page {
+  background-color: transparent !important;
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+html.dark,
+html[data-theme="dark"] .Polaris-Page__Content {
+  background-color: transparent !important;
+}
+
+html.dark .Polaris-Page__Title,
+html[data-theme="dark"] .Polaris-Page__Title {
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+html.dark .Polaris-Layout,
+html[data-theme="dark"] .Polaris-Layout {
+  background-color: transparent !important;
+}
+
+html.dark .Polaris-Layout__Section,
+html[data-theme="dark"] .Polaris-Layout__Section {
+  background-color: transparent !important;
+}
+
+html.dark .Polaris-BlockStack,
+html[data-theme="dark"] .Polaris-BlockStack {
+  color: inherit;
+}
+
+html.dark .Polaris-InlineStack,
+html[data-theme="dark"] .Polaris-InlineStack {
+  color: inherit;
+}
+
+/* Ensure text in cards is readable - especially body text */
+html.dark .Polaris-Card .Polaris-Text,
+html[data-theme="dark"] .Polaris-Card .Polaris-Text {
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+html.dark .Polaris-Card p,
+html[data-theme="dark"] .Polaris-Card p,
+html.dark .Polaris-Card .Polaris-Text[class*="body"],
+html[data-theme="dark"] .Polaris-Card .Polaris-Text[class*="body"] {
+  color: rgb(255 255 255) !important; /* white - maximum brightness for body text */
+}
+
+html.dark .Polaris-Card .Polaris-Text--toneSubdued,
+html[data-theme="dark"] .Polaris-Card .Polaris-Text--toneSubdued,
+html.dark .Polaris-Card .Polaris-Text--subdued,
+html[data-theme="dark"] .Polaris-Card .Polaris-Text--subdued {
+  color: rgb(243 244 246) !important; /* gray-100 - very bright, almost white for better readability */
+}
+
+html.dark .Polaris-Card strong,
+html[data-theme="dark"] .Polaris-Card strong {
+  color: rgb(255 255 255) !important; /* white - brighter */
+}
+
+/* Email template preview - ensure text is dark on white background */
+/* Email template preview - ensure text is dark on white background (must override all other rules) */
+/* Only apply to elements without explicit inline color styles */
+html.dark .email-preview-content,
+html[data-theme="dark"] .email-preview-content,
+html.dark .Polaris-Card .email-preview-content,
+html[data-theme="dark"] .Polaris-Card .email-preview-content {
+  color: rgb(17 24 39) !important; /* gray-900 - dark text */
+}
+
+/* Only override elements that don't have inline color styles - be selective */
+html.dark .email-preview-content > *:not([style*="color"]),
+html[data-theme="dark"] .email-preview-content > *:not([style*="color"]),
+html.dark .Polaris-Card .email-preview-content > *:not([style*="color"]),
+html[data-theme="dark"] .Polaris-Card .email-preview-content > *:not([style*="color"]) {
+  color: rgb(17 24 39) !important; /* gray-900 - dark text */
+}
+
+/* Only override p, div, span that don't have inline color styles */
+html.dark .email-preview-content p:not([style*="color"]),
+html[data-theme="dark"] .email-preview-content p:not([style*="color"]),
+html.dark .Polaris-Card .email-preview-content p:not([style*="color"]),
+html[data-theme="dark"] .Polaris-Card .email-preview-content p:not([style*="color"]),
+html.dark .email-preview-content div:not([style*="color"]),
+html[data-theme="dark"] .email-preview-content div:not([style*="color"]),
+html.dark .Polaris-Card .email-preview-content div:not([style*="color"]),
+html[data-theme="dark"] .Polaris-Card .email-preview-content div:not([style*="color"]),
+html.dark .email-preview-content span:not([style*="color"]),
+html[data-theme="dark"] .email-preview-content span:not([style*="color"]),
+html.dark .Polaris-Card .email-preview-content span:not([style*="color"]),
+html[data-theme="dark"] .Polaris-Card .email-preview-content span:not([style*="color"]) {
+  color: rgb(17 24 39) !important; /* gray-900 - dark text */
+}
+
+html.dark .email-preview-content h1,
+html[data-theme="dark"] .email-preview-content h1,
+html.dark .Polaris-Card .email-preview-content h1,
+html[data-theme="dark"] .Polaris-Card .email-preview-content h1,
+html.dark .email-preview-content h2,
+html[data-theme="dark"] .email-preview-content h2,
+html.dark .Polaris-Card .email-preview-content h2,
+html[data-theme="dark"] .Polaris-Card .email-preview-content h2,
+html.dark .email-preview-content h3,
+html[data-theme="dark"] .email-preview-content h3,
+html.dark .Polaris-Card .email-preview-content h3,
+html[data-theme="dark"] .Polaris-Card .email-preview-content h3,
+html.dark .email-preview-content h4,
+html[data-theme="dark"] .email-preview-content h4,
+html.dark .Polaris-Card .email-preview-content h4,
+html[data-theme="dark"] .Polaris-Card .email-preview-content h4 {
+  color: rgb(17 24 39) !important; /* gray-900 - dark text */
+}
+
+html.dark .email-preview-content a,
+html[data-theme="dark"] .email-preview-content a,
+html.dark .Polaris-Card .email-preview-content a,
+html[data-theme="dark"] .Polaris-Card .email-preview-content a {
+  color: rgb(59 130 246) !important; /* blue-500 - visible link color */
+}
+
+/* Buttons and links in email preview - ensure they're visible */
+html.dark .email-preview-content a[style*="background-color"],
+html[data-theme="dark"] .email-preview-content a[style*="background-color"],
+html.dark .email-preview-content a[style*="background-color: #0066cc"],
+html[data-theme="dark"] .email-preview-content a[style*="background-color: #0066cc"],
+html.dark .Polaris-Card .email-preview-content a[style*="background-color"],
+html[data-theme="dark"] .Polaris-Card .email-preview-content a[style*="background-color"] {
+  color: rgb(255 255 255) !important; /* white text on blue buttons */
+}
+
+html.dark .email-preview-content button,
+html[data-theme="dark"] .email-preview-content button,
+html.dark .email-preview-content .button,
+html[data-theme="dark"] .email-preview-content .button,
+html.dark .Polaris-Card .email-preview-content button,
+html[data-theme="dark"] .Polaris-Card .email-preview-content button,
+html.dark .Polaris-Card .email-preview-content .button,
+html[data-theme="dark"] .Polaris-Card .email-preview-content .button {
+  color: rgb(255 255 255) !important; /* white text on buttons */
+  background-color: rgb(59 130 246) !important; /* blue button background */
+}
+
+/* Text on black/dark backgrounds in email preview - make white */
+html.dark .email-preview-content [style*="background-color: #000000"] *,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #000000"] *,
+html.dark .email-preview-content [style*="background-color: #000"] *,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #000"] *,
+html.dark .email-preview-content [style*="background-color: black"] *,
+html[data-theme="dark"] .email-preview-content [style*="background-color: black"] *,
+html.dark .Polaris-Card .email-preview-content [style*="background-color: #000000"] *,
+html[data-theme="dark"] .Polaris-Card .email-preview-content [style*="background-color: #000000"] * {
+  color: rgb(255 255 255) !important; /* white text on black backgrounds */
+}
+
+html.dark .email-preview-content [style*="background-color: #000000"] p,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #000000"] p,
+html.dark .email-preview-content [style*="background-color: #000"] p,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #000"] p,
+html.dark .email-preview-content [style*="background-color: black"] p,
+html[data-theme="dark"] .email-preview-content [style*="background-color: black"] p,
+html.dark .Polaris-Card .email-preview-content [style*="background-color: #000000"] p,
+html[data-theme="dark"] .Polaris-Card .email-preview-content [style*="background-color: #000000"] p {
+  color: rgb(255 255 255) !important; /* white text on black backgrounds */
+}
+
+html.dark .email-preview-content [style*="background-color: #000000"] div,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #000000"] div,
+html.dark .email-preview-content [style*="background-color: #000"] div,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #000"] div,
+html.dark .email-preview-content [style*="background-color: black"] div,
+html[data-theme="dark"] .email-preview-content [style*="background-color: black"] div,
+html.dark .Polaris-Card .email-preview-content [style*="background-color: #000000"] div,
+html[data-theme="dark"] .Polaris-Card .email-preview-content [style*="background-color: #000000"] div {
+  color: rgb(255 255 255) !important; /* white text on black backgrounds */
+}
+
+/* Text in blue info boxes - make dark for visibility */
+html.dark .email-preview-content [style*="background-color: #f8f9fa"] *,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #f8f9fa"] *,
+html.dark .email-preview-content [style*="background-color: #0066cc"] *,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #0066cc"] *,
+html.dark .Polaris-Card .email-preview-content [style*="background-color: #f8f9fa"] *,
+html[data-theme="dark"] .Polaris-Card .email-preview-content [style*="background-color: #f8f9fa"] * {
+  color: rgb(17 24 39) !important; /* dark text on light blue backgrounds */
+}
+
+html.dark .email-preview-content [style*="background-color: #0066cc"] *,
+html[data-theme="dark"] .email-preview-content [style*="background-color: #0066cc"] *,
+html.dark .Polaris-Card .email-preview-content [style*="background-color: #0066cc"] *,
+html[data-theme="dark"] .Polaris-Card .email-preview-content [style*="background-color: #0066cc"] * {
+  color: rgb(255 255 255) !important; /* white text on blue backgrounds */
+}
+
+/* Text fields and textareas - dark background with light text */
+html.dark .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-TextField__Input,
+html.dark .Polaris-TextField input,
+html[data-theme="dark"] .Polaris-TextField input,
+html.dark .Polaris-TextField__Input input,
+html[data-theme="dark"] .Polaris-TextField__Input input,
+html.dark .Polaris-TextContainer input,
+html[data-theme="dark"] .Polaris-TextContainer input,
+html.dark input[type="text"],
+html[data-theme="dark"] input[type="text"],
+html.dark input[type="email"],
+html[data-theme="dark"] input[type="email"],
+html.dark input[type="tel"],
+html[data-theme="dark"] input[type="tel"],
+html.dark input[type="number"],
+html[data-theme="dark"] input[type="number"],
+html.dark .Polaris-TextField input[type="number"],
+html[data-theme="dark"] .Polaris-TextField input[type="number"],
+html.dark .Polaris-TextField__Input[type="number"],
+html[data-theme="dark"] .Polaris-TextField__Input[type="number"],
+html.dark .Polaris-TextField__Input input[type="number"],
+html[data-theme="dark"] .Polaris-TextField__Input input[type="number"],
+html.dark .Polaris-TextField--hasValue .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-TextField--hasValue .Polaris-TextField__Input,
+html.dark .Polaris-TextField--hasValue .Polaris-TextField__Input[type="number"],
+html[data-theme="dark"] .Polaris-TextField--hasValue .Polaris-TextField__Input[type="number"],
+html.dark .Polaris-Connected .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-Connected .Polaris-TextField__Input,
+html.dark .Polaris-Connected .Polaris-TextField__Input[type="number"],
+html[data-theme="dark"] .Polaris-Connected .Polaris-TextField__Input[type="number"],
+html.dark .Polaris-Connected input[type="number"],
+html[data-theme="dark"] .Polaris-Connected input[type="number"],
+html.dark textarea,
+html[data-theme="dark"] textarea {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  color: rgb(255 255 255) !important; /* white */
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 - more visible */
+  border-radius: 6px !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important; /* inset shadow for depth */
+}
+
+/* Number field spinner controls - make visible in dark mode */
+html.dark .Polaris-TextField__Spinner,
+html[data-theme="dark"] .Polaris-TextField__Spinner {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-TextField__SpinnerIcon,
+html[data-theme="dark"] .Polaris-TextField__SpinnerIcon {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-TextField__Spinner .Polaris-Icon,
+html[data-theme="dark"] .Polaris-TextField__Spinner .Polaris-Icon {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-TextField__SpinnerIcon .Polaris-Icon,
+html[data-theme="dark"] .Polaris-TextField__SpinnerIcon .Polaris-Icon {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-TextField__SpinnerIcon svg,
+html[data-theme="dark"] .Polaris-TextField__SpinnerIcon svg,
+html.dark .Polaris-TextField__Spinner .Polaris-Icon svg,
+html[data-theme="dark"] .Polaris-TextField__Spinner .Polaris-Icon svg,
+html.dark .Polaris-TextField__SpinnerIcon .Polaris-Icon svg,
+html[data-theme="dark"] .Polaris-TextField__SpinnerIcon .Polaris-Icon svg {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  fill: rgb(209 213 219) !important; /* gray-300 */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-TextField__SpinnerIcon path,
+html[data-theme="dark"] .Polaris-TextField__SpinnerIcon path,
+html.dark .Polaris-TextField__Spinner .Polaris-Icon path,
+html[data-theme="dark"] .Polaris-TextField__Spinner .Polaris-Icon path,
+html.dark .Polaris-TextField__SpinnerIcon .Polaris-Icon path,
+html[data-theme="dark"] .Polaris-TextField__SpinnerIcon .Polaris-Icon path,
+html.dark .Polaris-TextField__Spinner svg path,
+html[data-theme="dark"] .Polaris-TextField__Spinner svg path {
+  fill: rgb(209 213 219) !important; /* gray-300 */
+  stroke: rgb(209 213 219) !important;
+  color: rgb(209 213 219) !important;
+}
+
+html.dark .Polaris-TextField__Spinner .Polaris-TextField__Segment,
+html[data-theme="dark"] .Polaris-TextField__Spinner .Polaris-TextField__Segment {
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-TextField__Spinner .Polaris-TextField__Segment:hover,
+html[data-theme="dark"] .Polaris-TextField__Spinner .Polaris-TextField__Segment:hover {
+  background-color: rgb(55 65 81) !important; /* gray-700 - subtle hover */
+}
+
+html.dark .Polaris-TextField__Spinner .Polaris-TextField__Segment:hover .Polaris-Icon path,
+html[data-theme="dark"] .Polaris-TextField__Spinner .Polaris-TextField__Segment:hover .Polaris-Icon path {
+  fill: rgb(243 244 246) !important; /* gray-100 - lighter on hover */
+}
+
+html.dark .Polaris-TextField__Input:focus,
+html[data-theme="dark"] .Polaris-TextField__Input:focus,
+html.dark .Polaris-TextField input:focus,
+html[data-theme="dark"] .Polaris-TextField input:focus,
+html.dark .Polaris-TextContainer input:focus,
+html[data-theme="dark"] .Polaris-TextContainer input:focus,
+html.dark input[type="text"]:focus,
+html[data-theme="dark"] input[type="text"]:focus,
+html.dark input[type="email"]:focus,
+html[data-theme="dark"] input[type="email"]:focus,
+html.dark input[type="tel"]:focus,
+html[data-theme="dark"] input[type="tel"]:focus,
+html.dark input[type="number"]:focus,
+html[data-theme="dark"] input[type="number"]:focus,
+html.dark .Polaris-TextField input[type="number"]:focus,
+html[data-theme="dark"] .Polaris-TextField input[type="number"]:focus,
+html.dark .Polaris-TextField__Input[type="number"]:focus,
+html[data-theme="dark"] .Polaris-TextField__Input[type="number"]:focus,
+html.dark .Polaris-TextField__Input input[type="number"]:focus,
+html[data-theme="dark"] .Polaris-TextField__Input input[type="number"]:focus,
+html.dark .Polaris-TextField.Polaris-TextField--hasValue .Polaris-TextField__Input[type="number"]:focus,
+html[data-theme="dark"] .Polaris-TextField.Polaris-TextField--hasValue .Polaris-TextField__Input[type="number"]:focus,
+html.dark textarea:focus,
+html[data-theme="dark"] textarea:focus {
+  background-color: rgb(31 41 55) !important;
+  color: rgb(255 255 255) !important;
+  border: 1px solid rgb(99 102 241) !important; /* indigo-500 - focus border */
+  outline: none !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(99, 102, 241, 0.2) !important; /* inset shadow + focus glow */
+}
+
+/* Text fields with prefix icons - remove outlines (more specific selectors) */
+html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
+html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
+html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
+html.dark .Polaris-TextField__Prefix ~ .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input,
+html.dark .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus,
+html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus,
+html.dark .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input,
+html.dark .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input:focus,
+html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input:focus,
+html.dark .Polaris-TextField input[role="combobox"],
+html[data-theme="dark"] .Polaris-TextField input[role="combobox"],
+html.dark .Polaris-TextField input[role="combobox"]:focus,
+html[data-theme="dark"] .Polaris-TextField input[role="combobox"]:focus,
+html.dark .Polaris-TextField__Input[role="combobox"],
+html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"],
+html.dark .Polaris-TextField__Input[role="combobox"]:focus,
+html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"]:focus {
+  outline: none !important;
+  box-shadow: none !important; /* remove focus glow */
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 - keep subtle border */
+}
+
+/* Override the focus styles specifically for combobox inputs */
+html.dark .Polaris-TextField__Input[role="combobox"]:focus,
+html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"]:focus,
+html.dark input[role="combobox"].Polaris-TextField__Input:focus,
+html[data-theme="dark"] input[role="combobox"].Polaris-TextField__Input:focus,
+html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
+html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
+html.dark .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus,
+html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus {
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 - no indigo on focus */
+  box-shadow: none !important; /* no focus glow */
+  outline: none !important;
+}
+
+/* Also override any focus ring or border that might be applied */
+html.dark .Polaris-TextField__Input[role="combobox"]:focus-visible,
+html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"]:focus-visible,
+html.dark input[role="combobox"].Polaris-TextField__Input:focus-visible,
+html[data-theme="dark"] input[role="combobox"].Polaris-TextField__Input:focus-visible {
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 */
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Also remove outline from the TextField container when it has a prefix */
+html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix),
+html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) {
+  outline: none !important;
+}
+
+html.dark .Polaris-TextField__Input::placeholder,
+html[data-theme="dark"] .Polaris-TextField__Input::placeholder,
+html.dark .Polaris-TextField input::placeholder,
+html[data-theme="dark"] .Polaris-TextField input::placeholder,
+html.dark input::placeholder,
+html[data-theme="dark"] input::placeholder,
+html.dark textarea::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: rgb(156 163 175) !important; /* gray-400 */
+  opacity: 1 !important;
+}
+
+/* TextField clear button and backdrop - dark mode */
+html.dark .Polaris-TextField__ClearButton,
+html[data-theme="dark"] .Polaris-TextField__ClearButton {
+  background-color: transparent !important; /* remove white background */
+  color: rgb(209 213 219) !important; /* gray-300 - visible icon */
+}
+
+html.dark .Polaris-TextField__ClearButton:hover,
+html[data-theme="dark"] .Polaris-TextField__ClearButton:hover {
+  background-color: rgb(55 65 81) !important; /* gray-700 - subtle hover */
+}
+
+html.dark .Polaris-TextField__ClearButton .Polaris-Icon,
+html[data-theme="dark"] .Polaris-TextField__ClearButton .Polaris-Icon {
+  background-color: transparent !important;
+  color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+html.dark .Polaris-TextField__ClearButton svg,
+html[data-theme="dark"] .Polaris-TextField__ClearButton svg,
+html.dark .Polaris-TextField__ClearButton .Polaris-Icon__Svg,
+html[data-theme="dark"] .Polaris-TextField__ClearButton .Polaris-Icon__Svg {
+  background-color: transparent !important;
+  color: rgb(209 213 219) !important; /* gray-300 */
+  fill: rgb(209 213 219) !important; /* gray-300 */
+}
+
+html.dark .Polaris-TextField__ClearButton path,
+html[data-theme="dark"] .Polaris-TextField__ClearButton path {
+  fill: rgb(209 213 219) !important; /* gray-300 */
+  stroke: rgb(209 213 219) !important; /* gray-300 */
+}
+
+html.dark .Polaris-TextField__Backdrop,
+html[data-theme="dark"] .Polaris-TextField__Backdrop {
+  background-color: transparent !important; /* remove white background */
+}
+
+/* Select dropdowns - dark background with light text */
+html.dark .Polaris-Select,
+html[data-theme="dark"] .Polaris-Select {
+  color: rgb(255 255 255) !important; /* white text */
+}
+
+html.dark .Polaris-Select__Input,
+html[data-theme="dark"] .Polaris-Select__Input,
+html.dark .Polaris-Select select,
+html[data-theme="dark"] .Polaris-Select select,
+html.dark select.Polaris-Select__Input,
+html[data-theme="dark"] select.Polaris-Select__Input {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  color: rgb(255 255 255) !important; /* white */
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 - more visible */
+  border-radius: 6px !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important; /* inset shadow for depth */
+}
+
+html.dark .Polaris-Select__Content,
+html[data-theme="dark"] .Polaris-Select__Content {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  color: rgb(255 255 255) !important; /* white */
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 */
+  border-radius: 6px !important;
+}
+
+html.dark .Polaris-Select__SelectedOption,
+html[data-theme="dark"] .Polaris-Select__SelectedOption {
+  color: rgb(255 255 255) !important; /* white */
+}
+
+html.dark .Polaris-Select__Icon,
+html[data-theme="dark"] .Polaris-Select__Icon {
+  color: rgb(209 213 219) !important; /* gray-300 - visible icon */
+}
+
+html.dark .Polaris-Select__Icon .Polaris-Icon,
+html[data-theme="dark"] .Polaris-Select__Icon .Polaris-Icon {
+  color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+html.dark .Polaris-Select__Icon svg,
+html[data-theme="dark"] .Polaris-Select__Icon svg,
+html.dark .Polaris-Select__Icon .Polaris-Icon svg,
+html[data-theme="dark"] .Polaris-Select__Icon .Polaris-Icon svg {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  fill: rgb(209 213 219) !important; /* gray-300 */
+}
+
+html.dark .Polaris-Select__Icon path,
+html[data-theme="dark"] .Polaris-Select__Icon path,
+html.dark .Polaris-Select__Icon .Polaris-Icon path,
+html[data-theme="dark"] .Polaris-Select__Icon .Polaris-Icon path {
+  fill: rgb(209 213 219) !important; /* gray-300 */
+  stroke: rgb(209 213 219) !important;
+  color: rgb(209 213 219) !important;
+}
+
+html.dark .Polaris-Select__Input:focus,
+html[data-theme="dark"] .Polaris-Select__Input:focus,
+html.dark .Polaris-Select select:focus,
+html[data-theme="dark"] .Polaris-Select select:focus,
+html.dark select.Polaris-Select__Input:focus,
+html[data-theme="dark"] select.Polaris-Select__Input:focus,
+html.dark .Polaris-Select__Content:focus,
+html[data-theme="dark"] .Polaris-Select__Content:focus {
+  background-color: rgb(31 41 55) !important;
+  color: rgb(255 255 255) !important;
+  border: 1px solid rgb(99 102 241) !important; /* indigo-500 - focus border */
+  outline: none !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(99, 102, 241, 0.2) !important; /* inset shadow + focus glow */
+}
+
+html.dark .Polaris-Select__Backdrop,
+html[data-theme="dark"] .Polaris-Select__Backdrop {
+  background-color: transparent !important;
+}
+
+/* Select option elements in dropdown */
+html.dark .Polaris-Select__Input option,
+html[data-theme="dark"] .Polaris-Select__Input option,
+html.dark .Polaris-Select select option,
+html[data-theme="dark"] .Polaris-Select select option,
+html.dark select.Polaris-Select__Input option,
+html[data-theme="dark"] select.Polaris-Select__Input option {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  color: rgb(255 255 255) !important; /* white */
+}
+
+/* Enrollment Progress Bar - invert colors for dark mode */
+html.dark .enrollment-progress-bar .enrollment-step-circle.current,
+html[data-theme="dark"] .enrollment-progress-bar .enrollment-step-circle.current {
+  background-color: rgb(107 114 128) !important; /* gray-500 (not purple/indigo) */
+  color: rgb(255 255 255) !important; /* white text */
+}
+
+html.dark .enrollment-progress-bar .enrollment-step-circle.upcoming,
+html[data-theme="dark"] .enrollment-progress-bar .enrollment-step-circle.upcoming {
+  background-color: rgb(75 85 99) !important; /* gray-600 - inactive step */
+  color: rgb(209 213 219) !important; /* gray-300 - lighter text */
+}
+
+html.dark .enrollment-progress-bar .enrollment-step-circle.completed,
+html[data-theme="dark"] .enrollment-progress-bar .enrollment-step-circle.completed {
+  background-color: rgb(34 197 94) !important; /* green-500 - completed step */
+  color: rgb(255 255 255) !important; /* white text */
+}
+
+/* Connector lines */
+html.dark .enrollment-progress-bar .enrollment-connector.inactive,
+html[data-theme="dark"] .enrollment-progress-bar .enrollment-connector.inactive {
+  background-color: rgb(75 85 99) !important; /* gray-600 - inactive connector */
+}
+
+html.dark .enrollment-progress-bar .enrollment-connector.completed,
+html[data-theme="dark"] .enrollment-progress-bar .enrollment-connector.completed {
+  background-color: rgb(34 197 94) !important; /* green-500 - completed connector */
+}
+
+/* Autocomplete dropdown list - dark mode */
+html.dark .Polaris-Autocomplete,
+html[data-theme="dark"] .Polaris-Autocomplete {
+  color: rgb(255 255 255) !important;
+}
+
+/* Popover container (used by Autocomplete) */
+html.dark .Polaris-Popover,
+html[data-theme="dark"] .Polaris-Popover {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+}
+
+html.dark .Polaris-Popover__Content,
+html[data-theme="dark"] .Polaris-Popover__Content,
+html.dark .Polaris-Popover__ContentContainer,
+html[data-theme="dark"] .Polaris-Popover__ContentContainer {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 */
+  border-radius: 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important; /* subtle shadow */
+}
+
+html.dark .Polaris-Autocomplete__Listbox,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox,
+html.dark [role="listbox"],
+html[data-theme="dark"] [role="listbox"],
+html.dark [role="combobox"] + [role="listbox"],
+html[data-theme="dark"] [role="combobox"] + [role="listbox"] {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  border: 1px solid rgb(75 85 99) !important; /* gray-600 */
+  border-radius: 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important; /* subtle shadow */
+}
+
+html.dark .Polaris-Autocomplete__Option,
+html[data-theme="dark"] .Polaris-Autocomplete__Option,
+html.dark [role="listbox"] [role="option"],
+html[data-theme="dark"] [role="listbox"] [role="option"],
+html.dark [role="option"],
+html[data-theme="dark"] [role="option"],
+html.dark .Polaris-Popover [role="option"],
+html[data-theme="dark"] .Polaris-Popover [role="option"],
+html.dark li[role="option"],
+html[data-theme="dark"] li[role="option"],
+html.dark button[role="option"],
+html[data-theme="dark"] button[role="option"],
+html.dark div[role="option"],
+html[data-theme="dark"] div[role="option"] {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  background: rgb(31 41 55) !important; /* override background shorthand */
+  color: rgb(255 255 255) !important; /* white text */
+}
+
+html.dark .Polaris-Autocomplete__Option:hover,
+html[data-theme="dark"] .Polaris-Autocomplete__Option:hover,
+html.dark [role="listbox"] [role="option"]:hover,
+html[data-theme="dark"] [role="listbox"] [role="option"]:hover,
+html.dark [role="option"]:hover,
+html[data-theme="dark"] [role="option"]:hover,
+html.dark .Polaris-Popover [role="option"]:hover,
+html[data-theme="dark"] .Polaris-Popover [role="option"]:hover,
+html.dark [role="option"]:focus-within,
+html[data-theme="dark"] [role="option"]:focus-within,
+html.dark li[role="option"]:hover,
+html[data-theme="dark"] li[role="option"]:hover,
+html.dark button[role="option"]:hover,
+html[data-theme="dark"] button[role="option"]:hover,
+html.dark div[role="option"]:hover,
+html[data-theme="dark"] div[role="option"]:hover {
+  background-color: rgb(55 65 81) !important; /* gray-700 - hover state */
+  background: rgb(55 65 81) !important; /* override background shorthand */
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Autocomplete__Option[aria-selected="true"],
+html[data-theme="dark"] .Polaris-Autocomplete__Option[aria-selected="true"],
+html.dark [role="listbox"] [role="option"][aria-selected="true"],
+html[data-theme="dark"] [role="listbox"] [role="option"][aria-selected="true"],
+html.dark [role="option"][aria-selected="true"],
+html[data-theme="dark"] [role="option"][aria-selected="true"],
+html.dark .Polaris-Popover [role="option"][aria-selected="true"],
+html[data-theme="dark"] .Polaris-Popover [role="option"][aria-selected="true"],
+html.dark [role="option"][data-focused="true"],
+html[data-theme="dark"] [role="option"][data-focused="true"],
+html.dark [role="option"]:focus,
+html[data-theme="dark"] [role="option"]:focus,
+html.dark [role="option"]:focus-visible,
+html[data-theme="dark"] [role="option"]:focus-visible,
+html.dark li[role="option"][aria-selected="true"],
+html[data-theme="dark"] li[role="option"][aria-selected="true"],
+html.dark li[role="option"]:focus,
+html[data-theme="dark"] li[role="option"]:focus {
+  background-color: rgb(55 65 81) !important; /* gray-700 - selected/focused state */
+  color: rgb(255 255 255) !important; /* white text for better contrast */
+}
+
+/* Override any light background that might be applied to focused options */
+html.dark [role="option"][aria-selected="true"],
+html[data-theme="dark"] [role="option"][aria-selected="true"],
+html.dark [role="option"]:focus,
+html[data-theme="dark"] [role="option"]:focus,
+html.dark li[role="option"]:focus,
+html[data-theme="dark"] li[role="option"]:focus,
+html.dark button[role="option"]:focus,
+html[data-theme="dark"] button[role="option"]:focus,
+html.dark div[role="option"]:focus,
+html[data-theme="dark"] div[role="option"]:focus,
+html.dark li[role="option"][aria-selected="true"],
+html[data-theme="dark"] li[role="option"][aria-selected="true"],
+html.dark button[role="option"][aria-selected="true"],
+html[data-theme="dark"] button[role="option"][aria-selected="true"],
+html.dark div[role="option"][aria-selected="true"],
+html[data-theme="dark"] div[role="option"][aria-selected="true"] {
+  background-color: rgb(55 65 81) !important; /* gray-700 - override any light background */
+  background: rgb(55 65 81) !important; /* also override background shorthand */
+}
+
+/* Force dark background on any element inside Popover that might have white background */
+html.dark .Polaris-Popover *,
+html[data-theme="dark"] .Polaris-Popover * {
+  background-color: transparent !important; /* let parent handle background */
+}
+
+html.dark .Polaris-Popover [role="option"],
+html[data-theme="dark"] .Polaris-Popover [role="option"],
+html.dark .Polaris-Popover li,
+html[data-theme="dark"] .Polaris-Popover li,
+html.dark .Polaris-Popover button,
+html[data-theme="dark"] .Polaris-Popover button,
+html.dark .Polaris-Popover div,
+html[data-theme="dark"] .Polaris-Popover div {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  background: rgb(31 41 55) !important;
+}
+
+html.dark .Polaris-Popover [role="option"]:hover,
+html[data-theme="dark"] .Polaris-Popover [role="option"]:hover,
+html.dark .Polaris-Popover [role="option"]:focus,
+html[data-theme="dark"] .Polaris-Popover [role="option"]:focus,
+html.dark .Polaris-Popover [role="option"][aria-selected="true"],
+html[data-theme="dark"] .Polaris-Popover [role="option"][aria-selected="true"],
+html.dark .Polaris-Popover li:hover,
+html[data-theme="dark"] .Polaris-Popover li:hover,
+html.dark .Polaris-Popover li:focus,
+html[data-theme="dark"] .Polaris-Popover li:focus,
+html.dark .Polaris-Popover button:hover,
+html[data-theme="dark"] .Polaris-Popover button:hover,
+html.dark .Polaris-Popover button:focus,
+html[data-theme="dark"] .Polaris-Popover button:focus,
+html.dark .Polaris-Popover div:hover,
+html[data-theme="dark"] .Polaris-Popover div:hover,
+html.dark .Polaris-Popover div:focus,
+html[data-theme="dark"] .Polaris-Popover div:focus {
+  background-color: rgb(55 65 81) !important; /* gray-700 */
+  background: rgb(55 65 81) !important;
+}
+
+/* Target any button-like elements inside listbox/autocomplete */
+html.dark [role="listbox"] button,
+html[data-theme="dark"] [role="listbox"] button,
+html.dark [role="listbox"] li button,
+html[data-theme="dark"] [role="listbox"] li button,
+html.dark .Polaris-Autocomplete__Listbox button,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox button,
+html.dark .Polaris-Autocomplete__Listbox li button,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox li button {
+  background-color: rgb(31 41 55) !important; /* gray-800 */
+  background: rgb(31 41 55) !important;
+  color: rgb(255 255 255) !important;
+}
+
+html.dark [role="listbox"] button:hover,
+html[data-theme="dark"] [role="listbox"] button:hover,
+html.dark [role="listbox"] button:focus,
+html[data-theme="dark"] [role="listbox"] button:focus,
+html.dark [role="listbox"] li button:hover,
+html[data-theme="dark"] [role="listbox"] li button:hover,
+html.dark [role="listbox"] li button:focus,
+html[data-theme="dark"] [role="listbox"] li button:focus,
+html.dark .Polaris-Autocomplete__Listbox button:hover,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox button:hover,
+html.dark .Polaris-Autocomplete__Listbox button:focus,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox button:focus,
+html.dark .Polaris-Autocomplete__Listbox li button:hover,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox li button:hover,
+html.dark .Polaris-Autocomplete__Listbox li button:focus,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox li button:focus {
+  background-color: rgb(55 65 81) !important; /* gray-700 */
+  background: rgb(55 65 81) !important;
+  color: rgb(255 255 255) !important;
+}
+
+/* Override any white background on list items or buttons in autocomplete */
+html.dark .Polaris-Autocomplete__Listbox > *,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox > *,
+html.dark [role="listbox"] > *,
+html[data-theme="dark"] [role="listbox"] > * {
+  background-color: rgb(31 41 55) !important;
+  background: rgb(31 41 55) !important;
+}
+
+html.dark .Polaris-Autocomplete__Listbox > *:hover,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox > *:hover,
+html.dark .Polaris-Autocomplete__Listbox > *:focus,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox > *:focus,
+html.dark [role="listbox"] > *:hover,
+html[data-theme="dark"] [role="listbox"] > *:hover,
+html.dark [role="listbox"] > *:focus,
+html[data-theme="dark"] [role="listbox"] > *:focus {
+  background-color: rgb(55 65 81) !important;
+  background: rgb(55 65 81) !important;
+}
+
+/* Nuclear option: Force dark background on ANY element inside autocomplete/popover that has white/light background */
+html.dark .Polaris-Popover [style*="background"],
+html[data-theme="dark"] .Polaris-Popover [style*="background"],
+html.dark [role="listbox"] [style*="background"],
+html[data-theme="dark"] [role="listbox"] [style*="background"],
+html.dark .Polaris-Autocomplete__Listbox [style*="background"],
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox [style*="background"] {
+  background-color: rgb(31 41 55) !important;
+  background: rgb(31 41 55) !important;
+}
+
+html.dark .Polaris-Popover [style*="background"]:hover,
+html[data-theme="dark"] .Polaris-Popover [style*="background"]:hover,
+html.dark .Polaris-Popover [style*="background"]:focus,
+html[data-theme="dark"] .Polaris-Popover [style*="background"]:focus,
+html.dark [role="listbox"] [style*="background"]:hover,
+html[data-theme="dark"] [role="listbox"] [style*="background"]:hover,
+html.dark [role="listbox"] [style*="background"]:focus,
+html[data-theme="dark"] [role="listbox"] [style*="background"]:focus,
+html.dark .Polaris-Autocomplete__Listbox [style*="background"]:hover,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox [style*="background"]:hover,
+html.dark .Polaris-Autocomplete__Listbox [style*="background"]:focus,
+html[data-theme="dark"] .Polaris-Autocomplete__Listbox [style*="background"]:focus {
+  background-color: rgb(55 65 81) !important;
+  background: rgb(55 65 81) !important;
+}
+
+/* Listbox items - ensure text is white */
+html.dark .Polaris-Popover .Polaris-Text,
+html[data-theme="dark"] .Polaris-Popover .Polaris-Text,
+html.dark [role="listbox"] .Polaris-Text,
+html[data-theme="dark"] [role="listbox"] .Polaris-Text,
+html.dark [role="option"] .Polaris-Text,
+html[data-theme="dark"] [role="option"] .Polaris-Text {
+  color: rgb(255 255 255) !important; /* white text */
+}
+
+/* Selected option text - make sure it's bright */
+html.dark [role="option"][aria-selected="true"] .Polaris-Text,
+html[data-theme="dark"] [role="option"][aria-selected="true"] .Polaris-Text,
+html.dark .Polaris-Popover [role="option"][aria-selected="true"] .Polaris-Text,
+html[data-theme="dark"] .Polaris-Popover [role="option"][aria-selected="true"] .Polaris-Text,
+html.dark [role="option"][aria-selected="true"] *,
+html[data-theme="dark"] [role="option"][aria-selected="true"] *,
+html.dark .Polaris-Popover [role="option"][aria-selected="true"] *,
+html[data-theme="dark"] .Polaris-Popover [role="option"][aria-selected="true"] * {
+  color: rgb(255 255 255) !important; /* white text on selected - override all child elements */
+}
+
+/* All text inside Popover options */
+html.dark .Polaris-Popover [role="option"] *,
+html[data-theme="dark"] .Polaris-Popover [role="option"] *,
+html.dark [role="listbox"] [role="option"] *,
+html[data-theme="dark"] [role="listbox"] [role="option"] * {
+  color: rgb(255 255 255) !important; /* white text for all option content */
+}
+
+/* Tier selection cards - invert colors for dark mode */
+html.dark .tier-selection-card.unselected,
+html[data-theme="dark"] .tier-selection-card.unselected {
+  border-color: rgb(75 85 99) !important; /* gray-600 - visible border */
+  background-color: transparent !important; /* keep transparent */
+}
+
+html.dark .tier-selection-card.selected,
+html[data-theme="dark"] .tier-selection-card.selected {
+  border-color: rgb(34 197 94) !important; /* green-500 - selected border */
+  background-color: rgb(55 65 81) !important; /* gray-700 - subtle dark background */
+}
+
+/* General Polaris icons - make visible in dark mode */
+html.dark .Polaris-Icon,
+html[data-theme="dark"] .Polaris-Icon {
+  color: rgb(209 213 219) !important; /* gray-300 - visible but not too bright */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-Icon svg,
+html[data-theme="dark"] .Polaris-Icon svg,
+html.dark .Polaris-Icon__Svg,
+html[data-theme="dark"] .Polaris-Icon__Svg,
+html.dark svg.Polaris-Icon__Svg,
+html[data-theme="dark"] svg.Polaris-Icon__Svg {
+  color: rgb(209 213 219) !important; /* gray-300 */
+  fill: rgb(209 213 219) !important; /* gray-300 */
+  background-color: transparent !important; /* remove white background */
+}
+
+html.dark .Polaris-Icon path,
+html[data-theme="dark"] .Polaris-Icon path,
+html.dark .Polaris-Icon__Svg path,
+html[data-theme="dark"] .Polaris-Icon__Svg path,
+html.dark svg.Polaris-Icon__Svg path,
+html[data-theme="dark"] svg.Polaris-Icon__Svg path {
+  fill: rgb(209 213 219) !important; /* gray-300 */
+  stroke: rgb(209 213 219) !important; /* gray-300 */
+  color: rgb(209 213 219) !important; /* gray-300 */
+}
+
+/* All SVG elements - remove white backgrounds */
+html.dark svg,
+html[data-theme="dark"] svg {
+  background-color: transparent !important;
+}
+
+html.dark .Polaris-Icon svg,
+html[data-theme="dark"] .Polaris-Icon svg {
+  background-color: transparent !important;
+}
+
+/* Navigation button arrow/icon - make white/visible */
+html.dark .Polaris-Button svg,
+html[data-theme="dark"] .Polaris-Button svg,
+html.dark .Polaris-Button .Polaris-Icon,
+html[data-theme="dark"] .Polaris-Button .Polaris-Icon,
+html.dark .Polaris-Button path,
+html[data-theme="dark"] .Polaris-Button path {
+  color: rgb(255 255 255) !important;
+  fill: rgb(255 255 255) !important;
+  stroke: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Button--plain svg,
+html[data-theme="dark"] .Polaris-Button--plain svg,
+html.dark .Polaris-Button--plain .Polaris-Icon,
+html[data-theme="dark"] .Polaris-Button--plain .Polaris-Icon,
+html.dark .Polaris-Button--plain path,
+html[data-theme="dark"] .Polaris-Button--plain path {
+  color: rgb(99 102 241) !important;
+  fill: rgb(99 102 241) !important;
+  stroke: rgb(99 102 241) !important;
+}
+
+/* General body text and paragraphs - make very bright */
+html.dark p:not(.email-preview-content p):not(.email-preview-content *),
+html[data-theme="dark"] p:not(.email-preview-content p):not(.email-preview-content *),
+html.dark .Polaris-Card p:not(.email-preview-content p):not(.email-preview-content *),
+html[data-theme="dark"] .Polaris-Card p:not(.email-preview-content p):not(.email-preview-content *),
+html.dark .Polaris-BlockStack p:not(.email-preview-content p):not(.email-preview-content *),
+html[data-theme="dark"] .Polaris-BlockStack p:not(.email-preview-content p):not(.email-preview-content *),
+html.dark .Polaris-Layout p:not(.email-preview-content p):not(.email-preview-content *),
+html[data-theme="dark"] .Polaris-Layout p:not(.email-preview-content p):not(.email-preview-content *),
+html.dark .Polaris-Layout__Section p:not(.email-preview-content p):not(.email-preview-content *),
+html[data-theme="dark"] .Polaris-Layout__Section p:not(.email-preview-content p):not(.email-preview-content *) {
+  color: rgb(255 255 255) !important; /* white - maximum brightness */
+}
+
+/* All text elements in dark mode should be bright */
+html.dark .Polaris-Card,
+html[data-theme="dark"] .Polaris-Card {
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Card *:not(.Polaris-Button):not(.Polaris-Button *):not(.email-preview-content):not(.email-preview-content *),
+html[data-theme="dark"] .Polaris-Card *:not(.Polaris-Button):not(.Polaris-Button *):not(.email-preview-content):not(.email-preview-content *) {
+  color: rgb(255 255 255) !important;
+}
+
+/* Override any dimmed text */
+html.dark .Polaris-Text--toneSubdued,
+html[data-theme="dark"] .Polaris-Text--toneSubdued,
+html.dark .Polaris-Text--subdued,
+html[data-theme="dark"] .Polaris-Text--subdued {
+  color: rgb(243 244 246) !important; /* gray-100 - very bright, almost white for better readability */
+  opacity: 1 !important;
+}
+
+/* Dividers - make more subdued in dark mode */
+html.dark .Polaris-Divider,
+html[data-theme="dark"] .Polaris-Divider,
+html.dark hr,
+html[data-theme="dark"] hr,
+html.dark [class*="Divider"],
+html[data-theme="dark"] [class*="Divider"] {
+  border-color: rgb(55 65 81) !important; /* gray-700 - more subdued than white */
+  background-color: rgb(55 65 81) !important; /* gray-700 - more subdued than white */
+  opacity: 0.5 !important; /* further reduce visibility */
+}
+
+/* Subdue hover state on ResourceList items */
+html.dark .Polaris-ResourceItem:hover,
+html[data-theme="dark"] .Polaris-ResourceItem:hover,
+html.dark .Polaris-ResourceItem__Container:hover,
+html[data-theme="dark"] .Polaris-ResourceItem__Container:hover {
+  background-color: rgb(39 49 63) !important; /* gray-750 - very subtle hover, slightly darker than card */
+}
+
+/* DataTable hover states - make more subdued */
+html.dark .Polaris-DataTable tbody tr:hover,
+html[data-theme="dark"] .Polaris-DataTable tbody tr:hover,
+html.dark .Polaris-DataTable__Table tbody tr:hover,
+html[data-theme="dark"] .Polaris-DataTable__Table tbody tr:hover,
+html.dark table tbody tr:hover,
+html[data-theme="dark"] table tbody tr:hover {
+  background-color: rgb(39 49 63) !important; /* gray-750 - very subtle hover */
+}
+
+html.dark .Polaris-DataTable tbody tr:hover td,
+html[data-theme="dark"] .Polaris-DataTable tbody tr:hover td,
+html.dark .Polaris-DataTable__Table tbody tr:hover td,
+html[data-theme="dark"] .Polaris-DataTable__Table tbody tr:hover td,
+html.dark table tbody tr:hover td,
+html[data-theme="dark"] table tbody tr:hover td {
+  background-color: transparent !important; /* let row background show through */
+}
+
+/* Target Polaris DataTable hovered cells specifically */
+html.dark .Polaris-DataTable_Cell--hovered,
+html[data-theme="dark"] .Polaris-DataTable_Cell--hovered,
+html.dark .Polaris-DataTable__Cell--hovered,
+html[data-theme="dark"] .Polaris-DataTable__Cell--hovered,
+html.dark td.Polaris-DataTable_Cell--hovered,
+html[data-theme="dark"] td.Polaris-DataTable_Cell--hovered,
+html.dark td.Polaris-DataTable__Cell--hovered,
+html[data-theme="dark"] td.Polaris-DataTable__Cell--hovered {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Button cells in tables - make hover more subdued */
+html.dark .Polaris-DataTable tbody tr:hover button,
+html[data-theme="dark"] .Polaris-DataTable tbody tr:hover button,
+html.dark table tbody tr:hover button,
+html[data-theme="dark"] table tbody tr:hover button,
+html.dark .Polaris-DataTable tbody tr button:hover,
+html[data-theme="dark"] .Polaris-DataTable tbody tr button:hover,
+html.dark table tbody tr button:hover,
+html[data-theme="dark"] table tbody tr button:hover {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* All buttons in table cells - ensure no white background */
+html.dark .Polaris-DataTable tbody tr button,
+html[data-theme="dark"] .Polaris-DataTable tbody tr button,
+html.dark table tbody tr button,
+html[data-theme="dark"] table tbody tr button {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+html.dark .Polaris-ResourceItem:focus,
+html[data-theme="dark"] .Polaris-ResourceItem:focus,
+html.dark .Polaris-ResourceItem__Container:focus,
+html[data-theme="dark"] .Polaris-ResourceItem__Container:focus {
+  background-color: rgb(39 49 63) !important; /* gray-750 - very subtle focus state */
+}
+
+/* Tabs - improve readability for unselected and hover states */
+html.dark .Polaris-Tabs,
+html[data-theme="dark"] .Polaris-Tabs {
+  color: rgb(255 255 255) !important;
+}
+
+/* Unselected tabs - make more readable but clearly different from active */
+html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active),
+html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) {
+  color: rgb(156 163 175) !important; /* gray-400 - subdued for unselected */
+  opacity: 1 !important;
+}
+
+/* Active/selected tab - make very clear with bright text and prominent indicator */
+html.dark .Polaris-Tabs__Tab--active,
+html[data-theme="dark"] .Polaris-Tabs__Tab--active,
+html.dark .Polaris-Tabs__Tab[aria-selected="true"],
+html[data-theme="dark"] .Polaris-Tabs__Tab[aria-selected="true"] {
+  color: rgb(255 255 255) !important; /* white - maximum visibility */
+  border-bottom-color: rgb(99 102 241) !important; /* indigo-500 - visible indicator */
+  border-bottom-width: 2px !important; /* thicker border for visibility */
+  font-weight: 600 !important; /* semi-bold to stand out */
+}
+
+/* Hover state on tabs - make more visible */
+html.dark .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active),
+html[data-theme="dark"] .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active) {
+  color: rgb(209 213 219) !important; /* gray-300 - brighter on hover */
+  background-color: rgb(39 49 63) !important; /* gray-750 - subtle background on hover */
+  opacity: 1 !important;
+}
+
+/* Tab content text - unselected */
+html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) .Polaris-Text,
+html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) .Polaris-Text {
+  color: rgb(156 163 175) !important; /* gray-400 - subdued */
+}
+
+/* Tab content text - active */
+html.dark .Polaris-Tabs__Tab--active .Polaris-Text,
+html[data-theme="dark"] .Polaris-Tabs__Tab--active .Polaris-Text,
+html.dark .Polaris-Tabs__Tab[aria-selected="true"] .Polaris-Text,
+html[data-theme="dark"] .Polaris-Tabs__Tab[aria-selected="true"] .Polaris-Text {
+  color: rgb(255 255 255) !important; /* white - maximum visibility */
+  font-weight: 600 !important; /* semi-bold for active tab text */
 }

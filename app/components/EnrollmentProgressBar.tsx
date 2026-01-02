@@ -25,7 +25,7 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
   const currentStepOrder = STEPS.find(s => s.key === currentStep)?.order || 1;
   
   return (
-    <Box padding="400" background="bg-surface-secondary">
+    <Box padding="400" background="bg-surface-secondary" className="enrollment-progress-bar">
       <InlineStack gap="400" align="center" blockAlign="center">
         {STEPS.map((step, index) => {
           const isCompleted = step.order < currentStepOrder;
@@ -36,6 +36,7 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
             <InlineStack key={step.key} gap="200" align="center" blockAlign="center">
               {/* Step Circle */}
               <div
+                className={`enrollment-step-circle ${isCompleted ? 'completed' : isCurrent ? 'current' : 'upcoming'}`}
                 style={{
                   width: '32px',
                   height: '32px',
@@ -46,7 +47,7 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
                   backgroundColor: isCompleted
                     ? '#008060' // success green
                     : isCurrent
-                    ? '#005BD3' // primary blue
+                    ? '#6B7280' // gray-500 (not purple/indigo)
                     : '#E3E3E3', // subdued gray
                   color: isCompleted || isCurrent ? 'white' : '#616161',
                   fontWeight: 600,
@@ -76,6 +77,7 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
               {/* Connector Line */}
               {index < STEPS.length - 1 && (
                 <div
+                  className={`enrollment-connector ${isCompleted ? 'completed' : 'inactive'}`}
                   style={{
                     width: '40px',
                     height: '2px',

@@ -28,6 +28,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Error('Session not found');
   }
   
+  // Check if user is starting fresh (not navigating back from a later step)
+  const referer = request.headers.get('referer');
+  const isStartingFresh = !referer || !referer.includes('/app/members/new/');
+  
+  // Clear any existing draft when starting a new enrollment
+  if (isStartingFresh) {
+    await db.clearEnrollmentDraft(session.id);
+  }
+  
   // Get all tiers
   const clubProgram = await db.getClubProgram(session.clientId);
   if (!clubProgram || !clubProgram.club_stages) {
@@ -339,6 +348,7 @@ export default function QualifyTier() {
                   <div
                     key={tier.id}
                     onClick={() => setSelectedTierId(tier.id)}
+                    className={`tier-selection-card ${isSelected ? 'selected' : 'unselected'}`}
                     style={{
                       cursor: 'pointer',
                       padding: '16px',

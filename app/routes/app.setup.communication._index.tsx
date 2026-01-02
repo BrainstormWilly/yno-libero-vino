@@ -228,8 +228,6 @@ export default function CommunicationProviderSelection() {
             <input type="hidden" name="email_provider" value={emailProvider || ''} />
             <input type="hidden" name="sms_provider" value={smsProvider || ''} />
             <Button
-              variant="primary"
-              size="large"
               submit
               disabled={!emailProvider}
               onClick={() => {

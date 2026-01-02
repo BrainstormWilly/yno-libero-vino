@@ -388,8 +388,6 @@ export default function ProviderSetup() {
           </Button>
           
           <Button
-            variant="primary"
-            size="large"
             onClick={handleContinue}
             disabled={!isConfirmed}
           >

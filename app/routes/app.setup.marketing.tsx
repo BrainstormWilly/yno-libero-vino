@@ -26,6 +26,7 @@ import {
   Spinner,
   Banner,
 } from '@shopify/polaris';
+import { DeleteIcon } from '@shopify/polaris-icons';
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
@@ -245,8 +246,6 @@ export default function MarketingSetup() {
                 </Button>
                 
                 <Button
-                  variant="primary"
-                  size="large"
                   onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
                 >
                   Continue to Communication →
@@ -451,12 +450,12 @@ export default function MarketingSetup() {
                             <Button
                               submit
                               disabled={isSubmitting}
+                              icon={DeleteIcon}
                               variant="plain"
                               tone="critical"
                               size="micro"
-                            >
-                              Remove
-                            </Button>
+                              accessibilityLabel={`Remove ${product.title || 'product'}`}
+                            />
                           </Form>
                         </InlineStack>
                       </Box>

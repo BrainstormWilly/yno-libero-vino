@@ -11,7 +11,11 @@
  * @returns URL with session parameter appended
  */
 export function addSessionToUrl(url: string, sessionId: string): string {
-  const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}session=${sessionId}`;
+  // Ensure URL is properly formatted (starts with /)
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  const separator = cleanUrl.includes('?') ? '&' : '?';
+  // Encode the session ID to handle special characters
+  const encodedSessionId = encodeURIComponent(sessionId);
+  return `${cleanUrl}${separator}session=${encodedSessionId}`;
 }
 

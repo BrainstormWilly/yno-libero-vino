@@ -7,8 +7,6 @@ interface EnrollmentSummaryProps {
 }
 
 export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSummaryProps) {
-  const isStepActive = (step: string) => step === currentStep;
-  
   return (
     <BlockStack gap="400">
       {/* Customer Card */}
@@ -19,12 +17,11 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
               <Text as="h2" variant="headingMd">
                 Customer
               </Text>
-              {draft?.customer && (
-                <Badge tone={draft.customer.isExisting ? 'info' : 'attention'}>
-                  {draft.customer.isExisting ? 'Existing' : 'New'}
-                </Badge>
+              {draft?.customer ? (
+                <Badge tone="success">Completed</Badge>
+              ) : (
+                <Badge>Not Added</Badge>
               )}
-              {isStepActive('qualify') && <Badge tone="info">Current</Badge>}
             </InlineGrid>
           </Box>
           
@@ -73,12 +70,11 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
               <Text as="h2" variant="headingMd">
                 Selected Tier
               </Text>
-              {draft?.tier && (
-                <Badge tone={draft.tier.qualified ? 'success' : 'attention'}>
-                  {draft.tier.qualified ? 'Qualified' : 'Not Qualified'}
-                </Badge>
+              {draft?.tier ? (
+                <Badge tone="success">Completed</Badge>
+              ) : (
+                <Badge>Not Added</Badge>
               )}
-              {isStepActive('qualify') && <Badge tone="info">Current</Badge>}
             </InlineGrid>
           </Box>
           
@@ -124,11 +120,10 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
                 Address
               </Text>
               {draft?.addressVerified ? (
-                <Badge tone="success">Verified ✓</Badge>
+                <Badge tone="success">Completed</Badge>
               ) : (
                 <Badge>Not Added</Badge>
               )}
-              {isStepActive('address') && <Badge tone="info">Current</Badge>}
             </InlineGrid>
           </Box>
           
@@ -203,11 +198,10 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
                 Payment
               </Text>
               {draft?.paymentVerified ? (
-                <Badge tone="success">Verified ✓</Badge>
+                <Badge tone="success">Completed</Badge>
               ) : (
                 <Badge>Not Added</Badge>
               )}
-              {isStepActive('payment') && <Badge tone="info">Current</Badge>}
             </InlineGrid>
           </Box>
           
@@ -238,10 +232,10 @@ export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSumm
               <Text as="h2" variant="headingMd">
                 Communication
               </Text>
-              {draft?.preferences?.unsubscribedAll ? (
-                <Badge tone="critical">Unsubscribed</Badge>
+              {draft?.preferences ? (
+                <Badge tone="success">Completed</Badge>
               ) : (
-                <Badge tone="success">Active</Badge>
+                <Badge>Not Added</Badge>
               )}
             </InlineGrid>
           </Box>
