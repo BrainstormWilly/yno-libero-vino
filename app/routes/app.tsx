@@ -183,7 +183,7 @@ export default function AppLayout() {
       <div className={`embedded-app-wrapper min-h-screen ${
         theme === 'dark' 
           ? 'bg-[#161C27]' 
-          : 'bg-gradient-to-br from-purple-50 to-violet-100'
+          : 'bg-white'
       }`}>
       {/* Setup Progress Bar */}
       {isSetupIncomplete && setupProgress && (
@@ -213,6 +213,21 @@ export default function AppLayout() {
 
       {/* Nested routes render here */}
       <Outlet />
+
+      {/* Footer button */}
+      <div className="footer-button">
+        <a
+          href="https://liberovino.wine"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img 
+            key={theme}
+            src={theme === 'dark' ? '/powered-by-dark.png' : '/powered-by-light.png'} 
+            alt="Powered by LiberoVino" 
+          />
+        </a>
+      </div>
     </div>
     </>
   );

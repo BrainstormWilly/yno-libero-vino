@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 229.85 34.95">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #f2f2f2;
+        font-family: Brushberry-Script, Brushberry;
+        font-size: 20.3px;
+      }
+
+      .cls-1, .cls-2 {
+        isolation: isolate;
+      }
+
+      .cls-3 {
+        fill: #ed1c24;
+      }
+
+      .cls-4 {
+        fill: #ccc;
+        font-family: Avenir-Roman, Avenir;
+        font-size: 21px;
+      }
+
+      .cls-5 {
+        letter-spacing: -.02em;
+      }
+    </style>
+  </defs>
+  <g class="cls-2">
+    <text class="cls-1" transform="translate(120.71 19.38)"><tspan x="0" y="0">LiberoVino</tspan></text>
+  </g>
+  <path class="cls-3" d="M135.81,1.25c.13,1.07.25,2.13.37,3.25,1.19-.11,2.38-.02,3.57,1.14-1.11-.36-2.23.21-3.34,1.03.13,1.23.25,2.58.37,4.07-.81-1.14-1.62-1.88-2.44-2.49-1.11.82-2.23,1.27-3.34,1.43.61-.77,1.22-1.55,1.83-2.68-.81-.76-1.62-1.97-2.44-3.37,1.19.95,2.38,1.2,3.57,1.12.61-1.29,1.22-2.59,1.83-3.51h-.01Z"/>
+  <text class="cls-4" transform="translate(0 20.43)"><tspan x="0" y="0">powe</tspan><tspan class="cls-5" x="52.54" y="0">r</tspan><tspan x="59.56" y="0">ed by</tspan></text>
+</svg>

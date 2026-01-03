@@ -45,12 +45,6 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: isCompleted
-                    ? '#008060' // success green
-                    : isCurrent
-                    ? '#6B7280' // gray-500 (not purple/indigo)
-                    : '#E3E3E3', // subdued gray
-                  color: isCompleted || isCurrent ? 'white' : '#616161',
                   fontWeight: 600,
                   fontSize: '14px',
                   transition: 'all 0.2s ease',
@@ -82,7 +76,6 @@ export default function EnrollmentProgressBar({ currentStep }: EnrollmentProgres
                   style={{
                     width: '40px',
                     height: '2px',
-                    backgroundColor: isCompleted ? '#008060' : '#E3E3E3',
                     marginLeft: '8px',
                     marginRight: '8px',
                     transition: 'all 0.2s ease',

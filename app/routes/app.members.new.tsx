@@ -1,11 +1,12 @@
 import { type LoaderFunctionArgs } from 'react-router';
-import { Outlet, useLoaderData, useNavigate } from 'react-router';
+import { Outlet, useLoaderData } from 'react-router';
 import { Page, Layout } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { addSessionToUrl } from '~/util/session';
 import EnrollmentSummary from '~/components/EnrollmentSummary';
-import EnrollmentProgressBar from '~/components/EnrollmentProgressBar';
+import ProgressNavBar, { type ProgressStep } from '~/components/ProgressNavBar';
+import { getMainNavigationActions } from '~/util/navigation';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -41,13 +42,37 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function MemberEnrollmentLayout() {
   const { draft, currentStep, session } = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
+  
+  // Define enrollment steps
+  const ENROLLMENT_STEPS: ProgressStep[] = [
+    { key: 'qualify', label: 'Tier', url: addSessionToUrl('/app/members/new', session.id), order: 1 },
+    { key: 'customer', label: 'Customer', url: addSessionToUrl('/app/members/new/customer', session.id), order: 2 },
+    { key: 'address', label: 'Address', url: addSessionToUrl('/app/members/new/address', session.id), order: 3 },
+    { key: 'payment', label: 'Payment', url: addSessionToUrl('/app/members/new/payment', session.id), order: 4 },
+    { key: 'review', label: 'Review', url: addSessionToUrl('/app/members/new/review', session.id), order: 5 },
+  ];
+  
+  // Determine completed steps from draft
+  const completedSteps = new Set<string>();
+  if (draft?.tier) completedSteps.add('qualify');
+  if (draft?.customer) completedSteps.add('customer');
+  if (draft?.customer?.shippingAddressId) completedSteps.add('address');
+  if (draft?.customer?.paymentMethodId) completedSteps.add('payment');
   
   return (
-    <Page title="Enroll New Member">
+    <Page title="Enroll New Member"
+      secondaryActions={getMainNavigationActions({
+        sessionId: session.id,
+        currentPath: location.pathname,
+      })}
+    >
       {/* Progress Bar */}
       <div style={{ marginBottom: '24px' }}>
-        <EnrollmentProgressBar currentStep={currentStep} />
+        <ProgressNavBar
+          steps={ENROLLMENT_STEPS}
+          currentStepKey={currentStep}
+          completedStepKeys={completedSteps}
+        />
       </div>
       
       <Layout>

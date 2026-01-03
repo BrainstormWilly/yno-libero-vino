@@ -50,6 +50,30 @@ body {
   overflow-y: auto !important;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  position: relative;
+}
+
+/* Background star - positioned with pseudo-element to allow opacity control */
+.embedded-app-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/star.png');
+  background-repeat: no-repeat;
+  background-position: -200px -200px; /* Negative values shift left/up to crop - adjust as needed */
+  background-size: 1000px 1000px; /* Adjust this value to crop the star */
+  opacity: 0.1; /* Adjust opacity (0.0 to 1.0) - change this value */
+  pointer-events: none; /* Allow clicks to pass through */
+  z-index: 0;
+}
+
+/* Ensure content is above the background star */
+.embedded-app-wrapper > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Ensure cards and sections can expand naturally in embedded context */
@@ -101,6 +125,13 @@ html[data-theme="dark"] {
   --p-color-text-warning: rgb(255 255 255) !important; /* white */
   --p-color-bg-surface-critical: rgb(153 27 27) !important; /* red-800 */
   --p-color-text-critical: rgb(255 255 255) !important; /* white */
+}
+
+/* Override Polaris CSS variables for light mode - white background with gray cards */
+html:not(.dark):not([data-theme="dark"]) {
+  --p-color-bg-surface: rgb(249 250 251); /* gray-50 - slight gray for cards */
+  --p-color-bg-surface-subdued: rgb(255 255 255); /* white - for page background */
+  --p-color-bg-surface-hovered: rgb(243 244 246); /* gray-100 - subtle hover */
 }
 
 /* Badge dark mode - darker backgrounds for white text */
@@ -1038,34 +1069,92 @@ html[data-theme="dark"] select.Polaris-Select__Input option {
   color: rgb(255 255 255) !important; /* white */
 }
 
-/* Enrollment Progress Bar - invert colors for dark mode */
+/* Progress Nav Bar - Box background override for dark mode */
+html.dark .progress-nav-bar .Polaris-Box,
+html[data-theme="dark"] .progress-nav-bar .Polaris-Box,
+html.dark .enrollment-progress-bar .Polaris-Box,
+html[data-theme="dark"] .enrollment-progress-bar .Polaris-Box {
+  background-color: rgb(31 41 55) !important; /* gray-800 - dark background */
+}
+
+/* Progress Nav Bar - light mode defaults */
+.progress-nav-bar .progress-nav-step-circle.current,
+.enrollment-progress-bar .enrollment-step-circle.current {
+  background-color: #6B7280; /* gray-500 */
+  color: white;
+}
+
+.progress-nav-bar .progress-nav-step-circle.upcoming,
+.enrollment-progress-bar .enrollment-step-circle.upcoming {
+  background-color: #E3E3E3; /* light gray */
+  color: #616161;
+}
+
+.progress-nav-bar .progress-nav-step-circle.completed,
+.enrollment-progress-bar .enrollment-step-circle.completed {
+  background-color: #008060; /* success green */
+  color: white;
+}
+
+.progress-nav-bar .progress-nav-connector.inactive,
+.enrollment-progress-bar .enrollment-connector.inactive {
+  background-color: #E3E3E3; /* light gray */
+}
+
+.progress-nav-bar .progress-nav-connector.completed,
+.enrollment-progress-bar .enrollment-connector.completed {
+  background-color: #008060; /* success green */
+}
+
+/* Progress Nav Bar - dark mode */
+html.dark .progress-nav-bar .progress-nav-step-circle.current,
+html[data-theme="dark"] .progress-nav-bar .progress-nav-step-circle.current,
 html.dark .enrollment-progress-bar .enrollment-step-circle.current,
 html[data-theme="dark"] .enrollment-progress-bar .enrollment-step-circle.current {
   background-color: rgb(107 114 128) !important; /* gray-500 (not purple/indigo) */
   color: rgb(255 255 255) !important; /* white text */
 }
 
+html.dark .progress-nav-bar .progress-nav-step-circle.upcoming,
+html[data-theme="dark"] .progress-nav-bar .progress-nav-step-circle.upcoming,
 html.dark .enrollment-progress-bar .enrollment-step-circle.upcoming,
 html[data-theme="dark"] .enrollment-progress-bar .enrollment-step-circle.upcoming {
   background-color: rgb(75 85 99) !important; /* gray-600 - inactive step */
   color: rgb(209 213 219) !important; /* gray-300 - lighter text */
 }
 
+html.dark .progress-nav-bar .progress-nav-step-circle.completed,
+html[data-theme="dark"] .progress-nav-bar .progress-nav-step-circle.completed,
 html.dark .enrollment-progress-bar .enrollment-step-circle.completed,
 html[data-theme="dark"] .enrollment-progress-bar .enrollment-step-circle.completed {
   background-color: rgb(34 197 94) !important; /* green-500 - completed step */
   color: rgb(255 255 255) !important; /* white text */
 }
 
-/* Connector lines */
+/* Connector lines - dark mode */
+html.dark .progress-nav-bar .progress-nav-connector.inactive,
+html[data-theme="dark"] .progress-nav-bar .progress-nav-connector.inactive,
 html.dark .enrollment-progress-bar .enrollment-connector.inactive,
 html[data-theme="dark"] .enrollment-progress-bar .enrollment-connector.inactive {
   background-color: rgb(75 85 99) !important; /* gray-600 - inactive connector */
 }
 
+html.dark .progress-nav-bar .progress-nav-connector.completed,
+html[data-theme="dark"] .progress-nav-bar .progress-nav-connector.completed,
 html.dark .enrollment-progress-bar .enrollment-connector.completed,
 html[data-theme="dark"] .enrollment-progress-bar .enrollment-connector.completed {
   background-color: rgb(34 197 94) !important; /* green-500 - completed connector */
+}
+
+/* Progress Nav Bar label button styles */
+.progress-nav-label-button:hover {
+  opacity: 0.8;
+}
+
+.progress-nav-label-button:focus {
+  outline: 2px solid var(--p-color-border-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 /* Autocomplete dropdown list - dark mode */
@@ -1540,6 +1629,29 @@ html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active),
 html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) {
   color: rgb(156 163 175) !important; /* gray-400 - subdued for unselected */
   opacity: 1 !important;
+}
+
+/* Footer button */
+.footer-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 80px;
+  position: relative;
+  z-index: 10;
+  margin: 100px;
+  margin-top: 40px;
+}
+
+.footer-button a {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.footer-button img {
+  height: 60px;
+  width: auto;
+  display: block;
 }
 
 /* Active/selected tab - make very clear with bright text and prominent indicator */
