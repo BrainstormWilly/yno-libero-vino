@@ -2,16 +2,13 @@ import { type LoaderFunctionArgs } from 'react-router';
 import { Outlet, useLoaderData, useSearchParams } from 'react-router';
 import { useEffect } from 'react';
 import { 
-  Text,
-  InlineStack,
-  Button,
   ProgressBar,
   Banner,
   BlockStack,
+  Text,
 } from '@shopify/polaris';
 import { Toaster, toast } from 'sonner';
 import { getSubdomainInfo } from '~/util/subdomain';
-import { addSessionToUrl } from '~/util/session';
 import { 
   isDevMode,
   handleDevMode,
@@ -188,48 +185,6 @@ export default function AppLayout() {
           ? 'bg-[#161C27]' 
           : 'bg-gradient-to-br from-purple-50 to-violet-100'
       }`}>
-      {/* Simple header */}
-      <div className={`${
-        theme === 'dark' 
-          ? 'bg-gray-900 border-gray-800' 
-          : 'bg-white border-gray-200'
-      } shadow-sm border-b mb-6`}>
-        <div className="container mx-auto px-4 py-4">
-          <InlineStack align="space-between" blockAlign="center">
-            <div>
-              <Text variant="headingLg" as="h1">
-                {client?.org_name || 'LiberoVino'}
-              </Text>
-              {session && (
-                <Text variant="bodySm" as="p" tone="subdued">
-                  {session.userName} ({session.userEmail})
-                </Text>
-              )}
-            </div>
-            <InlineStack gap="200">
-              <Button 
-                url={addSessionToUrl('/app', session.id)}
-                disabled={isSetupIncomplete}
-              >
-                Dashboard
-              </Button>
-              <Button 
-                url={addSessionToUrl('/app/members', session.id)}
-                disabled={isSetupIncomplete}
-              >
-                Members
-              </Button>
-              <Button 
-                url={addSessionToUrl('/app/settings', session.id)}
-                disabled={isSetupIncomplete}
-              >
-                Settings
-              </Button>
-            </InlineStack>
-          </InlineStack>
-        </div>
-      </div>
-      
       {/* Setup Progress Bar */}
       {isSetupIncomplete && setupProgress && (
         <div className="container mx-auto px-4 mb-6">
@@ -257,9 +212,7 @@ export default function AppLayout() {
       )}
 
       {/* Nested routes render here */}
-      <div className="container mx-auto px-4 pb-8">
-        <Outlet />
-      </div>
+      <Outlet />
     </div>
     </>
   );

@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, redirect } from 'react-router';
-import { useLoaderData } from 'react-router';
+import { useLoaderData, useLocation } from 'react-router';
 import { 
   Page, 
   Layout, 
@@ -12,6 +12,7 @@ import {
 } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
 import { getClient } from '~/lib/db/supabase.server';
+import { getMainNavigationActions } from '~/util/navigation';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // Trust that parent /app route already checked authorization
@@ -32,12 +33,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function AppDashboard() {
   const { client, session } = useLoaderData<typeof loader>();
+  const location = useLocation();
   const crmType = session?.crmType || 'commerce7';
   const identifier = session?.tenantShop || 'unknown';
 
   return (
-    <div className="container mx-auto px-4">
-      <Page title="Dashboard" narrowWidth>
+    <Page 
+      title="Dashboard" 
+      narrowWidth
+      secondaryActions={getMainNavigationActions({
+        sessionId: session?.id || '',
+        currentPath: location.pathname,
+      })}
+    >
         <Layout>
           {/* Welcome Section */}
           <Layout.Section>
@@ -145,7 +153,6 @@ export default function AppDashboard() {
           </Layout.Section>
         </Layout>
       </Page>
-    </div>
-  );
-}
+    );
+  }
 

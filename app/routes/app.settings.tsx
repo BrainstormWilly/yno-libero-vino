@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData, redirect } from 'react-router';
+import { useLoaderData, Form, useActionData, redirect, useLocation } from 'react-router';
 import { 
   Page, 
   Layout, 
@@ -14,6 +14,7 @@ import {
 import { WelcomeBanner } from '~/components/WelcomeBanner';
 import { getAppSession } from '~/lib/sessions.server';
 import { addSessionToUrl } from '~/util/session';
+import { getMainNavigationActions } from '~/util/navigation';
 import {
   isFirstVisit,
   getClientAndCheckSetup,
@@ -99,6 +100,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Settings() {
   const { client, identifier, crmType, isFirstVisit, session } = useLoaderData<typeof loader>();
+  const location = useLocation();
   const actionData = useActionData<typeof action>();
   
   // crmType should always be set at this point (validated in loader)
@@ -106,8 +108,14 @@ export default function Settings() {
   const crmName = crmType === 'commerce7' ? 'Commerce7' : 'Shopify';
 
   return (
-    <div className="container mx-auto px-4">
-      <Page title="Settings" narrowWidth>
+    <Page 
+      title="Settings" 
+      narrowWidth
+      secondaryActions={getMainNavigationActions({
+        sessionId: session.id,
+        currentPath: location.pathname,
+      })}
+    >
         <Layout>
           {/* Banners at Top */}
           <Layout.Section>
@@ -310,7 +318,6 @@ export default function Settings() {
           </Layout.Section>
         </Layout>
       </Page>
-    </div>
-  );
-}
+    );
+  }
 

@@ -269,11 +269,10 @@ export default function SetupTiers() {
                 </Button>
                 
                 <Button
-                  variant="primary"
-                  onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
+                  onClick={() => navigate(addSessionToUrl('/app/setup/marketing', session.id))}
                   disabled={!canContinue}
                 >
-                  Continue to Communication →
+                  Continue to Marketing →
                 </Button>
               </InlineStack>
             </Box>

@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs } from 'react-router';
-import { useLoaderData, useNavigate, useSubmit } from 'react-router';
+import { useLoaderData, useNavigate, useSubmit, useLocation } from 'react-router';
 import { useEffect, useState, useCallback } from 'react';
 import {
   Page,
@@ -18,6 +18,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { addSessionToUrl } from '~/util/session';
 import { setupAutoResize } from '~/util/iframe-helper';
+import { getMainNavigationActions } from '~/util/navigation';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -60,6 +61,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function MembersPage() {
   const { session, customers, tiers, search: initialSearch, tierFilter: initialTierFilter, statusFilter: initialStatusFilter } = useLoaderData<typeof loader>();
+  const location = useLocation();
   const navigate = useNavigate();
   const submit = useSubmit();
 
@@ -271,6 +273,10 @@ export default function MembersPage() {
         content: 'Add Member',
         onAction: () => navigate(addSessionToUrl('/app/members/new', session.id)),
       }}
+      secondaryActions={getMainNavigationActions({
+        sessionId: session.id,
+        currentPath: location.pathname,
+      })}
     >
       <Layout>
         {/* Search and Filter Bar */}

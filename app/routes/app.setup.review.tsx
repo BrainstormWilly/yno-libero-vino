@@ -447,18 +447,23 @@ export default function SetupReview() {
         <Layout.Section>
           <Card>
             <BlockStack gap="400">
-              <Text variant="headingLg" as="h2">
-                {clubProgram.name}
-              </Text>
+              <InlineStack align="space-between">
+                <Text variant="headingLg" as="h2">
+                  {clubProgram.name}
+                </Text>
+                <Box paddingInlineEnd="400">
+                  <Button
+                    variant="plain"
+                    onClick={() => navigate(addSessionToUrl('/app/setup', session.id))}
+                  >
+                    Edit Club Info
+                  </Button>
+                </Box>
+              </InlineStack>
+              <Divider />
               <Text variant="bodyMd" as="p">
                 {clubProgram.description}
               </Text>
-              <Button
-                variant="plain"
-                onClick={() => navigate(addSessionToUrl('/app/setup', session.id))}
-              >
-                Edit Club Info
-              </Button>
             </BlockStack>
           </Card>
         </Layout.Section>
@@ -471,12 +476,14 @@ export default function SetupReview() {
                 <Text variant="headingMd" as="h3">
                   Membership Tiers ({activeTiers.length})
                 </Text>
-                <Button
-                  variant="plain"
-                  onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
-                >
-                  Edit Tiers
-                </Button>
+                <Box paddingInlineEnd="400">
+                  <Button
+                    variant="plain"
+                    onClick={() => navigate(addSessionToUrl('/app/setup/tiers', session.id))}
+                  >
+                    Edit Tiers
+                  </Button>
+                </Box>
               </InlineStack>
               
               <Divider />
@@ -635,12 +642,14 @@ export default function SetupReview() {
                 <Text variant="headingMd" as="h3">
                   Communication Settings
                 </Text>
-                <Button
-                  variant="plain"
-                  onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
-                >
-                  Edit Settings
-                </Button>
+                <Box paddingInlineEnd="400">
+                  <Button
+                    variant="plain"
+                    onClick={() => navigate(addSessionToUrl('/app/setup/communication', session.id))}
+                  >
+                    Edit Settings
+                  </Button>
+                </Box>
               </InlineStack>
               
               <Divider />
