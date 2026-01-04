@@ -35,7 +35,7 @@ export function getMainNavigationActions(config: NavigationConfig): MenuActionDe
     {
       content: 'Settings',
       url: addSessionToUrl('/app/settings', sessionId),
-      disabled: isSetupIncomplete || normalizedPath.startsWith('/app/settings'),
+      disabled: isSetupIncomplete || normalizedPath === '/app/settings',
     },
   ];
   
