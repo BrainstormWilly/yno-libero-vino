@@ -617,7 +617,10 @@ export default function Settings() {
                 </BlockStack>
               )}
               <InlineStack gap="200">
-                <Button url="#" variant="primary">
+                <Button 
+                  url={addSessionToUrl('/app/settings/marketing', session.id)} 
+                  variant="primary"
+                >
                   Manage Marketing
                 </Button>
               </InlineStack>

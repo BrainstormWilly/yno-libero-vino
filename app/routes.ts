@@ -25,6 +25,7 @@ export default [
         route("promo/:promo_id", "routes/app.settings.club_tiers.$id.promo.$promo_id.tsx"),
       ]),
     ]),
+    route("settings/marketing", "routes/app.settings.marketing.tsx"),
     route("setup", "routes/app.setup.tsx", [
       index("routes/app.setup._index.tsx"),
       route("tiers", "routes/app.setup.tiers.tsx"),
