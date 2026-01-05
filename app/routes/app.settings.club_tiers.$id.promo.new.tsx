@@ -1,16 +1,34 @@
-import { type ActionFunctionArgs } from 'react-router';
-import { useActionData, useNavigate, useRouteLoaderData } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
+import { useActionData, useNavigate, useLoaderData } from 'react-router';
 import { useEffect } from 'react';
 import { Page, BlockStack, Box, Button } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
-import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
+import { getMainNavigationActions } from '~/util/navigation';
 import * as db from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
-import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const session = await getAppSession(request);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+  
+  const tierId = params.id!;
+  const tier = await db.getClubStageWithDetails(tierId);
+  
+  if (!tier) {
+    throw new Response('Tier not found', { status: 404 });
+  }
+  
+  return {
+    session,
+    tier,
+  };
+}
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const session = await getAppSession(request);
@@ -95,7 +113,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     
     return {
       success: true,
-      redirect: addSessionToUrl(`/app/setup/tiers/${tierId}`, session.id),
+      redirect: addSessionToUrl(`/app/settings/club_tiers/${tierId}`, session.id),
     };
   } catch (error) {
     return {
@@ -106,16 +124,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function NewPromotion() {
-  const parentData = useRouteLoaderData<typeof tierLayoutLoader>('routes/app.setup.tiers.$id');
-  if (!parentData) throw new Error('Parent loader data not found');
-  
-  const { tier, session } = parentData;
+  const { session, tier } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
-  
-  useEffect(() => {
-    setupAutoResize();
-  }, []);
   
   // Handle redirect
   useEffect(() => {
@@ -125,21 +136,22 @@ export default function NewPromotion() {
   }, [actionData, navigate]);
   
   return (
-    <Page title="New Promotion">
+    <Page 
+      title="Add Promotion"
+      backAction={{
+        content: tier.name,
+        url: addSessionToUrl(`/app/settings/club_tiers/${tier.id}`, session.id),
+      }}
+      secondaryActions={getMainNavigationActions({
+        sessionId: session.id,
+        currentPath: `/app/settings/club_tiers/${tier.id}/promo/new`,
+      })}
+    >
       <BlockStack gap="400">
-        {/* Navigation Button at Top */}
-        <Box paddingBlockEnd="400">
-          <Button
-            onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
-          >
-            ← Back to Tier
-          </Button>
-        </Box>
-
         <PromotionForm
           mode="create"
           session={session}
-          onCancel={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+          onCancel={() => navigate(addSessionToUrl(`/app/settings/club_tiers/${tier.id}`, session.id))}
           actionData={actionData}
         />
       </BlockStack>

@@ -1,16 +1,15 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData, useNavigate, useRouteLoaderData } from 'react-router';
+import { useLoaderData, Form, useActionData, useNavigate, useLocation } from 'react-router';
 import { useEffect } from 'react';
 import { Page, BlockStack, Box, Button, Banner } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
-import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
+import { getMainNavigationActions } from '~/util/navigation';
 import * as db from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
-import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -19,13 +18,21 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   
   const tierId = params.id!;
-  const promoId = params.promoId!;
+  const promoId = params.promo_id!;
   
-  const allPromotions = await db.getStagePromotions(tierId);
-  const promotion = allPromotions.find(p => p.id === promoId);
+  const tier = await db.getClubStageWithDetails(tierId);
+  if (!tier) {
+    throw new Response('Tier not found', { status: 404 });
+  }
   
+  const promotion = await db.getStagePromotion(promoId);
   if (!promotion) {
     throw new Response('Promotion not found', { status: 404 });
+  }
+  
+  // Verify promotion belongs to this tier
+  if (promotion.club_stage_id !== tierId) {
+    throw new Response('Promotion does not belong to this tier', { status: 404 });
   }
   
   // Fetch promotion details from CRM
@@ -37,9 +44,10 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   
   return {
+    session,
+    tier,
+    promotion,
     discount,
-    promotionId: promotion.id,
-    crmId: promotion.crm_id,
   };
 }
 
@@ -50,13 +58,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   
   const tierId = params.id!;
-  const promoId = params.promoId!;
+  const promoId = params.promo_id!;
   const formData = await request.formData();
   const actionType = formData.get('action') as string;
   
   try {
     if (actionType === 'delete_promotion') {
-      const promotion = (await db.getStagePromotions(tierId)).find(p => p.id === promoId);
+      const promotion = await db.getStagePromotion(promoId);
       
       if (promotion) {
         // Delete from CRM
@@ -64,12 +72,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
       }
       
       // Delete from DB
-      const supabase = db.getSupabaseClient();
-      await supabase.from('club_stage_promotions').delete().eq('id', promoId);
+      await db.deleteStagePromotion(promoId);
       
       return {
         success: true,
-        redirect: addSessionToUrl(`/app/setup/tiers/${tierId}`, session.id),
+        redirect: addSessionToUrl(`/app/settings/club_tiers/${tierId}`, session.id),
       };
     }
     
@@ -87,7 +94,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const usageLimitStr = formData.get('usage_limit') as string;
       const usageLimit = usageLimitStr && usageLimitType !== 'Unlimited' ? parseInt(usageLimitStr) : null;
       
-      const promotion = (await db.getStagePromotions(tierId)).find(p => p.id === promoId);
+      const promotion = await db.getStagePromotion(promoId);
       if (!promotion) {
         return { success: false, message: 'Promotion not found' };
       }
@@ -135,16 +142,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
       );
       
       // Update title in DB cache
-      const supabase = db.getSupabaseClient();
-      await supabase
-        .from('club_stage_promotions')
-        .update({ title })
-        .eq('id', promoId);
+      await db.updateStagePromotion(promoId, { title });
       
       return {
         success: true,
         message: 'Promotion updated',
-        redirect: addSessionToUrl(`/app/setup/tiers/${tierId}`, session.id),
+        redirect: addSessionToUrl(`/app/settings/club_tiers/${tierId}`, session.id),
       };
     }
     
@@ -157,18 +160,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 }
 
-export default function EditPromotion() {
-  const { discount } = useLoaderData<typeof loader>();
-  const parentData = useRouteLoaderData<typeof tierLayoutLoader>('routes/app.setup.tiers.$id');
-  if (!parentData) throw new Error('Parent loader data not found');
-  
-  const { tier, session } = parentData;
+export default function PromotionDetail() {
+  const { session, tier, promotion, discount } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const location = useLocation();
   const navigate = useNavigate();
-  
-  useEffect(() => {
-    setupAutoResize();
-  }, []);
   
   // Handle redirect
   useEffect(() => {
@@ -178,31 +174,44 @@ export default function EditPromotion() {
   }, [actionData, navigate]);
   
   const handleDelete = () => {
-    // Submit delete form
-    const form = document.createElement('form');
-    form.method = 'post';
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'action';
-    input.value = 'delete_promotion';
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
+    if (confirm('Are you sure you want to delete this promotion? This action cannot be undone.')) {
+      const form = document.createElement('form');
+      form.method = 'post';
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'action';
+      input.value = 'delete_promotion';
+      form.appendChild(input);
+      document.body.appendChild(form);
+      form.submit();
+    }
   };
   
   return (
-    <Page title="Edit Promotion">
+    <Page 
+      title={promotion.title || 'Promotion'}
+      backAction={{
+        content: tier.name,
+        url: addSessionToUrl(`/app/settings/club_tiers/${tier.id}`, session.id),
+      }}
+      primaryAction={{
+        content: 'Back to Club Tiers',
+        url: addSessionToUrl('/app/settings/club_tiers', session.id),
+      }}
+      secondaryActions={[
+        ...getMainNavigationActions({
+          sessionId: session.id,
+          currentPath: location.pathname,
+        }),
+        {
+          content: 'Delete Promotion',
+          destructive: true,
+          onAction: handleDelete,
+        },
+      ]}
+    >
       <BlockStack gap="400">
-        {/* Navigation Button at Top */}
-        <Box paddingBlockEnd="400">
-          <Button
-            onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
-          >
-            ← Back to Tier
-          </Button>
-        </Box>
-
-        {/* Banners at Top */}
+        {/* Banners */}
         {actionData && !actionData.success && (
           <Banner tone="critical" title={actionData.message} />
         )}
@@ -216,14 +225,12 @@ export default function EditPromotion() {
             mode="edit"
             initialDiscount={discount}
             session={session}
-            onCancel={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}`, session.id))}
+            onCancel={() => navigate(addSessionToUrl(`/app/settings/club_tiers/${tier.id}`, session.id))}
             onDelete={handleDelete}
             actionData={actionData}
           />
         ) : (
-          <Form method="post">
-            <input type="hidden" name="action" value="delete_promotion" />
-          </Form>
+          <Banner tone="warning" title="Could not load promotion details from CRM. The promotion may have been deleted." />
         )}
       </BlockStack>
     </Page>

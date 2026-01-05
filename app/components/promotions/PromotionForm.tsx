@@ -96,6 +96,23 @@ export function PromotionForm({
     return (initialDiscount.minimumRequirement.amount / 100).toString();
   });
   
+  // Usage limits
+  const [usageLimitType, setUsageLimitType] = useState<'Unlimited' | 'Customer' | 'Store'>(() => {
+    // Check platformData first, then default to Unlimited
+    if (initialDiscount?.platformData?.usageLimitType) {
+      return initialDiscount.platformData.usageLimitType;
+    }
+    return 'Unlimited';
+  });
+  
+  const [usageLimit, setUsageLimit] = useState(() => {
+    // Check platformData first
+    if (initialDiscount?.platformData?.usageLimit) {
+      return initialDiscount.platformData.usageLimit.toString();
+    }
+    return '';
+  });
+  
   // Product/Collection selection
   const [selectedProducts, setSelectedProducts] = useState<Array<{ id: string; title: string }>>(
     initialDiscount?.appliesTo.products.map(p => ({ id: p.id, title: p.title || '' })) || []
@@ -136,6 +153,8 @@ export function PromotionForm({
         )}
         <input type="hidden" name="selected_ids" value={JSON.stringify(selectedIds)} />
         <input type="hidden" name="discount_target" value={discountTarget} />
+        <input type="hidden" name="usage_limit_type" value={usageLimitType} />
+        <input type="hidden" name="usage_limit" value={usageLimitType === 'Unlimited' ? '' : usageLimit} />
         
         <BlockStack gap="500">
           <Card>
@@ -259,6 +278,48 @@ export function PromotionForm({
                     helpText={mode === 'create' ? "Leave blank for no minimum" : undefined}
                   />
                 </>
+              )}
+              
+              <Divider />
+              
+              <Text variant="headingSm" as="h5">
+                Usage Limits
+              </Text>
+              
+              <Select
+                label=""
+                options={[
+                  { label: 'Unlimited', value: 'Unlimited' },
+                  { label: 'Customer', value: 'Customer' },
+                  { label: 'Store', value: 'Store' },
+                ]}
+                value={usageLimitType}
+                onChange={(val) => {
+                  setUsageLimitType(val as 'Unlimited' | 'Customer' | 'Store');
+                  // Clear usage limit when switching to Unlimited
+                  if (val === 'Unlimited') {
+                    setUsageLimit('');
+                  }
+                }}
+                name="usage_limit_type"
+                helpText={
+                  usageLimitType === 'Unlimited' ? 'No limit on usage' :
+                  usageLimitType === 'Customer' ? 'Limit applies per customer' :
+                  'Limit applies store-wide'
+                }
+              />
+              
+              {usageLimitType !== 'Unlimited' && (
+                <TextField
+                  label="Limit Quantity"
+                  value={usageLimit}
+                  onChange={setUsageLimit}
+                  name="usage_limit"
+                  type="number"
+                  min={1}
+                  autoComplete="off"
+                  helpText={`Maximum number of times this promotion can be used ${usageLimitType === 'Customer' ? 'per customer' : 'store-wide'}`}
+                />
               )}
               
               <InlineStack align="space-between">

@@ -223,9 +223,9 @@ export const toC7Promotion = (
     cartRequirementMaximum: null,
     cartRequirementCountType: "All Items",
     
-    // Usage limits (promotions are unlimited)
-    usageLimitType: "Unlimited",
-    usageLimit: null,
+    // Usage limits
+    usageLimitType: discount.platformData?.usageLimitType === 'Unlimited' ? "Unlimited" : "Limited",
+    usageLimit: discount.platformData?.usageLimitType === 'Unlimited' ? null : (discount.platformData?.usageLimit || null),
     
     // Availability - linked to club
     status: toC7Status(discount.status),
@@ -340,6 +340,10 @@ export const fromC7Promotion = (c7Promotion: C7Promotion): Discount => {
     platformData: {
       promotionSets: c7Promotion.promotionSets,
       actionMessage: c7Promotion.actionMessage,
+      // Map C7 usageLimitType back to our form values
+      // C7 only has "Unlimited" | "Limited", so we default "Limited" to "Customer"
+      usageLimitType: c7Promotion.usageLimitType === "Unlimited" ? "Unlimited" : "Customer",
+      usageLimit: c7Promotion.usageLimit,
     },
   };
 

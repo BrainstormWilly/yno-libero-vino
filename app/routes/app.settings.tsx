@@ -1,5 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData, useLocation } from 'react-router';
+import { useLoaderData, useActionData, useLocation, useSubmit } from 'react-router';
+import { useState } from 'react';
 import { 
   Page, 
   Card, 
@@ -16,6 +17,8 @@ import {
   useBreakpoints,
   Link,
   TextField,
+  Form,
+  FormLayout
 } from '@shopify/polaris';
 
 import { WelcomeBanner } from '~/components/WelcomeBanner';
@@ -264,10 +267,25 @@ export default function Settings() {
   const location = useLocation();
   const actionData = useActionData<typeof action>();
   const { smUp } = useBreakpoints();
+  const submit = useSubmit();
   
   // crmType should always be set at this point (validated in loader)
   const crmTypeStr = crmType || 'commerce7';
   const crmName = crmType === 'commerce7' ? 'Commerce7' : 'Shopify';
+  const [orgName, setOrgName] = useState(client.org_name);
+  const [orgContact, setOrgContact] = useState(client.org_contact);
+  const [shopUrl, setShopUrl] = useState(client.shop_url || (client.website_url ? `${client.website_url}/shop` : ''));
+
+  const handleSubmitOrg = () => {
+    const formData = new FormData();
+    formData.append('action', 'update_organization');
+    formData.append('org_name', orgName);
+    formData.append('org_contact', orgContact);
+    formData.append('shop_url', shopUrl);
+    formData.append('identifier', identifier);
+    formData.append('crmType', crmTypeStr);
+    submit(formData, { method: 'put' });
+  }
 
   return (
     <Page 
@@ -311,119 +329,46 @@ export default function Settings() {
             </BlockStack>
           </Box>
           <Card roundedAbove="sm">
-            <BlockStack gap="400">
-              <Form method="post">
-                <input type="hidden" name="action" value="update_organization" />
-                <input type="hidden" name="identifier" value={identifier} />
-                <input type="hidden" name="crmType" value={crmTypeStr} />
-                
-                <BlockStack gap="400">
-                  {/* Organization Name */}
-                  <div>
-                    <label htmlFor="org_name" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>
-                      Organization Name
-                    </label>
-                    <input
-                      type="text"
-                      id="org_name"
-                      name="org_name"
-                      defaultValue={client.org_name}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #c9cccf',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  {/* Organization Contact */}
-                  <div>
-                    <label htmlFor="org_contact" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>
-                      Contact Person
-                    </label>
-                    <input
-                      type="text"
-                      id="org_contact"
-                      name="org_contact"
-                      defaultValue={client.org_contact}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #c9cccf',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                  </div>
-
-                  {/* Shop URL */}
-                  <div>
-                    <label htmlFor="shop_url" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>
-                      Shop URL
-                    </label>
-                    <input
-                      type="url"
-                      id="shop_url"
-                      name="shop_url"
-                      defaultValue={client.shop_url || (client.website_url ? `${client.website_url}/shop` : '')}
-                      placeholder={client.website_url ? `${client.website_url}/shop` : 'https://example.com/shop'}
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #c9cccf',
-                        borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                    <p style={{ marginTop: '4px', fontSize: '12px', color: '#6d7175' }}>
-                      URL for &quot;Shop Now&quot; buttons in email templates. Defaults to your website URL + /shop
-                    </p>
-                  </div>
-
-                  {/* Read-only Email */}
-                  <div>
-                    <label htmlFor="user_email" style={{ display: 'block', marginBottom: '8px', fontWeight: 600 }}>
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      id="user_email"
-                      value={client.user_email || ''}
-                      disabled
-                      style={{
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: '1px solid #c9cccf',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        backgroundColor: '#f6f6f7',
-                        color: '#6d7175',
-                        opacity: 0.5
-                      }}
-                    />
-                    <div style={{ marginTop: '4px' }}>
-                      <Text variant="bodySm" as="p" tone="subdued">
-                        Email is synced from {crmName} and cannot be changed here.
-                      </Text>
-                    </div>
-                  </div>
-
-                  {/* Save Button */}
-                  <InlineStack gap="200">
-                    <Button variant="primary" submit>
-                      Save Changes
-                    </Button>
-                    <Button url="/app">
-                      Cancel
-                    </Button>
-                  </InlineStack>
-                </BlockStack>
-              </Form>
-            </BlockStack>
+            <Form onSubmit={handleSubmitOrg}>
+              <FormLayout>
+                <FormLayout.Group>
+                  <TextField
+                    label="Organization Name"
+                    value={orgName}
+                    onChange={setOrgName}
+                    autoComplete="off"
+                    requiredIndicator
+                  />
+                  <TextField
+                    label="Contact Person"
+                    value={orgContact}
+                    onChange={setOrgContact}
+                    autoComplete="off"
+                    requiredIndicator
+                  />
+                  <TextField
+                    label="Shop URL"
+                    value={shopUrl}
+                    onChange={setShopUrl}
+                    autoComplete="off"
+                    helpText="URL for &quot;Shop Now&quot; buttons in email templates. Defaults to your website URL + /shop"
+                    requiredIndicator
+                  />
+                  <TextField
+                    label="Email"
+                    value={client.user_email || ''}
+                    onChange={() => {}}
+                    autoComplete="off"
+                    helpText="Email is synced from CRM and cannot be changed here."
+                    requiredIndicator
+                    disabled
+                  />
+                  <Button variant="primary" submit>
+                    Save Changes
+                  </Button>
+                </FormLayout.Group>
+              </FormLayout>
+            </Form>
           </Card>
         </InlineGrid>
         {smUp ? <Divider /> : null}
@@ -477,7 +422,7 @@ export default function Settings() {
                       <List>
                         {tiersWithDetails.map(({ stage, promotionCount }) => (
                           <List.Item key={stage.id}>
-                            <Link url="#" removeUnderline>
+                            <Link url={addSessionToUrl(`/app/settings/club_tiers/${stage.id}`, session.id)} removeUnderline>
                               {stage.name}
                             </Link>
                             <Text as="span" variant="bodySm" tone="subdued">

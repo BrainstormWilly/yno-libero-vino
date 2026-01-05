@@ -418,6 +418,61 @@ export async function deleteStagePromotions(stageId: string) {
     .eq('club_stage_id', stageId);
 }
 
+export async function getStagePromotion(promotionId: string): Promise<StagePromotion | null> {
+  const supabase = getSupabaseClient();
+  
+  const { data: promotion, error } = await supabase
+    .from('club_stage_promotions')
+    .select('*')
+    .eq('id', promotionId)
+    .maybeSingle();
+  
+  if (error) {
+    throw new Error(`Failed to get promotion: ${error.message}`);
+  }
+  
+  return promotion;
+}
+
+export async function updateStagePromotion(
+  promotionId: string,
+  data: {
+    title?: string;
+    description?: string;
+  }
+) {
+  const supabase = getSupabaseClient();
+  
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+  
+  if (data.title !== undefined) updateData.title = data.title;
+  if (data.description !== undefined) updateData.description = data.description;
+  
+  const { error } = await supabase
+    .from('club_stage_promotions')
+    .update(updateData)
+    .eq('id', promotionId);
+  
+  if (error) {
+    throw new Error(`Failed to update promotion: ${error.message}`);
+  }
+}
+
+export async function deleteStagePromotion(promotionId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { error } = await supabase
+    .from('club_stage_promotions')
+    .delete()
+    .eq('id', promotionId);
+  
+  if (error) {
+    throw new Error(`Failed to delete promotion: ${error.message}`);
+  }
+}
+
 // ============================================
 // LOYALTY OPERATIONS
 // ============================================

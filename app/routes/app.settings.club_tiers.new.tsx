@@ -1,5 +1,5 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData, useNavigate, useLocation } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, redirect } from 'react-router';
+import { useLoaderData, Form, useActionData, useLocation } from 'react-router';
 import { useState } from 'react';
 import { 
   Page, 
@@ -76,10 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }]);
     
     // Redirect to the tier detail page
-    return {
-      success: true,
-      redirect: addSessionToUrl(`/app/settings/club_tiers/${newTiers[0].id}`, session.id),
-    };
+    return redirect(addSessionToUrl(`/app/settings/club_tiers/${newTiers[0].id}`, session.id));
   }
   
   return {
@@ -91,18 +88,11 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function NewTier() {
   const { session, tierCount } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const navigate = useNavigate();
   const location = useLocation();
   
   const [tierName, setTierName] = useState('');
   const [durationMonths, setDurationMonths] = useState(3);
   const [minLtvAmount, setMinLtvAmount] = useState(600);
-  
-  // Handle redirect from action
-  if (actionData?.redirect) {
-    navigate(actionData.redirect);
-    return null;
-  }
   
   return (
     <Page 

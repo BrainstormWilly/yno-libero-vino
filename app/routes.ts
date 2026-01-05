@@ -19,8 +19,11 @@ export default [
     route("settings/club_tiers", "routes/app.settings.club_tiers.tsx", [
       index("routes/app.settings.club_tiers._index.tsx"),
       route("new", "routes/app.settings.club_tiers.new.tsx"),
-      route(":id", "routes/app.settings.club_tiers.$id.tsx"),
-      // route(":tier_id/promo/:id", "routes/app.settings.club_tiers.$tier_id.promo.$id.tsx"),
+      route(":id", "routes/app.settings.club_tiers.$id.tsx", [
+        index("routes/app.settings.club_tiers.$id._index.tsx"),
+        route("promo/new", "routes/app.settings.club_tiers.$id.promo.new.tsx"),
+        route("promo/:promo_id", "routes/app.settings.club_tiers.$id.promo.$promo_id.tsx"),
+      ]),
     ]),
     route("setup", "routes/app.setup.tsx", [
       index("routes/app.setup._index.tsx"),

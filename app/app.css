@@ -808,7 +808,10 @@ html[data-theme="dark"] textarea {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important; /* inset shadow for depth */
 }
 
-
+html.dark .Polaris-Labelled__HelpText,
+html[data-theme="dark"] .Polaris-Labelled__HelpText {
+  opacity: 0.7 !important;
+}
 
 /* Number field spinner controls - make visible in dark mode */
 html.dark .Polaris-TextField__Spinner,
@@ -905,66 +908,12 @@ html[data-theme="dark"] textarea:focus {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 2px rgba(99, 102, 241, 0.2) !important; /* inset shadow + focus glow */
 }
 
-/* Override focus styles for TextField inputs with prefix or suffix - must come after general focus rule */
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) input:focus,
-html.dark .Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html.dark .Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus {
-  border: 1px solid rgb(75 85 99) !important; /* gray-600 - no indigo border on focus */
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important; /* only inset shadow, no outer glow */
-  outline: none !important;
+/* Override border for TextFields with a prefix or suffix */
+html.dark .Polaris-TextField__Backdrop,
+html[data-theme="dark"] .Polaris-TextField__Backdrop {
+  border: 1px solid rgb(75 85 99) !important;
 }
 
-/* Text fields with prefix icons - remove outlines (more specific selectors) */
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus-visible,
-html.dark .Polaris-TextField__Prefix ~ .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input,
-html.dark .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:focus-visible,
-html.dark .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input,
-html.dark .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Prefix + .Polaris-TextField__Input:focus-visible,
-html.dark .Polaris-TextField input[role="combobox"],
-html[data-theme="dark"] .Polaris-TextField input[role="combobox"],
-html.dark .Polaris-TextField input[role="combobox"]:focus,
-html[data-theme="dark"] .Polaris-TextField input[role="combobox"]:focus,
-html.dark .Polaris-TextField input[role="combobox"]:focus-visible,
-html[data-theme="dark"] .Polaris-TextField input[role="combobox"]:focus-visible,
-html.dark .Polaris-TextField__Input[role="combobox"],
-html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"],
-html.dark .Polaris-TextField__Input[role="combobox"]:focus,
-html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"]:focus,
-html.dark .Polaris-TextField__Input[role="combobox"]:focus-visible,
-html[data-theme="dark"] .Polaris-TextField__Input[role="combobox"]:focus-visible {
-  outline: none !important;
-  outline-width: 0 !important;
-  outline-style: none !important;
-  outline-color: transparent !important;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3) !important; /* only inset shadow, no outer glow */
-  border: 1px solid rgb(75 85 99) !important; /* gray-600 - keep subtle border */
-}
 
 /* Override the focus styles specifically for combobox inputs */
 html.dark .Polaris-TextField__Input[role="combobox"]:focus,
@@ -980,61 +929,22 @@ html[data-theme="dark"] .Polaris-TextField__Prefix ~ .Polaris-TextField__Input:f
   outline: none !important;
 }
 
-/* Remove outline for TextField inputs with prefix or suffix - more aggressive selectors */
-html.dark .Polaris-TextField__Input[aria-labelledby*="Prefix"],
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Prefix"],
-html.dark .Polaris-TextField__Input[aria-labelledby*="Suffix"],
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Suffix"],
-html.dark .Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html.dark .Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html.dark .Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus-visible,
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus-visible,
-html.dark .Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus-visible,
-html[data-theme="dark"] .Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus-visible,
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Prefix"],
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Prefix"],
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Suffix"],
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Suffix"],
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus,
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus,
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus-visible,
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Prefix"]:focus-visible,
-html.dark input.Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus-visible,
-html[data-theme="dark"] input.Polaris-TextField__Input[aria-labelledby*="Suffix"]:focus-visible,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) input,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) input,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) input,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) input,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) input:focus-visible,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) input:focus-visible,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input:focus-visible,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus-visible,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus-visible {
-  outline: none !important;
-  outline-width: 0 !important;
-  outline-style: none !important;
-  outline-color: transparent !important;
+/* Override border for TextField with a spinner */
+html.dark .Polaris-TextField:has(.Polaris-TextField__Spinner) .Polaris-TextField__Input,
+html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Spinner) .Polaris-TextField__Input {
   box-shadow: none !important;
-  border: none !important; /* gray-600 - keep subtle border */
+  border-right: none !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* Override border for TextField with a prefix */
+html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input,
+html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix) .Polaris-TextField__Input {
+  box-shadow: none !important;
+  border-left: none !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
 }
 
 /* Also override any focus ring or border that might be applied */
@@ -1045,32 +955,6 @@ html[data-theme="dark"] input[role="combobox"].Polaris-TextField__Input:focus-vi
   border: 1px solid rgb(75 85 99) !important; /* gray-600 */
   box-shadow: none !important;
   outline: none !important;
-}
-
-/* Also remove outline from the TextField container when it has a prefix or suffix */
-html.dark .Polaris-TextField:has(.Polaris-TextField__Prefix),
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Prefix),
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix),
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) {
-  outline: none !important;
-}
-
-/* Remove outline for TextField with suffix in dark mode */
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input,
-html.dark .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField:has(.Polaris-TextField__Suffix) .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField__Suffix ~ .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField__Suffix ~ .Polaris-TextField__Input,
-html.dark .Polaris-TextField__Suffix ~ .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField__Suffix ~ .Polaris-TextField__Input:focus,
-html.dark .Polaris-TextField .Polaris-TextField__Suffix + .Polaris-TextField__Input,
-html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Suffix + .Polaris-TextField__Input,
-html.dark .Polaris-TextField .Polaris-TextField__Suffix + .Polaris-TextField__Input:focus,
-html[data-theme="dark"] .Polaris-TextField .Polaris-TextField__Suffix + .Polaris-TextField__Input:focus {
-  outline: none !important;
-  box-shadow: none !important;
-  border: 1px solid rgb(75 85 99) !important; /* gray-600 - keep subtle border */
 }
 
 html.dark .Polaris-TextField__Input::placeholder,
@@ -1469,6 +1353,10 @@ html.dark .Polaris-Autocomplete__Listbox li button,
 html[data-theme="dark"] .Polaris-Autocomplete__Listbox li button {
   background-color: rgb(31 41 55) !important; /* gray-800 */
   background: rgb(31 41 55) !important;
+  color: rgb(255 255 255) !important;
+}
+
+html.dark .Polaris-Popover__ContentContainer {
   color: rgb(255 255 255) !important;
 }
 
