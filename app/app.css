@@ -109,6 +109,7 @@ html.dark,
 html[data-theme="dark"] {
   --p-color-bg-surface: rgb(31 41 55); /* gray-800 */
   --p-color-bg-surface-subdued: #161C27; /* C7 background */
+  --p-color-bg-surface-tertiary: rgb(31 41 55); /* gray-800 - for modal headers */
   --p-color-bg-surface-hovered: rgb(55 65 81); /* gray-700 */
   --p-color-bg-surface-pressed: rgb(75 85 99); /* gray-600 */
   --p-color-text: rgb(255 255 255); /* white - brighter */
@@ -205,23 +206,18 @@ html[data-theme="dark"] .Polaris-Card__Section {
   border-color: rgb(55 65 81) !important;
 }
 
-/* Action buttons (primary) - keep bright purple/indigo (exclude buttons with tones) */
-html.dark .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical),
-html[data-theme="dark"] .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical),
-html.dark .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical),
-html[data-theme="dark"] .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical) {
-  background-color: rgb(99 102 241) !important; /* indigo-500 - action buttons stay bright */
+html.dark .Polaris-Button--variantPrimary,
+html[data-theme="dark"] .Polaris-Button--variantPrimary {
+  background-color: rgb(99 102 241) !important;
   color: rgb(255 255 255) !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
 }
 
-html.dark .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled),
-html[data-theme="dark"] .Polaris-Button--variantPrimary:not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled),
-html.dark .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled),
-html[data-theme="dark"] .Polaris-Button:not(.Polaris-Button--plain):not(.Polaris-Button--variantSecondary):not([data-tone]):not(.Polaris-Button--toneSuccess):not(.Polaris-Button--toneCritical):hover:not(:disabled) {
-  background-color: rgb(79 70 229) !important; /* indigo-600 */
+html.dark .Polaris-Button--variantPrimary:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantPrimary:hover:not(:disabled) {
+  background-color: rgb(79 70 229) !important;
   border: none !important;
   box-shadow: none !important;
   outline: none !important;
@@ -243,6 +239,11 @@ html[data-theme="dark"] .Polaris-Button--variantSecondary:hover:not(:disabled) {
   color: rgb(243 244 246) !important; /* gray-100 - brighter text on hover */
   border: none !important;
   box-shadow: none !important;
+}
+
+html.dark .Polaris-Button--variantTertiary:hover:not(:disabled),
+html[data-theme="dark"] .Polaris-Button--variantTertiary:hover:not(:disabled) {
+  opacity: 0.5;
 }
 
 html.dark .Polaris-Button:focus,
@@ -1472,46 +1473,6 @@ html[data-theme="dark"] .tier-selection-card.selected {
   background-color: rgb(55 65 81) !important; /* gray-700 - subtle dark background */
 }
 
-/* General Polaris icons - make visible in dark mode */
-html.dark .Polaris-Icon,
-html[data-theme="dark"] .Polaris-Icon {
-  color: rgb(209 213 219) !important; /* gray-300 - visible but not too bright */
-  background-color: transparent !important; /* remove white background */
-}
-
-html.dark .Polaris-Icon svg,
-html[data-theme="dark"] .Polaris-Icon svg,
-html.dark .Polaris-Icon__Svg,
-html[data-theme="dark"] .Polaris-Icon__Svg,
-html.dark svg.Polaris-Icon__Svg,
-html[data-theme="dark"] svg.Polaris-Icon__Svg {
-  color: rgb(209 213 219) !important; /* gray-300 */
-  fill: rgb(209 213 219) !important; /* gray-300 */
-  background-color: transparent !important; /* remove white background */
-}
-
-html.dark .Polaris-Icon path,
-html[data-theme="dark"] .Polaris-Icon path,
-html.dark .Polaris-Icon__Svg path,
-html[data-theme="dark"] .Polaris-Icon__Svg path,
-html.dark svg.Polaris-Icon__Svg path,
-html[data-theme="dark"] svg.Polaris-Icon__Svg path {
-  fill: rgb(209 213 219) !important; /* gray-300 */
-  stroke: rgb(209 213 219) !important; /* gray-300 */
-  color: rgb(209 213 219) !important; /* gray-300 */
-}
-
-/* All SVG elements - remove white backgrounds */
-html.dark svg,
-html[data-theme="dark"] svg {
-  background-color: transparent !important;
-}
-
-html.dark .Polaris-Icon svg,
-html[data-theme="dark"] .Polaris-Icon svg {
-  background-color: transparent !important;
-}
-
 /* Navigation button arrow/icon - make white/visible */
 html.dark .Polaris-Button svg,
 html[data-theme="dark"] .Polaris-Button svg,
@@ -1522,17 +1483,6 @@ html[data-theme="dark"] .Polaris-Button path {
   color: rgb(255 255 255) !important;
   fill: rgb(255 255 255) !important;
   stroke: rgb(255 255 255) !important;
-}
-
-html.dark .Polaris-Button--plain svg,
-html[data-theme="dark"] .Polaris-Button--plain svg,
-html.dark .Polaris-Button--plain .Polaris-Icon,
-html[data-theme="dark"] .Polaris-Button--plain .Polaris-Icon,
-html.dark .Polaris-Button--plain path,
-html[data-theme="dark"] .Polaris-Button--plain path {
-  color: rgb(99 102 241) !important;
-  fill: rgb(99 102 241) !important;
-  stroke: rgb(99 102 241) !important;
 }
 
 /* General body text and paragraphs - make very bright */
@@ -1719,3 +1669,18 @@ html[data-theme="dark"] .Polaris-Tabs__Tab[aria-selected="true"] .Polaris-Text {
   color: rgb(255 255 255) !important; /* white - maximum visibility */
   font-weight: 600 !important; /* semi-bold for active tab text */
 }
+
+/* Modal dark mode styles - CSS variable overrides */
+
+html.dark .Polaris-Modal-Dialog__Modal .Polaris-Box {
+  background: rgb(31 41 55) !important;
+  color: rgb(255 255 255) !important;
+}
+
+
+/* Modal backdrop/overlay - make it transparent so background is visible */
+html.dark .Polaris-Modal__Backdrop,
+html[data-theme="dark"] .Polaris-Modal__Backdrop {
+  background-color: rgba(0, 0, 0, 0.5) !important; /* semi-transparent overlay - allows background to show through */
+}
+

@@ -559,7 +559,10 @@ export default function Settings() {
                 </BlockStack>
               )}
               <InlineStack gap="200">
-                <Button url="#" variant="primary">
+                <Button 
+                  url={addSessionToUrl('/app/settings/communication', session.id)} 
+                  variant="primary"
+                >
                   Manage Communication
                 </Button>
               </InlineStack>
