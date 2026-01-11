@@ -5,7 +5,7 @@
  * including email/SMS providers and email settings.
  */
 
-import { type LoaderFunctionArgs, type ActionFunctionArgs, Form, useLoaderData, useActionData, useLocation, useSubmit } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, Form, useLoaderData, useActionData, useLocation, useSubmit, useNavigation } from 'react-router';
 import { useState, useEffect } from 'react';
 import { 
   Page,
@@ -30,6 +30,10 @@ import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
 import { sendClientTestEmail, sendClientTestSMS } from '~/lib/communication/communication.service.server';
 import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
+import type { Database } from '~/types/supabase';
+
+type ProviderDataJson =
+  Database['public']['Tables']['communication_configs']['Insert']['provider_data'];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -91,19 +95,49 @@ export async function action({ request }: ActionFunctionArgs) {
         smsProviderConfirmed: emailProviderChanged ? false : undefined,
       };
 
-      // Clear email_api_key when switching to SendGrid (uses env var)
-      if (newEmailProvider === 'sendgrid') {
+      // Handle provider-specific fields
+      if (newEmailProvider === 'klaviyo') {
+        const apiKey = formData.get('email_api_key') as string | null;
+        const fromEmail = formData.get('email_from_address') as string | null;
+        const fromName = formData.get('email_from_name') as string | null;
+        const listId = formData.get('email_list_id') as string | null;
+        
+        if (apiKey !== null) updateData.emailApiKey = apiKey || null;
+        if (fromEmail !== null) updateData.emailFromAddress = fromEmail || null;
+        if (fromName !== null) updateData.emailFromName = fromName || null;
+        if (listId !== null) updateData.emailListId = listId || null;
+      } else if (newEmailProvider === 'mailchimp') {
+        const providerDataStr = formData.get('provider_data') as string | null;
+        const fromEmail = formData.get('email_from_address') as string | null;
+        const fromName = formData.get('email_from_name') as string | null;
+        
+        if (providerDataStr) {
+          try {
+            updateData.providerData = JSON.parse(providerDataStr) as ProviderDataJson;
+          } catch (e) {
+            console.error('Error parsing provider_data:', e);
+          }
+        }
+        if (fromEmail !== null) updateData.emailFromAddress = fromEmail || null;
+        if (fromName !== null) updateData.emailFromName = fromName || null;
+      } else if (newEmailProvider === 'sendgrid') {
+        // Clear email_api_key when switching to SendGrid (uses env var)
         updateData.emailApiKey = null;
       }
       
       // Clear provider_data when switching away from Klaviyo or Mailchimp
       if (emailProviderChanged) {
         if (previousEmailProvider === 'klaviyo' || previousEmailProvider === 'mailchimp') {
-          updateData.providerData = {}; // provider_data is NOT NULL, use empty object
+          // Only clear if we're not updating it above
+          if (newEmailProvider !== 'klaviyo' && newEmailProvider !== 'mailchimp') {
+            updateData.providerData = {}; // provider_data is NOT NULL, use empty object
+          }
         }
         // Clear email_list_id when switching away from Mailchimp/Klaviyo
         if (previousEmailProvider === 'mailchimp' || previousEmailProvider === 'klaviyo') {
-          updateData.emailListId = null;
+          if (newEmailProvider !== 'mailchimp' && newEmailProvider !== 'klaviyo') {
+            updateData.emailListId = null;
+          }
         }
       }
 
@@ -232,35 +266,49 @@ export default function CommunicationSettings() {
   const [smsTestResponse, setSmsTestResponse] = useState(false);
   // const [smsTestResult, setSmsTestResult] = useState(actionData?.testType === 'sms' ? actionData : null);
   const [emailSettingsSaveResponse, setEmailSettingsSaveResponse] = useState(false);
+  const [providerSaveResponse, setProviderSaveResponse] = useState(false);
   
+  const navigation = useNavigation();
+  const isSubmittingProvider = navigation.state === 'submitting' && navigation.formData?.get('intent') === 'update_providers';
+  
+  // Provider API key fields (for Klaviyo and Mailchimp)
+  const providerData = (communicationConfig?.provider_data as Record<string, unknown> | null) ?? null;
+  const [klaviyoApiKey, setKlaviyoApiKey] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_api_key ?? '' : '');
+  const [klaviyoFromEmail, setKlaviyoFromEmail] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_from_address ?? '' : '');
+  const [klaviyoFromName, setKlaviyoFromName] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_from_name ?? '' : '');
+  const [klaviyoListId, setKlaviyoListId] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_list_id ?? '' : '');
+  
+  const [mailchimpAccessToken, setMailchimpAccessToken] = useState(
+    communicationConfig?.email_provider === 'mailchimp' ? (providerData?.marketingAccessToken as string ?? '') : ''
+  );
+  const [mailchimpFromEmail, setMailchimpFromEmail] = useState(communicationConfig?.email_provider === 'mailchimp' ? communicationConfig.email_from_address ?? '' : '');
+  const [mailchimpFromName, setMailchimpFromName] = useState(communicationConfig?.email_provider === 'mailchimp' ? communicationConfig.email_from_name ?? '' : '');
+  const [mailchimpAudienceName, setMailchimpAudienceName] = useState(
+    communicationConfig?.email_provider === 'mailchimp' ? (providerData?.audienceName as string ?? '') : ''
+  );
 
   // Sync state with loader data
   useEffect(() => {
     setEmailProvider(communicationConfig?.email_provider ?? null);
     setWarningDaysBefore(String(communicationConfig?.warning_days_before || 7));
     setSmsActivated(!!communicationConfig?.sms_provider);
+    
+    // Sync provider-specific fields
+    const config = communicationConfig;
+    const pd = (config?.provider_data as Record<string, unknown> | null) ?? null;
+    
+    if (config?.email_provider === 'klaviyo') {
+      setKlaviyoApiKey(config.email_api_key ?? '');
+      setKlaviyoFromEmail(config.email_from_address ?? '');
+      setKlaviyoFromName(config.email_from_name ?? '');
+      setKlaviyoListId(config.email_list_id ?? '');
+    } else if (config?.email_provider === 'mailchimp') {
+      setMailchimpAccessToken((pd?.marketingAccessToken as string) ?? '');
+      setMailchimpFromEmail(config.email_from_address ?? '');
+      setMailchimpFromName(config.email_from_name ?? '');
+      setMailchimpAudienceName((pd?.audienceName as string) ?? '');
+    }
   }, [communicationConfig]);
-
-  // Handle test results - close modal on success
-  useEffect(() => {
-    if (actionData?.success && actionData.testType === 'email') {
-      setShowTestEmailModal(false);
-      setTestEmail('');
-    }
-    if (actionData?.success && actionData.testType === 'sms') {
-      setShowTestSmsModal(false);
-      setTestPhone('');
-    }
-  }, [actionData]);
-
-  // Handle SMS activated checkbox change
-  const handleSmsActivatedChange = (checked: boolean) => {
-    setSmsActivated(checked);
-    const formData = new FormData();
-    formData.append('intent', 'update_sms_activated');
-    formData.append('sms_activated', checked.toString());
-    submit(formData, { method: 'post' });
-  };
 
   const emailChoices = [
     {
@@ -290,6 +338,37 @@ export default function CommunicationSettings() {
     (actionData.message?.includes('Email settings') || actionData.error?.includes('Email settings'))
     ? actionData 
     : null;
+  // Get provider save result
+  const providerSaveResult = actionData && 
+    !actionData.testType && 
+    (actionData.message?.includes('Provider settings') || actionData.error?.includes('Provider settings') || actionData.error?.includes('Email provider is required'))
+    ? actionData 
+    : null;
+
+  // Handle test results - close modal on success
+  useEffect(() => {
+    if (actionData?.success && actionData.testType === 'email') {
+      setShowTestEmailModal(false);
+      setTestEmail('');
+    }
+    if (actionData?.success && actionData.testType === 'sms') {
+      setShowTestSmsModal(false);
+      setTestPhone('');
+    }
+    // Reset provider save response when new action data arrives
+    if (providerSaveResult) {
+      setProviderSaveResponse(false);
+    }
+  }, [actionData, providerSaveResult]);
+
+  // Handle SMS activated checkbox change
+  const handleSmsActivatedChange = (checked: boolean) => {
+    setSmsActivated(checked);
+    const formData = new FormData();
+    formData.append('intent', 'update_sms_activated');
+    formData.append('sms_activated', checked.toString());
+    submit(formData, { method: 'post' });
+  };
 
   return (
     <Page 
@@ -334,11 +413,21 @@ export default function CommunicationSettings() {
             <Form method="post">
               <input type="hidden" name="intent" value="update_providers" />
               <BlockStack gap="400">
+                {/* Provider save result banner */}
+                {providerSaveResult && !providerSaveResponse && (
+                  <Banner
+                    tone={providerSaveResult.success ? 'success' : 'critical'}
+                    onDismiss={() => setProviderSaveResponse(true)}
+                  >
+                    {providerSaveResult.success ? providerSaveResult.message : providerSaveResult.error}
+                  </Banner>
+                )}
+                
                 <Text variant="headingMd" as="h3">
-                  Email Provider
+                  Communication Provider
                 </Text>
                 <Text variant="bodyMd" as="p" tone="subdued">
-                  Choose your preferred email provider for sending communications to members.
+                  Choose your preferred communication provider for sending emails to members.
                 </Text>
                 
                 <BlockStack gap="300">
@@ -362,9 +451,120 @@ export default function CommunicationSettings() {
 
                 <input type="hidden" name="email_provider" value={emailProvider || ''} />
 
+                {/* Klaviyo API Key Fields */}
+                {emailProvider === 'klaviyo' && (
+                  <BlockStack gap="300">
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                      Klaviyo Configuration
+                    </Text>
+                    <TextField
+                      label="Klaviyo API Key"
+                      type="password"
+                      value={klaviyoApiKey}
+                      onChange={setKlaviyoApiKey}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="Your Klaviyo private API key (starts with 'pk_')"
+                    />
+                    <input type="hidden" name="email_api_key" value={klaviyoApiKey} />
+                    
+                    <TextField
+                      label="From Email Address"
+                      type="email"
+                      value={klaviyoFromEmail}
+                      onChange={setKlaviyoFromEmail}
+                      autoComplete="email"
+                      requiredIndicator
+                      helpText="The email address members will see as the sender. Must be a verified sender in Klaviyo."
+                    />
+                    <input type="hidden" name="email_from_address" value={klaviyoFromEmail} />
+                    
+                    <TextField
+                      label="From Name"
+                      value={klaviyoFromName}
+                      onChange={setKlaviyoFromName}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="The name members will see as the sender (e.g., 'Napa Valley Wines')"
+                    />
+                    <input type="hidden" name="email_from_name" value={klaviyoFromName} />
+                    
+                    <TextField
+                      label="List ID (Optional)"
+                      value={klaviyoListId}
+                      onChange={setKlaviyoListId}
+                      autoComplete="off"
+                      helpText="Your Klaviyo list ID for segmentation (optional)"
+                    />
+                    <input type="hidden" name="email_list_id" value={klaviyoListId} />
+                  </BlockStack>
+                )}
+
+                {/* Mailchimp API Key Fields */}
+                {emailProvider === 'mailchimp' && (
+                  <BlockStack gap="300">
+                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                      Mailchimp Configuration
+                    </Text>
+                    <TextField
+                      label="Marketing Access Token or API Key"
+                      type="password"
+                      value={mailchimpAccessToken}
+                      onChange={setMailchimpAccessToken}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="OAuth access token or classic API key for Marketing API calls"
+                    />
+                    
+                    <TextField
+                      label="From Email Address"
+                      type="email"
+                      value={mailchimpFromEmail}
+                      onChange={setMailchimpFromEmail}
+                      autoComplete="email"
+                      requiredIndicator
+                      helpText="Must match a verified domain in Mailchimp"
+                    />
+                    <input type="hidden" name="email_from_address" value={mailchimpFromEmail} />
+                    
+                    <TextField
+                      label="From Name"
+                      value={mailchimpFromName}
+                      onChange={setMailchimpFromName}
+                      autoComplete="off"
+                      requiredIndicator
+                      helpText="Displayed sender name"
+                    />
+                    <input type="hidden" name="email_from_name" value={mailchimpFromName} />
+                    
+                    <TextField
+                      label="Audience Name (Optional)"
+                      value={mailchimpAudienceName}
+                      onChange={setMailchimpAudienceName}
+                      autoComplete="off"
+                      helpText="Used as the default audience when seeding resources. Leave blank to use 'LiberoVino Members'."
+                    />
+                    
+                    {/* Store Mailchimp data in provider_data */}
+                    <input type="hidden" name="provider_data" value={JSON.stringify({
+                      marketingAccessToken: mailchimpAccessToken,
+                      audienceName: mailchimpAudienceName || null,
+                      ...(mailchimpAccessToken ? (() => {
+                        const match = mailchimpAccessToken.match(/-([a-z]{2}\d+)$/i);
+                        return match ? { serverPrefix: match[1] } : {};
+                      })() : {}),
+                    })} />
+                  </BlockStack>
+                )}
+
                 <InlineStack gap="200">
-                  <Button submit variant="primary">
-                    Save Provider
+                  <Button 
+                    submit 
+                    variant="primary"
+                    loading={isSubmittingProvider}
+                    disabled={isSubmittingProvider}
+                  >
+                    {isSubmittingProvider ? 'Saving...' : 'Save Provider'}
                   </Button>
                 </InlineStack>
               </BlockStack>
@@ -454,21 +654,12 @@ export default function CommunicationSettings() {
                     </Form>
 
                     <InlineStack gap="200">
-                      {emailProvider === 'sendgrid' ? (
-                        <Button 
-                          url={addSessionToUrl('/app/settings/communication/email_templates', session.id)}
-                          variant="secondary"
-                        >
-                          Manage Templates
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="secondary"
-                          disabled
-                        >
-                          Download Templates
-                        </Button>
-                      )}
+                      <Button 
+                        url={addSessionToUrl('/app/settings/communication/templates', session.id)}
+                        variant="secondary"
+                      >
+                        Manage Templates
+                      </Button>
                       <Button onClick={() => setShowTestEmailModal(true)}>
                         Send Test
                       </Button>

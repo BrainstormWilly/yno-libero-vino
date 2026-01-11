@@ -552,6 +552,7 @@ export default function ProviderTemplates() {
                     maxWidth: '600px',
                     margin: '0 auto',
                     backgroundColor: '#ffffff',
+                    color: '#202124',
                     padding: '20px',
                   }}
                 />

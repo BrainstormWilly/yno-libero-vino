@@ -1601,17 +1601,17 @@ html[data-theme="dark"] .Polaris-ResourceItem__Container:focus {
 }
 
 /* Tabs - improve readability for unselected and hover states */
-html.dark .Polaris-Tabs,
+/* html.dark .Polaris-Tabs,
 html[data-theme="dark"] .Polaris-Tabs {
   color: rgb(255 255 255) !important;
-}
+} */
 
 /* Unselected tabs - make more readable but clearly different from active */
-html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active),
+/* html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active),
 html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) {
-  color: rgb(156 163 175) !important; /* gray-400 - subdued for unselected */
+  color: rgb(156 163 175) !important;
   opacity: 1 !important;
-}
+} */
 
 /* Footer button */
 .footer-button {
@@ -1637,38 +1637,53 @@ html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) {
 }
 
 /* Active/selected tab - make very clear with bright text and prominent indicator */
+html.dark .Polaris-Tabs__Tab, 
+html[data-theme="dark"]  .Polaris-Tabs__Tab {
+  color: rgb(156 163 175) !important;
+}
+
+html.dark .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active),
+html[data-theme="dark"] .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active) {
+  color: rgb(209 213 219) !important;
+  background-color: rgb(39 49 63) !important;
+}
+
 html.dark .Polaris-Tabs__Tab--active,
+html[data-theme="dark"] .Polaris-Tabs__Tab--active {
+  color: rgb(255 255 255) !important;
+}
+/* html.dark .Polaris-Tabs__Tab--active,
 html[data-theme="dark"] .Polaris-Tabs__Tab--active,
 html.dark .Polaris-Tabs__Tab[aria-selected="true"],
 html[data-theme="dark"] .Polaris-Tabs__Tab[aria-selected="true"] {
-  color: rgb(255 255 255) !important; /* white - maximum visibility */
-  border-bottom-color: rgb(99 102 241) !important; /* indigo-500 - visible indicator */
-  border-bottom-width: 2px !important; /* thicker border for visibility */
-  font-weight: 600 !important; /* semi-bold to stand out */
-}
+  color: rgb(255 255 255) !important;
+  border-bottom-color: rgb(99 102 241) !important;
+  border-bottom-width: 2px !important;
+  font-weight: 600 !important;
+} */
 
 /* Hover state on tabs - make more visible */
-html.dark .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active),
+/* html.dark .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active),
 html[data-theme="dark"] .Polaris-Tabs__Tab:hover:not(.Polaris-Tabs__Tab--active) {
-  color: rgb(209 213 219) !important; /* gray-300 - brighter on hover */
-  background-color: rgb(39 49 63) !important; /* gray-750 - subtle background on hover */
+  color: rgb(209 213 219) !important;
+  background-color: rgb(39 49 63) !important;
   opacity: 1 !important;
-}
+} */
 
 /* Tab content text - unselected */
-html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) .Polaris-Text,
+/* html.dark .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) .Polaris-Text,
 html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) .Polaris-Text {
-  color: rgb(156 163 175) !important; /* gray-400 - subdued */
-}
+  color: rgb(156 163 175) !important;
+} */
 
 /* Tab content text - active */
-html.dark .Polaris-Tabs__Tab--active .Polaris-Text,
+/* html.dark .Polaris-Tabs__Tab--active .Polaris-Text,
 html[data-theme="dark"] .Polaris-Tabs__Tab--active .Polaris-Text,
 html.dark .Polaris-Tabs__Tab[aria-selected="true"] .Polaris-Text,
 html[data-theme="dark"] .Polaris-Tabs__Tab[aria-selected="true"] .Polaris-Text {
-  color: rgb(255 255 255) !important; /* white - maximum visibility */
-  font-weight: 600 !important; /* semi-bold for active tab text */
-}
+  color: rgb(255 255 255) !important;
+  font-weight: 600 !important;
+} */
 
 /* Modal dark mode styles - CSS variable overrides */
 

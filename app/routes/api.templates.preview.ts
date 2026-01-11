@@ -7,8 +7,15 @@ import { type LoaderFunctionArgs } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import type { TemplateType } from '~/lib/communication/template-variables';
-import { loadBaseTemplate, renderSendGridTemplate, getSampleDataForPreview } from '~/lib/communication/templates.server';
-import { getDefaultHeaderImageUrl, getDefaultFooterImageUrl } from '~/lib/storage/sendgrid-images.server';
+import { 
+  loadBaseTemplate, 
+  renderSendGridTemplate, 
+  getSampleDataForPreview,
+  convertTemplateForKlaviyo,
+  convertTemplateForMailchimp,
+  renderTemplate
+} from '~/lib/communication/templates.server';
+import { getDefaultHeaderImageUrl, getDefaultFooterImageUrl, getPoweredByDarkImageUrl } from '~/lib/storage/sendgrid-images.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -24,6 +31,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const customContent = url.searchParams.get('customContent');
   const variation = url.searchParams.get('variation');
   const includeMarketing = url.searchParams.get('includeMarketing') === 'true';
+  const providerParam = url.searchParams.get('provider')?.toLowerCase();
 
   if (!templateType) {
     return new Response(JSON.stringify({ error: 'Missing templateType parameter' }), { 
@@ -32,7 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  // Get client and check if they use SendGrid
+  // Get client and communication config
   const client = await db.getClient(session.clientId);
   if (!client) {
     return new Response(JSON.stringify({ error: 'Client not found' }), { 
@@ -42,8 +50,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const config = await db.getCommunicationConfig(session.clientId);
-  if (config?.email_provider?.toLowerCase() !== 'sendgrid') {
-    return new Response(JSON.stringify({ error: 'Preview only available for LiberoVino managed clients' }), { 
+  const emailProvider = config?.email_provider?.toLowerCase() || providerParam;
+  
+  // Determine which provider to use for preview
+  // If provider param is provided, use it (for KV/MC previews)
+  // Otherwise, use the client's configured provider (for SendGrid)
+  const provider = providerParam || emailProvider;
+  
+  if (!provider || !['sendgrid', 'klaviyo', 'mailchimp'].includes(provider)) {
+    return new Response(JSON.stringify({ error: 'Invalid or missing provider' }), { 
       status: 400,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -117,17 +132,37 @@ export async function loader({ request }: LoaderFunctionArgs) {
     }
   }
 
-  // Render template with sample data
-  // Pass request URL and session ID to convert localhost image URLs to proxy URLs
-  const html = await renderSendGridTemplate(
-    template,
-    sampleData,
-    contentToUse || null,
-    headerUrl,
-    footerUrl,
-    request.url,
-    session.id
-  );
+  // Render template - use SendGrid renderer for all providers for preview
+  // (The actual templates in zip files have provider-specific syntax)
+  let html: string;
+  
+  if (provider === 'sendgrid') {
+    // SendGrid: Use client's images and custom content
+    html = await renderSendGridTemplate(
+      template,
+      sampleData,
+      contentToUse || null,
+      headerUrl,
+      footerUrl,
+      request.url,
+      session.id
+    );
+  } else {
+    // Klaviyo/Mailchimp: Use default images for preview
+    // (Clients will edit templates themselves, so we just show a visual preview)
+    const defaultHeaderUrl = await getDefaultHeaderImageUrl();
+    const defaultFooterUrl = await getPoweredByDarkImageUrl();
+    
+    html = await renderSendGridTemplate(
+      template,
+      sampleData,
+      null, // No custom content for KV/MC previews
+      defaultHeaderUrl, // Use default header for preview
+      defaultFooterUrl, // Use powered-by-dark footer
+      request.url,
+      session.id
+    );
+  }
 
   return { html };
 }

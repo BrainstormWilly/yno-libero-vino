@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Congratulations on Your Upgrade - *|CLIENT_NAME|*</title>
+  </head>
+  <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff;">
+    <!-- Header Banner with Vineyard Image or Client Name -->
+    *|IF:HEADER_IMAGE_URL|*
+    <div style="width: 100%; max-width: 600px; margin: 0 auto;"><img src="*|HEADER_IMAGE_URL|*" alt="*|CLIENT_NAME|*" style="max-width: 600px; width: 100%; height: auto; display: block;" /></div>
+    *|ELSE:|*
+    <div style="width: 100%; max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: center; background-color: #ffffff;"><h1 style="margin: 0; font-family: 'Brush Script MT', 'Lucida Handwriting', cursive; font-size: 48px; font-weight: normal; color: #202124;">*|CLIENT_NAME|*</h1></div>
+    *|END:IF|*
+
+    <!-- Congratulations Section (Grey Background) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f5f5f5;">
+      <h2 style="margin: 0 0 20px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Congratulations!</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Your *|CLIENT_NAME|* benefits have been upgraded</h3>
+    </div>
+
+    <!-- Discount Offer Box (Black Background with Gray Border) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000000; border: 1px solid #e0e0e0;">
+      <div style="height: 100%; width: 100%; border: 2px solid #808080; border-radius: 8px;">
+        <div style="padding: 40px 10px;">
+          <p style="margin: 0 0 10px 0; font-size: 18px; font-weight: bold; color: #ffffff; text-align: center; text-transform: uppercase;">You've unlocked</p>
+          <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">*|NEW_TIER_DISCOUNT_PERCENTAGE|*% off</p>
+          <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">the store until</p>
+          <p style="margin: 0; font-size: 32px; font-weight: bold; color: #ffffff; text-align: center;">*|EXPIRATION_FORMATTED|*</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body Text Section (White Background) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #202124;">Hi *|CUSTOMER_FIRST_NAME|*,</p>
+      
+      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #202124;">
+        We're excited to announce your purchases this month have upgraded your *|CLIENT_NAME|* benefits. You are now eligible for *|NEW_TIER_DISCOUNT_PERCENTAGE|*% off any purchase of our wine and merchandise for the next *|NEW_TIER_DURATION_MONTHS|* months.
+      </p>
+
+      <!-- Next Tier Upgrade Info (shown only if next tier is available) -->
+      *|IF:NEXT_TIER_UPGRADE_AMOUNT|*
+      *|IF:NEXT_TIER_DISCOUNT_PERCENTAGE|*
+      <div style="margin: 20px 0; padding: 16px; background-color: #f8f9fa; border-left: 4px solid #0066cc; border-radius: 4px;">
+        <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">
+          <strong style="color: #0066cc;">You can up your membership again:</strong> Get even deeper discounts by reaching the next purchase milestone. If you spend $*|NEXT_TIER_UPGRADE_AMOUNT|* in the next *|NEW_TIER_DURATION_MONTHS|* months you will be upgraded with *|NEXT_TIER_DISCOUNT_PERCENTAGE|*% discounts off future purchases for a full year, plus entry into our points program! This is our top tier. Don't let it get away!
+        </p>
+      </div>
+      *|END:IF|*
+      *|END:IF|*
+
+      <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #202124;">
+        The choice is yours. Our limited, no obligation program gives you the power to choose the bottles you love when you want them.
+      </p>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="*|SHOP_URL|*" style="display: inline-block; padding: 16px 40px; background-color: #0066cc; color: #ffffff; text-decoration: none; font-size: 18px; font-weight: bold; border-radius: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Shop Now!</a>
+      </div>
+    </div>
+
+    <!-- Footer (Powered by LiberoVino image) -->
+    <!-- Replace the URL below with your LiberoVino footer image URL or remove this section -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 0;">
+      <img src="https://zsidpduwjlwjizxekdob.supabase.co/storage/v1/object/public/sendgrid-email-images/powered-by-dark.png" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" />
+    </div>
+  </body>
+</html>

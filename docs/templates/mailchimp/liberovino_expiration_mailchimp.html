@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your *|CLIENT_NAME|* Benefits Have Expired</title>
+  </head>
+  <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #ffffff;">
+    <!-- Header Banner with Vineyard Image or Client Name -->
+    *|IF:HEADER_IMAGE_URL|*
+    <div style="width: 100%; max-width: 600px; margin: 0 auto;"><img src="*|HEADER_IMAGE_URL|*" alt="*|CLIENT_NAME|*" style="max-width: 600px; width: 100%; height: auto; display: block;" /></div>
+    *|ELSE:|*
+    <div style="width: 100%; max-width: 600px; margin: 0 auto; padding: 40px 20px; text-align: center; background-color: #ffffff;"><h1 style="margin: 0; font-family: 'Brush Script MT', 'Lucida Handwriting', cursive; font-size: 48px; font-weight: normal; color: #202124;">*|CLIENT_NAME|*</h1></div>
+    *|END:IF|*
+
+    <!-- Don't Panic Section (Grey Background) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #f5f5f5;">
+      <h2 style="margin: 0 0 20px 0; font-size: 32px; font-weight: bold; color: #202124; text-align: center;">Don't Panic!</h2>
+      <h3 style="margin: 0; font-size: 20px; font-weight: bold; color: #202124; text-align: center;">Your *|CLIENT_NAME|* benefits have expired, but you can still get back in!</h3>
+    </div>
+
+    <!-- Rejoin Offer Box (Black Background with White Border) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #000000; border: 1px solid #ffffff;">
+      <div style="height: 100%; width: 100%; border: 2px solid #ffffff; border-radius: 8px;">
+        <div style="padding: 40px 10px;">
+          <p style="margin: 0 0 10px 0; font-size: 18px; font-weight: bold; color: #ffffff; text-align: center;">Just spend</p>
+          <p style="margin: 0; font-size: 64px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">$*|REJOIN_AMOUNT|*</p>
+          <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">on the store to unlock</p>
+          <p style="margin: 0; font-size: 48px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">*|DISCOUNT_PERCENTAGE|*% off</p>
+          <p style="margin: 20px 0 10px 0; font-size: 16px; color: #ffffff; text-align: center;">future purchases for another</p>
+          <p style="margin: 0; font-size: 48px; font-weight: bold; color: #ffffff; text-align: center; line-height: 1.2;">*|DURATION_MONTHS|* months</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body Text Section (White Background) -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #202124;">Hi *|CUSTOMER_FIRST_NAME|*,</p>
+      
+      <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #202124;">
+        Time's up. Your benefits have expired. However, our benefit programs are always available to you. Your business is important to us. So, whenever you're ready, you can restart your benefits with a single purchase of $*|REJOIN_AMOUNT|*.
+      </p>
+
+      <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 1.6; color: #202124;">
+        The choice is yours. Our limited, no obligation program gives you the power to choose the bottles you love when you want them.
+      </p>
+
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="*|SHOP_URL|*" style="display: inline-block; padding: 16px 40px; background-color: #0066cc; color: #ffffff; text-decoration: none; font-size: 18px; font-weight: bold; border-radius: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">Shop Now!</a>
+      </div>
+    </div>
+
+    <!-- Footer (Powered by LiberoVino image) -->
+    <!-- Replace the URL below with your LiberoVino footer image URL or remove this section -->
+    <div style="max-width: 600px; margin: 0 auto; padding: 0;">
+      <img src="https://zsidpduwjlwjizxekdob.supabase.co/storage/v1/object/public/sendgrid-email-images/powered-by-dark.png" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" />
+    </div>
+  </body>
+</html>

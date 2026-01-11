@@ -27,6 +27,7 @@ export default [
     ]),
     route("settings/marketing", "routes/app.settings.marketing.tsx"),
     route("settings/communication", "routes/app.settings.communication.tsx"),
+    route("settings/communication/templates", "routes/app.settings.communication.templates.tsx"),
     route("setup", "routes/app.setup.tsx", [
       index("routes/app.setup._index.tsx"),
       route("tiers", "routes/app.setup.tiers.tsx"),
