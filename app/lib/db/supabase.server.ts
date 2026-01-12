@@ -10,6 +10,7 @@ import {
   normalizeCommunicationPreferences,
   type CommunicationPreferences,
 } from '~/lib/communication/preferences';
+import { toDateString } from '~/util/date.utils';
 
 const supabaseUrl = process.env.SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -1650,5 +1651,234 @@ export async function reorderShowcaseProducts(
       throw new Error(`Failed to reorder showcase product ${id}: ${error.message}`);
     }
   }
+}
+
+// ============================================
+// ENROLLMENT HISTORY OPERATIONS
+// ============================================
+
+export type EnrollmentHistoryRecord = {
+  id: string;
+  enrollment_id: string;
+  customer_id: string;
+  client_id: string;
+  change_type: 'upgrade' | 'downgrade' | 'extension' | 'status_change';
+  old_club_stage_id: string | null;
+  new_club_stage_id: string | null;
+  old_expires_at: string | null;
+  new_expires_at: string | null;
+  old_status: string | null;
+  new_status: string | null;
+  changed_at: string | null;
+  metadata: any;
+};
+
+/**
+ * Get enrollment history for a specific enrollment
+ */
+export async function getEnrollmentHistory(
+  enrollmentId: string,
+  dateRange?: { startDate?: string; endDate?: string }
+): Promise<EnrollmentHistoryRecord[]> {
+  const supabase = getSupabaseClient();
+  
+  let query = supabase
+    .from('enrollment_history')
+    .select('*')
+    .eq('enrollment_id', enrollmentId)
+    .order('changed_at', { ascending: false });
+  
+  if (dateRange?.startDate) {
+    query = query.gte('changed_at', dateRange.startDate);
+  }
+  if (dateRange?.endDate) {
+    query = query.lte('changed_at', dateRange.endDate);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    throw new Error(`Failed to get enrollment history: ${error.message}`);
+  }
+  
+  return data || [];
+}
+
+/**
+ * Get upgrade/extension history for a specific customer
+ */
+export async function getCustomerUpgradeHistory(
+  customerId: string,
+  dateRange?: { startDate?: string; endDate?: string }
+): Promise<EnrollmentHistoryRecord[]> {
+  const supabase = getSupabaseClient();
+  
+  let query = supabase
+    .from('enrollment_history')
+    .select('*')
+    .eq('customer_id', customerId)
+    .in('change_type', ['upgrade', 'extension'])
+    .order('changed_at', { ascending: false });
+  
+  if (dateRange?.startDate) {
+    query = query.gte('changed_at', dateRange.startDate);
+  }
+  if (dateRange?.endDate) {
+    query = query.lte('changed_at', dateRange.endDate);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    throw new Error(`Failed to get customer upgrade history: ${error.message}`);
+  }
+  
+  return data || [];
+}
+
+/**
+ * Get upgrade statistics for a client
+ */
+export async function getUpgradeStats(
+  clientId: string,
+  dateRange?: { startDate?: string; endDate?: string }
+): Promise<{
+  totalUpgrades: number;
+  uniqueCustomers: number;
+  upgradesByDate: Array<{ date: string; count: number }>;
+  upgradeFrequency: Array<{ frequency: number; customerCount: number }>;
+}> {
+  const supabase = getSupabaseClient();
+  
+  let query = supabase
+    .from('enrollment_history')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('change_type', 'upgrade');
+  
+  if (dateRange?.startDate) {
+    query = query.gte('changed_at', dateRange.startDate);
+  }
+  if (dateRange?.endDate) {
+    query = query.lte('changed_at', dateRange.endDate);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    throw new Error(`Failed to get upgrade stats: ${error.message}`);
+  }
+  
+  const upgrades = data || [];
+  const uniqueCustomers = new Set(upgrades.map(u => u.customer_id)).size;
+  
+  // Group by date (day)
+  const upgradesByDateMap = new Map<string, number>();
+  upgrades.forEach(upgrade => {
+    const date = toDateString(upgrade.changed_at);
+    if (date) {
+      upgradesByDateMap.set(date, (upgradesByDateMap.get(date) || 0) + 1);
+    }
+  });
+  const upgradesByDate = Array.from(upgradesByDateMap.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  // Count upgrades per customer
+  const customerUpgradeCounts = new Map<string, number>();
+  upgrades.forEach(upgrade => {
+    const count = customerUpgradeCounts.get(upgrade.customer_id) || 0;
+    customerUpgradeCounts.set(upgrade.customer_id, count + 1);
+  });
+  
+  // Group by frequency
+  const frequencyMap = new Map<number, number>();
+  customerUpgradeCounts.forEach(count => {
+    const frequency = count >= 3 ? 3 : count; // Group 3+ as "3+"
+    frequencyMap.set(frequency, (frequencyMap.get(frequency) || 0) + 1);
+  });
+  const upgradeFrequency = Array.from(frequencyMap.entries())
+    .map(([frequency, customerCount]) => ({ frequency, customerCount }))
+    .sort((a, b) => a.frequency - b.frequency);
+  
+  return {
+    totalUpgrades: upgrades.length,
+    uniqueCustomers,
+    upgradesByDate,
+    upgradeFrequency,
+  };
+}
+
+/**
+ * Get extension statistics for a client
+ */
+export async function getExtensionStats(
+  clientId: string,
+  dateRange?: { startDate?: string; endDate?: string }
+): Promise<{
+  totalExtensions: number;
+  uniqueCustomers: number;
+  extensionsByDate: Array<{ date: string; count: number }>;
+  extensionFrequency: Array<{ frequency: number; customerCount: number }>;
+}> {
+  const supabase = getSupabaseClient();
+  
+  let query = supabase
+    .from('enrollment_history')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('change_type', 'extension');
+  
+  if (dateRange?.startDate) {
+    query = query.gte('changed_at', dateRange.startDate);
+  }
+  if (dateRange?.endDate) {
+    query = query.lte('changed_at', dateRange.endDate);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    throw new Error(`Failed to get extension stats: ${error.message}`);
+  }
+  
+  const extensions = data || [];
+  const uniqueCustomers = new Set(extensions.map(e => e.customer_id)).size;
+  
+  // Group by date (day)
+  const extensionsByDateMap = new Map<string, number>();
+  extensions.forEach(extension => {
+    const date = toDateString(extension.changed_at);
+    if (date) {
+      extensionsByDateMap.set(date, (extensionsByDateMap.get(date) || 0) + 1);
+    }
+  });
+  const extensionsByDate = Array.from(extensionsByDateMap.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  // Count extensions per customer
+  const customerExtensionCounts = new Map<string, number>();
+  extensions.forEach(extension => {
+    const count = customerExtensionCounts.get(extension.customer_id) || 0;
+    customerExtensionCounts.set(extension.customer_id, count + 1);
+  });
+  
+  // Group by frequency
+  const frequencyMap = new Map<number, number>();
+  customerExtensionCounts.forEach(count => {
+    const frequency = count >= 3 ? 3 : count; // Group 3+ as "3+"
+    frequencyMap.set(frequency, (frequencyMap.get(frequency) || 0) + 1);
+  });
+  const extensionFrequency = Array.from(frequencyMap.entries())
+    .map(([frequency, customerCount]) => ({ frequency, customerCount }))
+    .sort((a, b) => a.frequency - b.frequency);
+  
+  return {
+    totalExtensions: extensions.length,
+    uniqueCustomers,
+    extensionsByDate,
+    extensionFrequency,
+  };
 }
 

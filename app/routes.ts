@@ -67,6 +67,7 @@ export default [
   route("api/templates/download/:templateType", "routes/api.templates.download.$templateType.ts"),
   route("api/upload-sendgrid-image", "routes/api.upload-sendgrid-image.ts"),
   route("api/images/proxy", "routes/api.images.proxy.ts"),
+  route("api/dashboard/charts", "routes/api.dashboard.charts.ts"),
   // API webhook routes (flat structure, matching api/cron pattern)
   route("api/webhooks", "routes/api.webhooks._index.tsx"), // UI page for webhook management
   route("api/webhooks/c7", "routes/api.webhooks.c7.tsx"),

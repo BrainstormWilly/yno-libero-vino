@@ -1319,6 +1319,19 @@ export class Commerce7Provider implements CrmProvider {
         return;
       }
 
+      // Get old stage order for comparison
+      const { data: oldStage } = await supabase
+        .from('club_stages')
+        .select('stage_order')
+        .eq('id', enrollment.club_stage_id)
+        .single();
+
+      // Capture old values for history tracking
+      const oldClubStageId = enrollment.club_stage_id;
+      const oldExpiresAt = enrollment.expires_at;
+      const oldStatus = enrollment.status;
+      const oldStageOrder = oldStage?.stage_order ?? null;
+
       // Map C7 status to LV status
       // Database allows: 'active', 'expired', 'upgraded', 'cancelled'
       type EnrollmentStatus = 'active' | 'expired' | 'upgraded' | 'cancelled';
@@ -1350,6 +1363,7 @@ export class Commerce7Provider implements CrmProvider {
       let clubStageId = enrollment.club_stage_id;
       let tierChanged = false;
       let movedToNonLVClub = false;
+      let newStageOrder: number | null = null;
 
       if (membershipData.clubId) {
         // Find club_stage by c7_club_id
@@ -1364,10 +1378,14 @@ export class Commerce7Provider implements CrmProvider {
           movedToNonLVClub = true;
           // Keep the old club_stage_id in enrollment for history, but mark as expired
           tierChanged = true;
-        } else if (newStage.id !== enrollment.club_stage_id) {
-          // Member moved to a different LV tier
-          clubStageId = newStage.id;
-          tierChanged = true;
+        } else {
+          // Get stage_order for comparison
+          newStageOrder = newStage.stage_order;
+          if (newStage.id !== enrollment.club_stage_id) {
+            // Member moved to a different LV tier
+            clubStageId = newStage.id;
+            tierChanged = true;
+          }
         }
       }
 
@@ -1393,6 +1411,109 @@ export class Commerce7Provider implements CrmProvider {
         .from('club_enrollments')
         .update(updateData)
         .eq('id', enrollment.id);
+
+      // Log changes to enrollment_history for ROI tracking
+      try {
+        const changes: Array<{
+          change_type: 'upgrade' | 'downgrade' | 'extension' | 'status_change';
+          old_club_stage_id?: string;
+          new_club_stage_id?: string;
+          old_expires_at?: string;
+          new_expires_at?: string;
+          old_status?: string;
+          new_status?: string;
+        }> = [];
+
+        // Check for tier change (upgrade or downgrade)
+        if (tierChanged && !movedToNonLVClub && oldClubStageId !== clubStageId) {
+          if (oldStageOrder !== null && newStageOrder !== null) {
+            if (newStageOrder > oldStageOrder) {
+              changes.push({
+                change_type: 'upgrade',
+                old_club_stage_id: oldClubStageId,
+                new_club_stage_id: clubStageId,
+                old_expires_at: oldExpiresAt,
+                new_expires_at: updateData.expires_at || oldExpiresAt,
+                old_status: oldStatus,
+                new_status: updateData.status,
+              });
+            } else if (newStageOrder < oldStageOrder) {
+              changes.push({
+                change_type: 'downgrade',
+                old_club_stage_id: oldClubStageId,
+                new_club_stage_id: clubStageId,
+                old_expires_at: oldExpiresAt,
+                new_expires_at: updateData.expires_at || oldExpiresAt,
+                old_status: oldStatus,
+                new_status: updateData.status,
+              });
+            }
+          }
+        }
+
+        // Check for extension (expires_at increased)
+        if (updateData.expires_at && oldExpiresAt && updateData.expires_at !== oldExpiresAt) {
+          const oldExpires = new Date(oldExpiresAt);
+          const newExpires = new Date(updateData.expires_at);
+          if (newExpires > oldExpires) {
+            // Only log extension if not already logged as upgrade/downgrade
+            const hasTierChange = changes.some(c => c.change_type === 'upgrade' || c.change_type === 'downgrade');
+            if (!hasTierChange) {
+              changes.push({
+                change_type: 'extension',
+                old_club_stage_id: oldClubStageId,
+                new_club_stage_id: clubStageId,
+                old_expires_at: oldExpiresAt,
+                new_expires_at: updateData.expires_at,
+                old_status: oldStatus,
+                new_status: updateData.status,
+              });
+            } else {
+              // Update existing change record with extension info
+              const tierChange = changes[0];
+              tierChange.new_expires_at = updateData.expires_at;
+            }
+          }
+        }
+
+        // Check for status change (if no other changes logged)
+        if (changes.length === 0 && oldStatus !== updateData.status) {
+          changes.push({
+            change_type: 'status_change',
+            old_club_stage_id: oldClubStageId,
+            new_club_stage_id: clubStageId,
+            old_expires_at: oldExpiresAt,
+            new_expires_at: updateData.expires_at || oldExpiresAt,
+            old_status: oldStatus,
+            new_status: updateData.status,
+          });
+        }
+
+        // Insert history records for each change
+        for (const change of changes) {
+          await supabase
+            .from('enrollment_history')
+            .insert({
+              enrollment_id: enrollment.id,
+              customer_id: enrollment.customer_id,
+              client_id: clientId,
+              change_type: change.change_type,
+              old_club_stage_id: change.old_club_stage_id,
+              new_club_stage_id: change.new_club_stage_id,
+              old_expires_at: change.old_expires_at,
+              new_expires_at: change.new_expires_at,
+              old_status: change.old_status,
+              new_status: change.new_status,
+              metadata: {
+                c7_membership_id: c7MembershipId,
+                source: 'webhook',
+              },
+            });
+        }
+      } catch (historyError) {
+        // Log error but don't fail webhook processing
+        console.error(`Failed to log enrollment history for membership ${c7MembershipId}:`, historyError);
+      }
 
       // Handle customer flags and notifications based on tier change type
       if (tierChanged) {

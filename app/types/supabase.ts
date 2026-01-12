@@ -945,6 +945,104 @@ export type Database = {
         }
         Relationships: []
       }
+      enrollment_history: {
+        Row: {
+          change_type: Database["public"]["Enums"]["enrollment_change_type"]
+          changed_at: string | null
+          client_id: string
+          customer_id: string
+          enrollment_id: string
+          id: string
+          metadata: Json | null
+          new_club_stage_id: string | null
+          new_expires_at: string | null
+          new_status: string | null
+          old_club_stage_id: string | null
+          old_expires_at: string | null
+          old_status: string | null
+        }
+        Insert: {
+          change_type: Database["public"]["Enums"]["enrollment_change_type"]
+          changed_at?: string | null
+          client_id: string
+          customer_id: string
+          enrollment_id: string
+          id?: string
+          metadata?: Json | null
+          new_club_stage_id?: string | null
+          new_expires_at?: string | null
+          new_status?: string | null
+          old_club_stage_id?: string | null
+          old_expires_at?: string | null
+          old_status?: string | null
+        }
+        Update: {
+          change_type?: Database["public"]["Enums"]["enrollment_change_type"]
+          changed_at?: string | null
+          client_id?: string
+          customer_id?: string
+          enrollment_id?: string
+          id?: string
+          metadata?: Json | null
+          new_club_stage_id?: string | null
+          new_expires_at?: string | null
+          new_status?: string | null
+          old_club_stage_id?: string | null
+          old_expires_at?: string | null
+          old_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollment_history_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_history_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "enrollment_history_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_history_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "club_enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_history_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: false
+            referencedRelation: "customer_enrollment_summary"
+            referencedColumns: ["enrollment_id"]
+          },
+          {
+            foreignKeyName: "enrollment_history_new_club_stage_id_fkey"
+            columns: ["new_club_stage_id"]
+            isOneToOne: false
+            referencedRelation: "club_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollment_history_old_club_stage_id_fkey"
+            columns: ["old_club_stage_id"]
+            isOneToOne: false
+            referencedRelation: "club_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expiration_warning_queue: {
         Row: {
           attempts: number | null
@@ -1743,7 +1841,11 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      enrollment_change_type:
+        | "upgrade"
+        | "downgrade"
+        | "extension"
+        | "status_change"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1873,7 +1975,14 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      enrollment_change_type: [
+        "upgrade",
+        "downgrade",
+        "extension",
+        "status_change",
+      ],
+    },
   },
 } as const
 
