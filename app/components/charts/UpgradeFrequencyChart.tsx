@@ -34,6 +34,15 @@ const UpgradeFrequencyChart: FC<UpgradeFrequencyChartProps> = ({
           <Tooltip 
             formatter={(value: number) => [value, 'Customers']}
             labelFormatter={(label) => `Upgrades: ${label}`}
+            contentStyle={{
+              backgroundColor: 'var(--p-color-bg-surface-secondary, #1f1f1f)',
+              border: '1px solid var(--p-color-border-secondary, #3f3f3f)',
+              borderRadius: '4px',
+              color: 'var(--p-color-text, #ffffff)',
+            }}
+            labelStyle={{
+              color: 'var(--p-color-text, #ffffff)',
+            }}
           />
           <Legend />
           <Bar 

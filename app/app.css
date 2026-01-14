@@ -1699,3 +1699,80 @@ html[data-theme="dark"] .Polaris-Modal__Backdrop {
   background-color: rgba(0, 0, 0, 0.5) !important; /* semi-transparent overlay - allows background to show through */
 }
 
+/* Dark mode tooltip styling for Recharts */
+
+html.dark .recharts-default-tooltip,
+html[data-theme="dark"] .recharts-default-tooltip {
+  background-color: #1f1f1f !important;
+  border: 1px solid #3f3f3f !important;
+  color: #ffffff !important;
+}
+
+/* 
+html.dark .Polaris-DatePicker .Polaris-Text--regular {
+  color: rgb(156 163 175) !important;
+}
+
+html.dark .Polaris-DatePicker__Title {
+  color: rgb(255 255 255) !important;
+} */
+
+/* Ensure month names are visible in DatePicker with multiMonth */
+/* Polaris DatePicker with multiMonth should show month names in each month header */
+/* .Polaris-DatePicker__MonthLayout {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+} */
+
+/* Target month headers - Polaris uses different structures */
+/* .Polaris-DatePicker__MonthLayout > div > div:first-child,
+.Polaris-DatePicker__MonthLayout > div > header,
+.Polaris-DatePicker__MonthLayout > div > div[class*="Header"],
+.Polaris-DatePicker__MonthLayout > div > button[class*="Header"] {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+} */
+
+/* Ensure all text in month headers is visible */
+/* .Polaris-DatePicker__MonthLayout button,
+.Polaris-DatePicker__MonthLayout span,
+.Polaris-DatePicker__MonthLayout div[class*="Title"],
+.Polaris-DatePicker__MonthLayout div[class*="Month"] {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+} */
+
+/* Light mode - ensure month names have proper color */
+/* .Polaris-DatePicker__MonthLayout button:not([aria-label*="Previous"]):not([aria-label*="Next"]),
+.Polaris-DatePicker__MonthLayout span:not([class*="Day"]),
+.Polaris-DatePicker__MonthLayout div[class*="Title"] {
+  color: var(--p-color-text, #202223) !important;
+} */
+
+/* Dark mode - ensure month names are white */
+/* html.dark .Polaris-DatePicker__MonthLayout button:not([aria-label*="Previous"]):not([aria-label*="Next"]),
+html[data-theme="dark"] .Polaris-DatePicker__MonthLayout button:not([aria-label*="Previous"]):not([aria-label*="Next"]),
+html.dark .Polaris-DatePicker__MonthLayout span:not([class*="Day"]),
+html[data-theme="dark"] .Polaris-DatePicker__MonthLayout span:not([class*="Day"]),
+html.dark .Polaris-DatePicker__MonthLayout div[class*="Title"],
+html[data-theme="dark"] .Polaris-DatePicker__MonthLayout div[class*="Title"] {
+  color: rgb(255 255 255) !important;
+} */
+
+html.dark .Polaris-DatePicker .Polaris-DatePicker__MonthLayout .Polaris-DatePicker__Day--inRange {
+  background: rgb(51, 60, 76) !important;
+}
+
+html.dark .Polaris-DatePicker .Polaris-DatePicker__MonthLayout .Polaris-DatePicker__Day--lastInRange {
+  background: rgb(78, 90, 108) !important;
+}
+
+html.dark .Polaris-DatePicker .Polaris-DatePicker__MonthLayout .Polaris-DatePicker__Day--firstInRange {
+  background: rgb(78, 90, 108) !important;
+}
+
+html.dark .Polaris-DatePicker .Polaris-DatePicker__MonthLayout button:hover {
+  background: rgb(78, 90, 108) !important;
+}

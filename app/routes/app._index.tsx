@@ -30,6 +30,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Fetch tier count and member count
   let tierCount = 0;
   let memberCount = 0;
+  let totalCustomers = 0;
+  let totalLoyaltyPoints = 0;
   
   // Setup completion status
   let clubsTiersComplete = false;
@@ -40,6 +42,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let clubProgram: Awaited<ReturnType<typeof getClubProgram>> = null;
   
   if (client) {
+    const supabase = getSupabaseClient();
+    
+    // Get total customers count
+    const { count: customersCount } = await supabase
+      .from('customers')
+      .select('*', { count: 'exact', head: true })
+      .eq('client_id', client.id);
+    totalCustomers = customersCount || 0;
+    
+    // Get total loyalty points (sum of lifetime points)
+    const { data: loyaltyData } = await supabase
+      .from('customers')
+      .select('loyalty_points_lifetime')
+      .eq('client_id', client.id);
+    totalLoyaltyPoints = loyaltyData?.reduce((sum, customer) => sum + (customer.loyalty_points_lifetime || 0), 0) || 0;
+    
     // Get club program to count tiers
     clubProgram = await getClubProgram(client.id);
     if (clubProgram && clubProgram.club_stages) {
@@ -47,7 +65,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       
       // Get member count (active enrollments)
       if (tierCount > 0) {
-        const supabase = getSupabaseClient();
         const stageIds = clubProgram.club_stages.map(stage => stage.id);
         
         const { count } = await supabase
@@ -100,6 +117,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     session,
     tierCount,
     memberCount,
+    totalCustomers,
+    totalLoyaltyPoints,
     setupComplete: client?.setup_complete || false,
     completionStatus: {
       clubsTiers: clubsTiersComplete,
@@ -113,7 +132,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export default function AppDashboard() {
-  const { client, session, tierCount, memberCount, setupComplete, completionStatus, communicationProvider, hasLoyaltyPoints } = useLoaderData<typeof loader>();
+  const { client, session, tierCount, memberCount, totalCustomers, totalLoyaltyPoints, setupComplete, completionStatus, communicationProvider, hasLoyaltyPoints } = useLoaderData<typeof loader>();
   const location = useLocation();
   const navigate = useNavigate();
   const crmType = session?.crmType || 'commerce7';
@@ -219,7 +238,6 @@ export default function AppDashboard() {
   return (
     <Page 
       title="Dashboard" 
-      narrowWidth
       primaryAction={{
         content: 'Add Member',
         onAction: () => navigate(addSessionToUrl('/app/members/new', session?.id || '')),
@@ -293,7 +311,7 @@ export default function AppDashboard() {
                       Club Members
                     </Text>
                     <Text variant="heading2xl" as="p">
-                      0
+                      {memberCount}
                     </Text>
                     <Text variant="bodySm" tone="subdued" as="p">
                       Active memberships
@@ -307,7 +325,7 @@ export default function AppDashboard() {
                       Loyalty Points
                     </Text>
                     <Text variant="heading2xl" as="p">
-                      0
+                      {totalLoyaltyPoints.toLocaleString()}
                     </Text>
                     <Text variant="bodySm" tone="subdued" as="p">
                       Total points earned
@@ -321,7 +339,7 @@ export default function AppDashboard() {
                       Total Customers
                     </Text>
                     <Text variant="heading2xl" as="p">
-                      0
+                      {totalCustomers}
                     </Text>
                     <Text variant="bodySm" tone="subdued" as="p">
                       In your database

@@ -1,5 +1,6 @@
 import { type FC, useState, useCallback } from 'react';
-import { Select, BlockStack, Text, DatePicker, Popover, Button } from '@shopify/polaris';
+import { Select, BlockStack, Text, DatePicker, type Range} from '@shopify/polaris';
+// import { CalendarIcon } from '@shopify/polaris-icons';
 
 export type DateRangeOption = {
   label: string;
@@ -59,8 +60,8 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
   options = DEFAULT_OPTIONS
 }) => {
   const selectedOption = options.find(opt => opt.value === value) || options[1];
-  const [popoverActive, setPopoverActive] = useState(false);
-  const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
+  // const [popoverActive, setPopoverActive] = useState(false);
+  const [dateRange, setDateRange] = useState<Range>({
     start: selectedOption.startDate,
     end: selectedOption.endDate,
   });
@@ -79,7 +80,7 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
         endDate: dateRange.end,
       };
       onChange('custom', customOption);
-      setPopoverActive(true);
+      // setPopoverActive(true);
     } else {
       const option = options.find(opt => opt.value === selectedValue);
       if (option) {
@@ -96,7 +97,7 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
     }
   };
 
-  const handleDatePickerChange = useCallback((range: { start: Date; end: Date }) => {
+  const handleDatePickerChange = useCallback((range: Range) => {
     setDateRange(range);
     const customOption: DateRangeOption = {
       label: 'Custom',
@@ -112,15 +113,15 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
     []
   );
 
-  const togglePopoverActive = useCallback(
-    () => setPopoverActive((popoverActive) => !popoverActive),
-    []
-  );
+  // const togglePopoverActive = useCallback(
+  //   () => setPopoverActive((popoverActive) => !popoverActive),
+  //   []
+  // );
 
   const isCustom = value === 'custom';
-  const dateDisplay = isCustom
-    ? `${dateRange.start.toLocaleDateString()} - ${dateRange.end.toLocaleDateString()}`
-    : selectedOption.label;
+  // const dateDisplay = isCustom
+  //   ? `${dateRange.start.toLocaleDateString()} - ${dateRange.end.toLocaleDateString()}`
+  //   : selectedOption.label;
 
   return (
     <BlockStack gap="300">
@@ -135,15 +136,8 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
         onChange={handleSelectChange}
       />
       {isCustom && (
-        <Popover
-          active={popoverActive}
-          activator={
-            <Button onClick={togglePopoverActive} disclosure>
-              {dateDisplay}
-            </Button>
-          }
-          onClose={togglePopoverActive}
-        >
+        <fieldset style={{border: "none"}}>
+          <legend className="srOnly">Date Range Selection</legend>
           <DatePicker
             month={month}
             year={year}
@@ -153,7 +147,7 @@ const DateRangePicker: FC<DateRangePickerProps> = ({
             allowRange
             multiMonth
           />
-        </Popover>
+        </fieldset>
       )}
     </BlockStack>
   );
