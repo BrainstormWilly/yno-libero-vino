@@ -1,164 +1,125 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Link } from 'react-router';
-import { 
-  Page, 
-  Layout, 
-  Card, 
-  Button, 
-  Text, 
-  BlockStack,
-  InlineStack,
-  Banner,
-  Icon
-} from '@shopify/polaris';
-import { StoreIcon, ChartDonutIcon } from '@shopify/polaris-icons';
-import { getSubdomainInfo, getCrmUrl } from '~/util/subdomain';
+import type { MetaFunction } from "react-router";
+import { Button } from "@heroui/button";
+import { Avatar } from "@heroui/avatar";
+import { Link } from "@heroui/link";
+import {
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+} from "@heroui/dropdown";
+import SplashHeader from "~/components/splash/SplashHeader";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const subdomainInfo = getSubdomainInfo(request);
-  
-  // Create metadata for display purposes (not full provider instances)
-  const providerMetadata = [
-    { slug: 'shopify', name: 'Shopify' },
-    { slug: 'commerce7', name: 'Commerce7' }
-  ];
-  
-  // If we're on a CRM-specific subdomain, show only that CRM's content
-  if (subdomainInfo.isValid && subdomainInfo.crmType) {
-    const provider = providerMetadata.find(p => 
-      subdomainInfo.crmType === 'shopify' ? p.slug === 'shopify' : p.slug === 'commerce7'
-    );
-    return { 
-      providers: provider ? [provider] : providerMetadata,
-      subdomainInfo,
-      isSingleCrm: true
-    };
-  }
-  
-  // Otherwise show all providers (for www or no subdomain)
-  return { 
-    providers: providerMetadata,
-    subdomainInfo,
-    isSingleCrm: false
-  };
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-  // Handle POST requests gracefully - likely bots/scanners probing the site
-  if (request.method === "POST") {
-    return new Response("Method Not Allowed", { 
-      status: 405,
-      headers: { "Allow": "GET" }
-    });
-  }
-  return null;
-}
+export const meta: MetaFunction = () => [
+  { title: "Yno LiberoVino" },
+  {
+    name: "description",
+    content: "A wine club and loyalty platform for Commerce7.",
+  },
+];
 
 export default function Index() {
-  const { providers, subdomainInfo, isSingleCrm } = useLoaderData<typeof loader>();
-
-  // Determine the background gradient based on subdomain
-  const getBackgroundClass = () => {
-    if (subdomainInfo.crmType === 'shopify') {
-      return 'from-green-50 to-emerald-100';
-    } else if (subdomainInfo.crmType === 'commerce7') {
-      return 'from-purple-50 to-violet-100';
-    }
-    return 'from-blue-50 to-indigo-100';
-  };
-
-  // Get the title based on subdomain
-  const getTitle = () => {
-    if (isSingleCrm && providers.length > 0) {
-      return `Yno Libero Vino - ${providers[0].name}`;
-    }
-    return 'Yno Libero Vino';
-  };
-
-  // Get the description based on subdomain
-  const getDescription = () => {
-    if (isSingleCrm && providers.length > 0) {
-      return `Manage your ${providers[0].name} wine club and loyalty programs. Built with React Router v7, Supabase, and deployed on Heroku.`;
-    }
-    return 'A wine club and loyalty platform for Commerce7 and Shopify. Built with React Router v7, Supabase, and deployed on Heroku.';
-  };
-
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${getBackgroundClass()}`}>
-      <Page title={getTitle()} fullWidth>
-        <div className="container mx-auto px-4 py-16">
-          {/* Hero Section */}
-          <div className="text-center mb-12">
-            <Text variant="headingXl" as="h1" alignment="center">
-              {getTitle()}
-            </Text>
-            <div className="mt-4 max-w-2xl mx-auto">
-              <Text variant="headingMd" as="p" alignment="center" tone="subdued">
-                {getDescription()}
-              </Text>
+    <div className="fixed top-0 bottom-0 left-0 right-0 bg-[#050405]">
+      <SplashHeader variant="dark" />
+      <div className="absolute inset-x-0 left-0 right-0 h-px top-24 bg-[#8E8E93] z-100" />
+      <main className="absolute inset-x-0 bottom-0 overflow-y-auto top-24">
+        <section className="relative w-full h-100">
+          <img
+            src="/media/cork-star.jpg"
+            alt="Cork star"
+            className="absolute left-0 top-0 h-full object-cover"
+          />
+          <div className="absolute right-0 top-0 flex flex-col items-end mt-10 mr-10">
+            <img
+              src="/media/join-the-evolution.png"
+              alt="Join the evolution"
+              width={600}
+            />
+            <div className="flex gap-4 mt-10 mr-6">
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button color="primary">Install Now</Button>
+                </DropdownTrigger>
+                <DropdownMenu disabledKeys={["shopify"]}>
+                  <DropdownItem key="commerce7" onPress={() => {}}>Commerce7</DropdownItem>
+                  <DropdownItem key="shopify" onPress={() => {}}>Shopify (comming soon)</DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+              <Button color="secondary" onPress={() => {}}>Learn More</Button>
             </div>
-            {isSingleCrm && (
-              <div className="mt-4">
-                <Banner tone="info">
-                  You are on the {providers[0].name}-specific subdomain ({subdomainInfo.subdomain}.yourdomain.com)
-                </Banner>
+          </div>
+        </section>
+        <div className="inset-x-0 bottom-0 h-px bg-[#8E8E93]" />
+      <section className="relative w-full overflow-hidden">
+        <img
+          src="/media/boxes.jpg"
+          alt="Wine boxes"
+          className="absolute inset-0 h-full w-full object-cover object-right"
+        />
+        <div className="relative z-10 w-full bg-gradient-to-r from-[#050405] lg:from-40% to-transparent to-100% p-6 md:p-10">
+          <div className="flex flex-col items-center gap-10 lg:flex-row lg:items-start">
+            <div className="
+              relative max-w-130 h-full bg-[#050405]/50 lg:bg-white/20 
+              pt-25 px-5 pb-10 rounded-lg border-1 border-[#4e4e4f] lg:border-none
+            " >
+              <img src="/media/what-is.png" alt="What is LiberoVino?" width={400} className="absolute top-[-30px] right-[-20px]" />
+              <div className="text-white text-3xl font-bold font-serif">&ldquo;Liberate Wine&rdquo;</div>
+              <div className="text-white text-lg font-bold font-serif pl-4">a customer-driven benefits program for the <br/>direct-to-consumer wine industry</div>
+              <div className="text-white text-lg font-serif pl-4 mt-4">
+                LiberoVino empowers your winery to ditch forced shipments for true consumer flexibility. 
+                Our self-adjusting tier system automates allocation, loyalty and discounts based on real-time spending—liberating your customers to buy what they want, 
+                when they want, while maximizing your brand&apos;s retention.
               </div>
-            )}
-          </div>
-
-          {/* CRM Provider Cards */}
-          <div className={`grid ${isSingleCrm ? 'md:grid-cols-1 max-w-md' : 'md:grid-cols-2 max-w-4xl'} gap-8 mx-auto mb-12`}>
-            {providers.map((provider: any) => (
-              <Card key={provider.slug}>
-                <BlockStack gap="400" align="center">
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                    <Icon source={provider.slug === 'shopify' ? StoreIcon : ChartDonutIcon} />
-                  </div>
-                  <BlockStack gap="200" align="center">
-                    <Text variant="headingMd" as="h2">
-                      {provider.name}
-                    </Text>
-                    <Text variant="bodyMd" tone="subdued" alignment="center" as="p">
-                      Connect and manage your {provider.name} wine club and loyalty programs.
-                    </Text>
-                  </BlockStack>
-                  <Link to={provider.slug === 'shopify' ? '/shp/auth' : '/app'}>
-                    <Button variant="primary" size="large">
-                      Connect {provider.name}
-                    </Button>
-                  </Link>
-                </BlockStack>
-              </Card>
-            ))}
-          </div>
-
-          {/* Features Section */}
-          <div className="max-w-2xl mx-auto">
-            <Card>
-              <BlockStack gap="400">
-                <Text variant="headingMd" as="h3" alignment="center">
-                  Features
-                </Text>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {[
-                    'Unified Customer Management',
-                    'Product Synchronization', 
-                    'Order Tracking',
-                    'Discount Management',
-                    'Real-time Analytics',
-                    'Multi-CRM Support'
-                  ].map((feature) => (
-                    <div key={feature} className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <Text variant="bodyMd" as="span">{feature}</Text>
-                    </div>
-                  ))}
+            </div>
+            <div className="
+              relative max-w-130 h-full bg-[#050405]/50 
+              pt-25 px-5 pb-10 rounded-lg border-1 border-[#4e4e4f] 
+            " >
+              <div className="absolute top-5 right-5 flex items-center gap-4">
+                <Avatar size="lg" src="/media/ynoguy.jpg" />
+                <div className="flex flex-col">
+                  <div className="text-white text-lg font-bold">Bill Langley</div>
+                  <div className="text-white text-sm opacity-80">Founder, Engineer</div>
+                  <div className="text-white text-sm opacity-80">WSET Advanced, CSW</div>
                 </div>
-              </BlockStack>
-            </Card>
+              </div>
+              <div className="text-white text-3xl font-bold font-serif">&ldquo;YnoGuy&rdquo;</div>
+              <div className="text-white text-lg font-serif pl-4 mt-4">
+                LiberoVino is a solution built from experience. Combining years of software engineering with DtC wine sales, 
+                I&apos;ve seen firsthand how forced shipping kills loyalty. I built this platform to liberate wineries from rigid club tiers and provide a flexible, 
+                automated experience that consumers actually want. 
+              </div>
+            </div>
           </div>
         </div>
-      </Page>
+      </section>
+        <div className="inset-x-0 bottom-0 h-px bg-[#8E8E93]" />
+        <section className="
+          relative h-56 md:h-24 w-full 
+          flex flex-col lg:flex-row justify-between items-center gap-10 lg:gap-0
+          text-white px-6 py-6
+        ">
+          <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-10">
+            <div className="flex items-center gap-4 font-display">
+              <div className="text-lg">BUILT BY:</div>
+              <a href="https://ynosoftware.com" target="_blank" rel="noreferrer"><img src="/media/yno-software-logo-dark.png" alt="YnoSoftware" width={150} /></a>
+            </div>
+            <div className="flex items-center gap-2 font-display">
+              <div className="text-lg">BUILT ON:</div>
+              <a href="https://commerce7.com" target="_blank" rel="noreferrer"><img src="/media/c7_white.png" alt="Commerce7" width={150} /></a>
+              <a href="https://shopify.com" target="_blank" rel="noreferrer"><img src="/media/shopify_logo_white.png" alt="Shopify" width={100} /></a>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pb-10 lg:pb-0">
+            <div>© Yno Software 2026</div>
+            <div>|</div>
+            <Link target="_blank" rel="noreferrer" href="https://ynosoftware.com/privacy">Privacy</Link>
+            <div>|</div>
+            <Link target="_blank" rel="noreferrer" href="https://ynosoftware.com/terms">Terms</Link>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }

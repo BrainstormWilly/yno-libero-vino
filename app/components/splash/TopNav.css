@@ -1,0 +1,38 @@
+nav {
+  position: fixed;
+  left: 0; 
+  right: 0; 
+  top: 0; 
+  height: 6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 1rem;
+  padding-right: 2rem;
+  background-color: white;
+  z-index: 1;
+
+  actions {
+    display: flex;
+    gap: 1rem;
+  }
+
+  img {
+    height: 70px;
+  }
+}
+
+
+
+@media screen and (max-width: 600px) {
+  nav {
+    flex-direction: column;
+    justify-content: center;
+    height: 9rem;
+
+    actions {
+      flex-direction: column;
+      margin-top: 0.5rem;
+    }
+  }
+} 

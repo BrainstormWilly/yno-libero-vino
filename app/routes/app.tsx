@@ -223,7 +223,7 @@ export default function AppLayout() {
         >
           <img 
             key={theme}
-            src={theme === 'dark' ? '/powered-by-dark.png' : '/powered-by-light.png'} 
+            src={theme === 'dark' ? '/media/powered-by-dark.png' : '/media/powered-by-light.png'} 
             alt="Powered by LiberoVino" 
           />
         </a>

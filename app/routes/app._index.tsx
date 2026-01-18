@@ -1,15 +1,13 @@
-import { type LoaderFunctionArgs, redirect } from 'react-router';
+import { type LoaderFunctionArgs } from 'react-router';
 import { useLoaderData, useLocation, useNavigate } from 'react-router';
 import { useState, useEffect } from 'react';
 import { 
   Page, 
   Layout, 
   Card, 
-  Button, 
   Text, 
   BlockStack,
   Banner,
-  InlineStack,
   Link,
   List
 } from '@shopify/polaris';
@@ -232,8 +230,8 @@ export default function AppDashboard() {
 
   const theme = session?.theme || 'light';
   const logoSrc = theme === 'dark' 
-    ? '/yno-lv-logo-dark.png' 
-    : '/yno-lv-logo-light.png';
+    ? '/media/yno-lv-logo-dark.png' 
+    : '/media/yno-lv-logo-light.png';
 
   return (
     <Page 

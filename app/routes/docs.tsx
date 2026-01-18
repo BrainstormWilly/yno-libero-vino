@@ -1,5 +1,10 @@
 import { Outlet } from 'react-router';
+import MarketingLayout from '~/components/splash/MarketingLayout';
 
 export default function Docs() {
-  return <Outlet />;
-}
+  return (
+    <MarketingLayout>
+      <Outlet />
+    </MarketingLayout>
+  );
+};

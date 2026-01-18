@@ -20,6 +20,12 @@
     "db:import-seeds:local": "USE_LOCAL_SUPABASE=true tsx scripts/import-seeds.ts"
   },
   "dependencies": {
+    "@heroui/button": "^2.2.29",
+    "@heroui/card": "^2.2.27",
+    "@heroui/react": "^2.8.7",
+    "@heroui/shared-icons": "^2.1.10",
+    "@heroui/tabs": "^2.2.26",
+    "@heroui/theme": "^2.4.25",
     "@react-router/fs-routes": "^7.9.1",
     "@react-router/node": "^7.9.1",
     "@react-router/serve": "^7.9.1",
