@@ -41,8 +41,8 @@ export default function FaqsLayout() {
 
   return (
     <MarketingLayout>
-      <CrmTabs crmType={crmType} />
-      <div className="mt-8">
+      <div className="space-y-8">
+        <CrmTabs crmType={crmType} />
         <Outlet context={{ crmType }} />
       </div>
     </MarketingLayout>

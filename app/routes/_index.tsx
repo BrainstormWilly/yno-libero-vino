@@ -43,7 +43,7 @@ export default function Index() {
                 </DropdownTrigger>
                 <DropdownMenu disabledKeys={["shopify"]}>
                   <DropdownItem key="commerce7" onPress={() => {}}>Commerce7</DropdownItem>
-                  <DropdownItem key="shopify" onPress={() => {}}>Shopify (comming soon)</DropdownItem>
+                  <DropdownItem key="shopify" onPress={() => {}}>Shopify (coming soon)</DropdownItem>
                 </DropdownMenu>
               </Dropdown>
               <Button color="secondary" onPress={() => {}}>Learn More</Button>
