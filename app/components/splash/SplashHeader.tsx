@@ -2,6 +2,7 @@
 
 
 import { useState } from "react";
+import { useLocation } from "react-router";
 import { Link } from "@heroui/link";
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import {
@@ -30,11 +31,23 @@ const navLinks = [
   { label: "Contact", to: "/contact" }
 ];
 
+function isNavActive(pathname: string, to: string): boolean {
+  if (to === "/") return pathname === "/";
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
 const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+  const pathname = location.pathname;
   const isDark = variant === "dark";
   const backgroundClass = isDark ? "bg-black" : "bg-white";
   const textClass = isDark ? "text-white" : "text-gray-700";
+  const activeLinkClass = isDark
+    ? "font-semibold text-white underline underline-offset-4"
+    : "font-semibold text-gray-900 underline underline-offset-4";
+  const inactiveLinkClass = isDark ? "text-gray-100" : "text-gray-700";
+  const isDocsActive = pathname.startsWith("/docs");
 
   return (
     <header className={`fixed left-0 right-0 top-0 z-10 h-24 ${backgroundClass} flex align-middle`}>
@@ -55,13 +68,19 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
         </NavbarContent>
 
         <NavbarContent className="hidden md:flex" justify="end">
-          {navLinks.map((link) => (
-            <NavbarItem key={link.to}>
-              <Link href={link.to} className={isDark ? "text-gray-100" : "text-gray-700"}>
-                {link.label}
-              </Link>
-            </NavbarItem>
-          ))}
+          {navLinks.map((link) => {
+            const active = isNavActive(pathname, link.to);
+            return (
+              <NavbarItem key={link.to}>
+                <Link
+                  href={link.to}
+                  className={active ? activeLinkClass : inactiveLinkClass}
+                >
+                  {link.label}
+                </Link>
+              </NavbarItem>
+            );
+          })}
           <Dropdown classNames={{
             base: variant,
             trigger: variant,
@@ -70,10 +89,10 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
           }}>
             <NavbarItem>
               <DropdownTrigger>
-                <Link 
+                <Link
                   href="#"
                   anchorIcon={<ChevronDownIcon />}
-                  className={isDark ? "text-gray-100" : "text-gray-700"}
+                  className={isDocsActive ? activeLinkClass : inactiveLinkClass}
                 >
                   Docs
                 </Link>
@@ -91,13 +110,19 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
         </NavbarContent>
 
         <NavbarMenu className={`${textClass} ${backgroundClass}/60 pt-10 pl-20 mt-9`}>
-          {navLinks.map((link) => (
-            <NavbarMenuItem key={link.to}>
-              <Link href={link.to} className={isDark ? "text-gray-100" : "text-gray-700"}>
-                {link.label}
-              </Link>
-            </NavbarMenuItem>
-          ))}
+          {navLinks.map((link) => {
+            const active = isNavActive(pathname, link.to);
+            return (
+              <NavbarMenuItem key={link.to}>
+                <Link
+                  href={link.to}
+                  className={active ? activeLinkClass : inactiveLinkClass}
+                >
+                  {link.label}
+                </Link>
+              </NavbarMenuItem>
+            );
+          })}
           <Dropdown classNames={{
             base: variant,
             trigger: variant,
@@ -106,13 +131,13 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
           }}>
             <NavbarItem>
               <DropdownTrigger>
-                <Link 
+                <Link
                   href="#"
                   anchorIcon={<ChevronDownIcon />}
-                  className={isDark ? "text-gray-100" : "text-gray-700"}
+                  className={isDocsActive ? activeLinkClass : inactiveLinkClass}
                 >
                   Docs
-                </Link>              
+                </Link>
               </DropdownTrigger>
             </NavbarItem>
             <DropdownMenu>
