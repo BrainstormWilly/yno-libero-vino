@@ -4,7 +4,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router";
 import { Link } from "@heroui/link";
-import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from "@heroui/dropdown";
 import {
   Navbar,
   NavbarBrand,
@@ -15,8 +14,6 @@ import {
   NavbarMenuToggle,
 } from "@heroui/navbar";
 import { YnoLiberoVinoLogo } from "./YnoLiberoVinoLogo";
-import { Button } from "@heroui/button";
-import { ChevronDownIcon } from "~/components/icons/ChevronDown";
 
 type HeaderVariant = "dark" | "light";
 
@@ -47,10 +44,9 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
     ? "font-semibold text-white underline underline-offset-4"
     : "font-semibold text-gray-900 underline underline-offset-4";
   const inactiveLinkClass = isDark ? "text-gray-100" : "text-gray-700";
-  const isDocsActive = pathname.startsWith("/docs");
 
   return (
-    <header className={`fixed left-0 right-0 top-0 z-10 h-24 ${backgroundClass} flex align-middle`}>
+    <header className={`fixed left-0 right-0 top-0 z-10 h-24 md:pr-10 ${backgroundClass} flex align-middle`}>
       <Navbar
         isBordered
         isMenuOpen={isMenuOpen}
@@ -58,11 +54,11 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
         className="bg-transparent"
         classNames={{ 
           base: `w-full`, 
-          wrapper: `w-full max-w-none md:pl-10 ${textClass}`
+          wrapper: `w-full max-w-none ${textClass}`
         }}
       >
         <NavbarContent justify="start" className="flex-1">
-          <NavbarBrand className="ml-auto">
+          <NavbarBrand>
             <YnoLiberoVinoLogo variant={isDark ? "dark" : "light"} />
           </NavbarBrand>
         </NavbarContent>
@@ -81,28 +77,6 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
               </NavbarItem>
             );
           })}
-          <Dropdown classNames={{
-            base: variant,
-            trigger: variant,
-            content: variant,
-            backdrop: variant,
-          }}>
-            <NavbarItem>
-              <DropdownTrigger>
-                <Link
-                  href="#"
-                  anchorIcon={<ChevronDownIcon />}
-                  className={isDocsActive ? activeLinkClass : inactiveLinkClass}
-                >
-                  Docs
-                </Link>
-              </DropdownTrigger>
-            </NavbarItem>
-            <DropdownMenu>
-              <DropdownItem className={textClass} key="sms-opt-in" href="/docs/sms-opt-in">SMS Opt-In</DropdownItem>
-              <DropdownItem className={textClass} key="sms-opt-in-demo" href="/docs/sms-opt-in-demo">SMS Opt-In Demo</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
         </NavbarContent> 
 
         <NavbarContent className="md:hidden" justify="end">
@@ -123,28 +97,6 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
               </NavbarMenuItem>
             );
           })}
-          <Dropdown classNames={{
-            base: variant,
-            trigger: variant,
-            content: variant,
-            backdrop: variant,
-          }}>
-            <NavbarItem>
-              <DropdownTrigger>
-                <Link
-                  href="#"
-                  anchorIcon={<ChevronDownIcon />}
-                  className={isDocsActive ? activeLinkClass : inactiveLinkClass}
-                >
-                  Docs
-                </Link>
-              </DropdownTrigger>
-            </NavbarItem>
-            <DropdownMenu>
-              <DropdownItem className={textClass} key="sms-opt-in" href="/docs/sms-opt-in">SMS Opt-In</DropdownItem>
-              <DropdownItem className={textClass} key="sms-opt-in-demo" href="/docs/sms-opt-in-demo">SMS Opt-In Demo</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
         </NavbarMenu>
       </Navbar>
     </header>

@@ -22,7 +22,7 @@ export default function Index() {
   return (
     <div className="fixed top-0 bottom-0 left-0 right-0 bg-[#050405]">
       <SplashHeader variant="dark" />
-      <div className="absolute inset-x-0 left-0 right-0 h-px top-24 bg-[#8E8E93] z-100" />
+      <div className="absolute inset-x-0 left-0 right-0 h-px top-24 bg-stone-800 z-100" />
       <main className="absolute inset-x-0 bottom-0 overflow-y-auto top-24">
         <section className="relative w-full h-100">
           <img
@@ -30,13 +30,13 @@ export default function Index() {
             alt="Cork star"
             className="absolute left-0 top-0 h-full object-cover"
           />
-          <div className="absolute right-0 top-0 flex flex-col items-end mt-10 mr-10">
+          <div className="absolute right-0 top-0 flex flex-col items-end mt-10 mr-2 md:mr-10">
             <img
               src="/media/join-the-evolution.png"
               alt="Join the evolution"
               width={600}
             />
-            <div className="flex gap-4 mt-10 mr-6">
+            <div className="flex gap-4 mt-8 mr-3 md:mr-4">
               <Dropdown>
                 <DropdownTrigger>
                   <Button color="primary">Install Now</Button>
@@ -50,7 +50,7 @@ export default function Index() {
             </div>
           </div>
         </section>
-        <div className="inset-x-0 bottom-0 h-px bg-[#8E8E93]" />
+        <div className="inset-x-0 bottom-0 h-px bg-stone-800" />
       <section className="relative w-full overflow-hidden">
         <img
           src="/media/boxes.jpg"
@@ -94,7 +94,7 @@ export default function Index() {
           </div>
         </div>
       </section>
-        <div className="inset-x-0 bottom-0 h-px bg-[#8E8E93]" />
+        <div className="inset-x-0 bottom-0 h-px bg-stone-800" />
         <section className="
           relative h-56 md:h-24 w-full 
           flex flex-col lg:flex-row justify-between items-center gap-10 lg:gap-0
@@ -106,17 +106,21 @@ export default function Index() {
               <a href="https://ynosoftware.com" target="_blank" rel="noreferrer"><img src="/media/yno-software-logo-dark.png" alt="YnoSoftware" width={150} /></a>
             </div>
             <div className="flex items-center gap-2 font-display">
-              <div className="text-lg">BUILT ON:</div>
+              <div className="text-lg">BUILT FOR:</div>
               <a href="https://commerce7.com" target="_blank" rel="noreferrer"><img src="/media/c7_white.png" alt="Commerce7" width={150} /></a>
               <a href="https://shopify.com" target="_blank" rel="noreferrer"><img src="/media/shopify_logo_white.png" alt="Shopify" width={100} /></a>
             </div>
           </div>
-          <div className="flex items-center gap-2 pb-10 lg:pb-0">
+          <div className="flex flex-wrap items-center gap-2 pb-10 lg:pb-0">
             <div>© Yno Software 2026</div>
             <div>|</div>
             <Link target="_blank" rel="noreferrer" href="https://ynosoftware.com/privacy">Privacy</Link>
             <div>|</div>
             <Link target="_blank" rel="noreferrer" href="https://ynosoftware.com/terms">Terms</Link>
+            <div>|</div>
+            <Link href="/docs/sms-opt-in">SMS Opt-In</Link>
+            <div>|</div>
+            <Link href="/docs/sms-opt-in-demo">SMS Opt-In Demo</Link>
           </div>
         </section>
       </main>
