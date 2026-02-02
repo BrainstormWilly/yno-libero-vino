@@ -71,6 +71,7 @@ export default [
   route("api/cron/monthly-status/queue", "routes/api.cron.monthly-status.queue.ts"),
   route("api/cron/expiration-warning/queue", "routes/api.cron.expiration-warning.queue.ts"),
   route("api/downloads/mailchimp", "routes/api.downloads.mailchimp.ts"),
+  route("api/downloads/klaviyo", "routes/api.downloads.klaviyo.ts"),
   route("api/templates/preview", "routes/api.templates.preview.ts"),
   route("api/templates/download/:templateType", "routes/api.templates.download.$templateType.ts"),
   route("api/upload-sendgrid-image", "routes/api.upload-sendgrid-image.ts"),

@@ -69,6 +69,13 @@ const faqsByCrm: Record<CrmTypes, FaqItem[]> = {
         "They don't. It simply expires if they don't purchase anything within the tier's duration.",
     },
     {
+      question: "If a customer can simply stop purchasing, what incentive do they have to stay with the club?",
+      answer:
+        "That's where the upgradable tiers come in. When customers know they can increase their benefits with each purchase, \
+        they are incentivized to stay with the club. Furthermore, after they achieved the highest benefits, \
+        they are less likely to let them expire",
+    },
+    {
       question: "How do customers get \"upgraded\" to a higher tier?",
       answer:
         "Based on settings you configure, LiberoVino will automatically upgrade customers to the next tier they qualify for based on their spending. \
