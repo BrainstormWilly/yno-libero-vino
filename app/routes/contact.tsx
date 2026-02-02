@@ -13,6 +13,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const name = formData.get("name") as string;
   const email = formData.get("email") as string;
+  const company = formData.get("company") as string | null;
   const message = formData.get("message") as string;
   const platform = formData.get("platform") as string;
   const requestDemo = formData.get("requestDemo") === "on";
@@ -76,6 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const escapedName = escapeHtml(name);
     const escapedEmail = escapeHtml(email);
+    const escapedCompany = company ? escapeHtml(company) : "";
     const escapedPlatform = platform ? escapeHtml(platform) : "";
     const escapedMessage = message ? escapeHtml(message).replace(/\n/g, "<br>") : "";
 
@@ -84,6 +86,7 @@ export async function action({ request }: ActionFunctionArgs) {
       <h2>New Contact Form Submission</h2>
       <p><strong>Name:</strong> ${escapedName}</p>
       <p><strong>Email:</strong> ${escapedEmail}</p>
+      ${escapedCompany ? `<p><strong>Company:</strong> ${escapedCompany}</p>` : ""}
       ${escapedPlatform ? `<p><strong>Platform:</strong> ${escapedPlatform}</p>` : ""}
       <p><strong>Interests:</strong> ${interests.join(", ")}</p>
       ${escapedMessage ? `<p><strong>Message:</strong></p><p>${escapedMessage}</p>` : ""}
@@ -94,7 +97,7 @@ New Contact Form Submission
 
 Name: ${name}
 Email: ${email}
-${platform ? `Platform: ${platform}\n` : ""}Interests: ${interests.join(", ")}
+${company ? `Company: ${company}\n` : ""}${platform ? `Platform: ${platform}\n` : ""}Interests: ${interests.join(", ")}
 ${message ? `\nMessage:\n${message}` : ""}
     `;
 
@@ -196,6 +199,15 @@ export default function Contact() {
                 type="email"
                 isRequired
                 placeholder="your.email@example.com"
+                variant="bordered"
+              />
+
+              {/* Company Field */}
+              <Input
+                label="Company"
+                name="company"
+                type="text"
+                placeholder="Your company or winery"
                 variant="bordered"
               />
 
