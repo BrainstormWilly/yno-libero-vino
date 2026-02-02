@@ -7,9 +7,9 @@ type MarketingLayoutProps = {
 
 export default function MarketingLayout({ children }: MarketingLayoutProps) {
   return (
-    <div className="marketing-layout min-h-screen bg-white relative">
+    <div className="marketing-layout fixed inset-0 bg-white flex flex-col">
       <SplashHeader variant="light" />
-      <main className="mx-auto w-full max-w-6xl px-6 pb-16 pt-32 md:pt-24 relative">
+      <main className="flex-1 overflow-y-auto pt-24 mx-auto w-full max-w-6xl px-6 pb-16">
         {children}
       </main>
     </div>
