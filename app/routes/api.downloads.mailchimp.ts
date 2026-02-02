@@ -85,7 +85,7 @@ export async function loader(_args: LoaderFunctionArgs) {
     archive.finalize();
   });
 
-  return new Response(buffer, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": 'attachment; filename="liberovino-mailchimp.zip"',
