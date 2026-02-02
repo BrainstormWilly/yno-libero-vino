@@ -11,6 +11,7 @@ import { HeroUIProvider } from "@heroui/react";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import CookieBannerWrapper from "./components/splash/CookieBannerWrapper";
 import { PolarisThemeProvider } from "./components/PolarisThemeProvider";
 
 export const links: Route.LinksFunction = () => [
@@ -105,7 +106,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             },
           }}
         >
-          <HeroUIProvider>{children}</HeroUIProvider>
+          <HeroUIProvider>
+            {children}
+            <CookieBannerWrapper />
+          </HeroUIProvider>
         </PolarisThemeProvider>
         <ScrollRestoration />
         <Scripts />
