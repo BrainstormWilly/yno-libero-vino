@@ -263,7 +263,6 @@ export default function CommunicationTemplates() {
         content: 'Download Templates',
         url: zipFileUrl,
         external: true,
-        download: true,
       } : undefined}
       secondaryActions={getMainNavigationActions({
         sessionId: session.id,

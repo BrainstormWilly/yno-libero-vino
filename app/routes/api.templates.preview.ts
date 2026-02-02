@@ -4,20 +4,22 @@
  */
 
 import { type LoaderFunctionArgs } from 'react-router';
-import { getAppSession } from '~/lib/sessions.server';
-import * as db from '~/lib/db/supabase.server';
 import type { TemplateType } from '~/lib/communication/template-variables';
-import { 
-  loadBaseTemplate, 
-  renderSendGridTemplate, 
-  getSampleDataForPreview,
-  convertTemplateForKlaviyo,
-  convertTemplateForMailchimp,
-  renderTemplate
-} from '~/lib/communication/templates.server';
-import { getDefaultHeaderImageUrl, getDefaultFooterImageUrl, getPoweredByDarkImageUrl } from '~/lib/storage/sendgrid-images.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const { getAppSession } = await import('~/lib/sessions.server');
+  const db = await import('~/lib/db/supabase.server');
+  const {
+    loadBaseTemplate,
+    renderSendGridTemplate,
+    getSampleDataForPreview,
+  } = await import('~/lib/communication/templates.server');
+  const {
+    getDefaultHeaderImageUrl,
+    getDefaultFooterImageUrl,
+    getPoweredByDarkImageUrl,
+  } = await import('~/lib/storage/sendgrid-images.server');
+
   const session = await getAppSession(request);
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { 

@@ -154,11 +154,13 @@ export default function SMSOptInDemo() {
                     <Text variant="bodyMd" as="p" fontWeight="semibold">
                       Sample Confirmation Message:
                     </Text>
-                    <Text variant="bodyMd" as="p" tone="subdued" style={{ fontFamily: 'monospace', fontSize: '0.9em', marginTop: '0.5rem' }}>
-                      [Winery Name]: You opted in to receive SMS text messages. Reply YES to confirm and receive account notifications 
-                      (monthly status, expiration warnings) and marketing messages (promotions, product suggestions) via text. 
-                      Message and data rates may apply. Reply STOP to opt out anytime.
-                    </Text>
+                    <Box paddingBlockStart="200">
+                      <Text variant="bodyMd" as="p" tone="subdued">
+                        [Winery Name]: You opted in to receive SMS text messages. Reply YES to confirm and receive account notifications
+                        (monthly status, expiration warnings) and marketing messages (promotions, product suggestions) via text.
+                        Message and data rates may apply. Reply STOP to opt out anytime.
+                      </Text>
+                    </Box>
                   </Box>
                 </BlockStack>
 

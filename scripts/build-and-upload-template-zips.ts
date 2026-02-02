@@ -133,6 +133,10 @@ async function uploadToSupabase(filePath: string, fileName: string): Promise<str
   if (error) {
     throw new Error(`Failed to upload ${fileName}: ${error.message}`);
   }
+
+  if (!data) {
+    throw new Error(`Failed to upload ${fileName}: no data returned`);
+  }
   
   // Get public URL
   const { data: { publicUrl } } = supabase.storage

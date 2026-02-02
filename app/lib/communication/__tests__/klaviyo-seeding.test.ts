@@ -33,6 +33,12 @@ jest.mock('~/lib/communication/providers/klaviyo.server', () => {
   };
 });
 
+jest.mock('~/lib/storage/sendgrid-images.server', () => ({
+  getDefaultHeaderImageUrl: jest.fn<() => Promise<string>>().mockResolvedValue('https://example.com/header.png'),
+  getDefaultFooterImageUrl: jest.fn<() => Promise<string>>().mockResolvedValue('https://example.com/footer.png'),
+  getPoweredByDarkImageUrl: jest.fn<() => Promise<string>>().mockResolvedValue('https://example.com/powered-by.png'),
+}));
+
 const metricResponse = (name: string): KlaviyoMetricSeedResult => ({
   id: `${name}/metric`,
   name,
