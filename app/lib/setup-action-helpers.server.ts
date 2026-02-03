@@ -107,8 +107,8 @@ export async function createClubTiers(
   const stages = tiers.map((tier, index) => {
     const durationMonths = parseInt(tier.durationMonths);
     const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
-    // Calculate minPurchaseAmount from minLtvAmount and durationMonths
-    const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+    // Initial purchase = minLtvAmount / 12 (LTV/12)
+    const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount / 12 : parseFloat(tier.minPurchaseAmount || '0');
     
     return {
       name: tier.name,
@@ -148,8 +148,8 @@ export async function createTiersInC7(
       // Use orchestration method for atomic creation
       const durationMonths = parseInt(tier.durationMonths);
       const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
-      // Calculate minPurchaseAmount from minLtvAmount and durationMonths
-      const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+      // Initial purchase = minLtvAmount / 12 (LTV/12)
+      const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount / 12 : parseFloat(tier.minPurchaseAmount || '0');
       
       const result = await provider.createTierWithPromotionsAndLoyalty({
         name: tier.name,
@@ -266,8 +266,8 @@ export async function updateExistingTier(
 ) {
   const durationMonths = parseInt(tier.durationMonths);
   const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
-  // Calculate minPurchaseAmount from minLtvAmount and durationMonths
-  const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+  // Initial purchase = minLtvAmount / 12 (LTV/12)
+  const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount / 12 : parseFloat(tier.minPurchaseAmount || '0');
   
   return db.updateClubStage(tier.id, {
     name: tier.name,
@@ -290,8 +290,8 @@ export async function createNewTier(
 ) {
   const durationMonths = parseInt(tier.durationMonths);
   const minLtvAmount = parseFloat(tier.minLtvAmount || '0');
-  // Calculate minPurchaseAmount from minLtvAmount and durationMonths
-  const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount * (durationMonths / 12) : parseFloat(tier.minPurchaseAmount || '0');
+  // Initial purchase = minLtvAmount / 12 (LTV/12)
+  const minPurchaseAmount = minLtvAmount > 0 ? minLtvAmount / 12 : parseFloat(tier.minPurchaseAmount || '0');
   
   const stages = await db.createClubStages(clubProgramId, [{
     name: tier.name,

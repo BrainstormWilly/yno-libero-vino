@@ -142,64 +142,68 @@ export default function ClubTiersIndex() {
               
               {tiersWithDetails.length > 0 ? (
                 <BlockStack gap="300">
-                  {tiersWithDetails.map(({ stage, promotions }) => (
-                    <Box key={stage.id} paddingBlockEnd="400">
-                      <BlockStack gap="200">
-                        <InlineStack align="space-between" blockAlign="center">
-                          <Link 
-                            url={addSessionToUrl(`/app/settings/club_tiers/${stage.id}`, session.id)}
-                            removeUnderline
-                          >
-                            <Text as="span" variant="bodyMd" fontWeight="semibold">
-                              {stage.name}
-                            </Text>
-                          </Link>
-                          <Badge tone={stage.is_active ? 'success' : 'attention'}>
-                            {stage.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </InlineStack>
-                        
-                        <BlockStack gap="100">
-                          <Text variant="bodySm" as="p" tone="subdued">
-                            <strong>Min Purchase:</strong> ${stage.min_purchase_amount ? stage.min_purchase_amount.toFixed(2) : '0.00'}
-                          </Text>
-                          <Text variant="bodySm" as="p" tone="subdued">
-                            <strong>Duration:</strong> {stage.duration_months} month{stage.duration_months !== 1 ? 's' : ''}
-                          </Text>
-                          {promotions.length > 0 && (
-                            <BlockStack gap="100">
-                              <Text variant="bodySm" as="p" tone="subdued">
-                                <strong>Promotions:</strong>
+                  {tiersWithDetails.map(({ stage, promotions }, index) => (
+                    <Box key={stage.id}>
+                      <Box paddingBlockEnd={index < tiersWithDetails.length - 1 ? '400' : undefined}>
+                        <BlockStack gap="200">
+                          <InlineStack align="space-between" blockAlign="center" gap="200">
+                            <Link 
+                              url={addSessionToUrl(`/app/settings/club_tiers/${stage.id}`, session.id)}
+                              removeUnderline
+                            >
+                              <Text as="span" variant="bodyMd" fontWeight="semibold">
+                                {stage.name}
                               </Text>
-                              <List>
-                                {promotions.map((promo) => (
-                                  <List.Item key={promo.id}>
-                                    <Link 
-                                      url={addSessionToUrl(`/app/settings/club_tiers/${stage.id}/promo/${promo.id}`, session.id)}
-                                      removeUnderline
-                                    >
-                                      {promo.title || `Promotion ${promo.crm_id}`}
-                                    </Link>
-                                  </List.Item>
-                                ))}
-                              </List>
-                            </BlockStack>
-                          )}
+                            </Link>
+                            <InlineStack gap="200" wrap={false}>
+                              <Badge tone={stage.is_active ? 'success' : 'attention'}>
+                                {stage.is_active ? 'Active' : 'Inactive'}
+                              </Badge>
+                              {stage.initial_qualification_allowed === false ? (
+                                <Badge tone="warning">Upgrade only</Badge>
+                              ) : stage.upgradable ? (
+                                <Badge tone="info">Upgradable</Badge>
+                              ) : (
+                                <Badge>Not upgradable</Badge>
+                              )}
+                            </InlineStack>
+                          </InlineStack>
+                          
+                          <BlockStack gap="100">
+                            <Text variant="bodySm" as="p" tone="subdued">
+                              <strong>Min Purchase:</strong> ${stage.min_purchase_amount ? stage.min_purchase_amount.toFixed(2) : '0.00'}
+                            </Text>
+                            <Text variant="bodySm" as="p" tone="subdued">
+                              <strong>Duration:</strong> {stage.duration_months} month{stage.duration_months !== 1 ? 's' : ''}
+                            </Text>
+                            {promotions.length > 0 && (
+                              <BlockStack gap="100">
+                                <Text variant="bodySm" as="p" tone="subdued">
+                                  <strong>Promotions:</strong>
+                                </Text>
+                                <List>
+                                  {promotions.map((promo) => (
+                                    <List.Item key={promo.id}>
+                                      <Link 
+                                        url={addSessionToUrl(`/app/settings/club_tiers/${stage.id}/promo/${promo.id}`, session.id)}
+                                        removeUnderline
+                                      >
+                                        {promo.title || `Promotion ${promo.crm_id}`}
+                                      </Link>
+                                    </List.Item>
+                                  ))}
+                                </List>
+                              </BlockStack>
+                            )}
+                          </BlockStack>
                         </BlockStack>
-                      </BlockStack>
+                      </Box>
+                      {index < tiersWithDetails.length - 1 ? (
+
+                        <Divider />
+                      ) : null}
                     </Box>
                   ))}
-                  {/* Add dividers between tiers */}
-                  {tiersWithDetails.map(({ stage }, index) => {
-                    if (index < tiersWithDetails.length - 1) {
-                      return (
-                        <Box key={`divider-${stage.id}`} paddingBlockStart="400">
-                          <Divider />
-                        </Box>
-                      );
-                    }
-                    return null;
-                  })}
                 </BlockStack>
               ) : (
                 <Text variant="bodyMd" as="p" tone="subdued">

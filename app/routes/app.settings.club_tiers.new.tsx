@@ -11,6 +11,7 @@ import {
   TextField,
   InlineStack,
   Box,
+  Checkbox,
 } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
 import { getMainNavigationActions } from '~/util/navigation';
@@ -59,9 +60,15 @@ export async function action({ request }: ActionFunctionArgs) {
     const tierName = formData.get('tier_name') as string;
     const durationMonths = parseInt(formData.get('duration_months') as string) || 3;
     const minLtvAmount = parseFloat(formData.get('min_ltv_amount') as string) || 600;
+    const overrideRaw = formData.get('min_purchase_amount_override') as string;
+    const initialQualificationAllowed = formData.get('initial_qualification_allowed') !== 'false';
+    const upgradable = formData.get('upgradable') !== 'false';
     
-    // Calculate min_purchase_amount from min_ltv_amount and duration_months
-    const minPurchaseAmount = minLtvAmount * (durationMonths / 12);
+    const calculated = minLtvAmount / 12;
+    const minPurchaseAmount =
+      overrideRaw !== '' && overrideRaw != null && !Number.isNaN(parseFloat(overrideRaw))
+        ? Math.max(0, parseFloat(overrideRaw))
+        : calculated;
     
     // Get current tier count for order
     const tierCount = clubProgram.club_stages?.length || 0;
@@ -73,6 +80,8 @@ export async function action({ request }: ActionFunctionArgs) {
       minLtvAmount,
       stageOrder: tierCount + 1,
       tierType: 'discount',
+      initialQualificationAllowed,
+      upgradable,
     }]);
     
     // Redirect to the tier detail page
@@ -91,8 +100,15 @@ export default function NewTier() {
   const location = useLocation();
   
   const [tierName, setTierName] = useState('');
-  const [durationMonths, setDurationMonths] = useState(3);
-  const [minLtvAmount, setMinLtvAmount] = useState(600);
+  const [durationMonths, setDurationMonths] = useState('3');
+  const [minLtvAmount, setMinLtvAmount] = useState('600');
+  const [minPurchaseOverride, setMinPurchaseOverride] = useState('');
+  const [initialQualificationAllowed, setInitialQualificationAllowed] = useState(true);
+  const [upgradable, setUpgradable] = useState(true);
+  
+  const durationNum = durationMonths === '' ? 0 : parseInt(durationMonths, 10) || 0;
+  const minLtvNum = minLtvAmount === '' ? 0 : parseFloat(minLtvAmount) || 0;
+  const calculatedMinPurchase = (minLtvNum / 12).toFixed(2);
   
   return (
     <Page 
@@ -115,8 +131,11 @@ export default function NewTier() {
           <Form method="post">
             <input type="hidden" name="action" value="create_tier" />
             <input type="hidden" name="tier_name" value={tierName} />
-            <input type="hidden" name="duration_months" value={String(durationMonths)} />
-            <input type="hidden" name="min_ltv_amount" value={String(minLtvAmount)} />
+            <input type="hidden" name="duration_months" value={durationMonths === '' ? '3' : durationMonths} />
+            <input type="hidden" name="min_ltv_amount" value={minLtvAmount === '' ? '600' : minLtvAmount} />
+            <input type="hidden" name="min_purchase_amount_override" value={initialQualificationAllowed ? minPurchaseOverride : ''} />
+            <input type="hidden" name="initial_qualification_allowed" value={initialQualificationAllowed ? 'true' : 'false'} />
+            <input type="hidden" name="upgradable" value={upgradable ? 'true' : 'false'} />
             
             <BlockStack gap="400">
               <Text variant="headingMd" as="h2">
@@ -136,26 +155,53 @@ export default function NewTier() {
               <TextField
                 label="Duration (months)"
                 id="duration_months"
-                type="number"
-                value={String(durationMonths)}
-                onChange={(value) => setDurationMonths(parseInt(value) || 3)}
-                min={1}
-                max={24}
+                value={durationMonths ?? ''}
+                onChange={(value) => setDurationMonths(value == null ? '' : String(value))}
                 autoComplete="off"
-                helpText="How long the membership lasts (1-24 months)"
+                helpText="How long the membership lasts (1-24 months). Whole numbers only."
               />
               
               <TextField
                 label="Minimum Annual LTV"
                 id="min_ltv_amount"
-                type="number"
-                value={minLtvAmount.toString()}
-                onChange={(value) => setMinLtvAmount(parseFloat(value) || 600)}
-                min={0}
-                step={0.01}
+                value={minLtvAmount ?? ''}
+                onChange={(value) => setMinLtvAmount(value == null ? '' : String(value))}
                 autoComplete="off"
                 prefix="$"
                 helpText="Minimum annual lifetime value required for this tier. The minimum purchase amount will be calculated automatically based on duration."
+              />
+              
+              <Checkbox
+                label="Available for initial signup"
+                checked={initialQualificationAllowed}
+                onChange={setInitialQualificationAllowed}
+                disabled={!upgradable}
+                helpText={!upgradable
+                  ? 'Must be checked when tier is not upgradable (so members can join at signup).'
+                  : 'When unchecked, this tier can only be applied via upgrade, not at initial signup.'}
+              />
+              
+              {initialQualificationAllowed && (
+                <TextField
+                  label="Initial purchase amount"
+                  id="min_purchase_amount_override"
+                  value={minPurchaseOverride}
+                  onChange={(value) => setMinPurchaseOverride(value == null ? '' : String(value))}
+                  autoComplete="off"
+                  prefix="$"
+                  placeholder={calculatedMinPurchase}
+                  helpText="Leave blank to use suggested value (ALTV ÷ 12). Set a value to override."
+                />
+              )}
+              
+              <Checkbox
+                label="Upgradable"
+                checked={upgradable}
+                onChange={setUpgradable}
+                disabled={!initialQualificationAllowed}
+                helpText={!initialQualificationAllowed
+                  ? 'Must be checked for upgrade-only tiers (so members can reach this tier).'
+                  : 'When checked, members in lower tiers can upgrade to this tier. Uncheck for top-tier only.'}
               />
               
               <Box paddingBlockStart="200">

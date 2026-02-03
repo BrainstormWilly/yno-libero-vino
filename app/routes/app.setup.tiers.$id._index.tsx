@@ -74,8 +74,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const upgradable = formData.get('upgradable') === 'true';
       const tierType = formData.get('tier_type') as string || 'discount';
       
-      // Calculate min_purchase_amount automatically from min_ltv_amount and duration_months
-      const minPurchaseAmount = minLtvAmount * (durationMonths / 12);
+      // Initial purchase = min_ltv_amount / 12 (LTV/12)
+      const minPurchaseAmount = minLtvAmount / 12;
       
       // Update tier details in DB
       await db.updateClubStage(tierId, {
@@ -209,15 +209,14 @@ export default function TierDetails() {
   const [upgradable, setUpgradable] = useState(tier.upgradable ?? true);
   const [tierType, setTierType] = useState((tier as any).tier_type || 'discount');
   
-  // Calculate min_purchase_amount from min_ltv_amount and duration_months
+  // Initial purchase = min_ltv_amount / 12 (LTV/12)
   const calculatedMinPurchase = useMemo(() => {
     const minLtv = parseFloat(minLtvAmount) || 0;
-    const duration = parseFloat(durationMonths) || 0;
-    if (minLtv > 0 && duration > 0) {
-      return (minLtv * (duration / 12)).toFixed(2);
+    if (minLtv > 0) {
+      return (minLtv / 12).toFixed(2);
     }
     return '0.00';
-  }, [minLtvAmount, durationMonths]);
+  }, [minLtvAmount]);
   
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(!!loyalty);
   const [earnRate, setEarnRate] = useState(

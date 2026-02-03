@@ -364,6 +364,7 @@ export type Database = {
           created_at: string | null
           duration_months: number
           id: string
+          initial_qualification_allowed: boolean
           is_active: boolean | null
           min_ltv_amount: number
           min_purchase_amount: number
@@ -381,6 +382,7 @@ export type Database = {
           created_at?: string | null
           duration_months: number
           id?: string
+          initial_qualification_allowed?: boolean
           is_active?: boolean | null
           min_ltv_amount?: number
           min_purchase_amount: number
@@ -398,6 +400,7 @@ export type Database = {
           created_at?: string | null
           duration_months?: number
           id?: string
+          initial_qualification_allowed?: boolean
           is_active?: boolean | null
           min_ltv_amount?: number
           min_purchase_amount?: number

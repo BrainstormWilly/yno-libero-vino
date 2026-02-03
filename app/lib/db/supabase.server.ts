@@ -258,6 +258,7 @@ export async function createClubStages(
     stageOrder: number;
     upgradable?: boolean;
     tierType?: string;
+    initialQualificationAllowed?: boolean;
   }>
 ): Promise<ClubStage[]> {
   const supabase = getSupabaseClient();
@@ -272,6 +273,7 @@ export async function createClubStages(
       is_active: true,
       upgradable: stage.upgradable ?? true,
       tier_type: stage.tierType || 'discount',
+      initial_qualification_allowed: stage.initialQualificationAllowed ?? true,
     };
     
     // Only include min_ltv_amount if it's provided
@@ -310,6 +312,7 @@ export async function updateClubStage(
     upgradable?: boolean;
     isActive?: boolean;
     tierType?: string;
+    initialQualificationAllowed?: boolean;
   }
 ) {
   const supabase = getSupabaseClient();
@@ -320,12 +323,13 @@ export async function updateClubStage(
   
   if (data.name) updateData.name = data.name;
   if (data.durationMonths) updateData.duration_months = data.durationMonths;
-  if (data.minPurchaseAmount) updateData.min_purchase_amount = data.minPurchaseAmount;
+  if (data.minPurchaseAmount !== undefined) updateData.min_purchase_amount = data.minPurchaseAmount;
   if (data.minLtvAmount !== undefined) updateData.min_ltv_amount = data.minLtvAmount;
   if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder; // Can be null
   if (data.c7ClubId) updateData.c7_club_id = data.c7ClubId;
   if (data.upgradable !== undefined) updateData.upgradable = data.upgradable;
   if (data.tierType) updateData.tier_type = data.tierType;
+  if (data.initialQualificationAllowed !== undefined) updateData.initial_qualification_allowed = data.initialQualificationAllowed;
   if (data.isActive !== undefined) {
     updateData.is_active = data.isActive;
     // When marking as inactive, also set stage_order to NULL to free it up

@@ -30,10 +30,12 @@ function QualificationContent() {
         ($1,200 ALTV / 12 = $100)
       </div>
       <p>
-        The initial purchase calculation is really just a recommendation. Tier
-        qualification is still your determination for each new member. However,
-        upgrading tiers based on ALTV is automated by LV. So, let&apos;s look at
-        that.
+        The initial purchase calculation is really just a recommendation. You can
+        override it per tier in settings, and you can mark a tier as
+        &quot;upgrade only&quot; so it is not offered at first signup—only via
+        upgrade. Tier qualification is still your determination for each new
+        member. However, upgrading tiers based on ALTV is automated by LV. So,
+        let&apos;s look at that.
       </p>
     </div>
   );

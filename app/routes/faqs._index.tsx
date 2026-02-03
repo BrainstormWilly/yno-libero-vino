@@ -61,7 +61,8 @@ const faqsByCrm: Record<CrmTypes, FaqItem[]> = {
       question: "How do customers choose their wine club tier?",
       answer:
         "They don't. It is up to you which tier they qualify for. Based on settings you configure, \
-        LiberoVino recommends the highest tier based on either their LTV or initial purchase.",
+        LiberoVino recommends the highest tier based on either their LTV or initial purchase. \
+        You can override the initial purchase amount per tier or set a tier to \"upgrade only\" so it is not offered at first signup.",
     },
     {
       question: "How does a customer quit a LiberoVino wine club?",
