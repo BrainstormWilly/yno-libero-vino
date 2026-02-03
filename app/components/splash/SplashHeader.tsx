@@ -46,7 +46,7 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
   const inactiveLinkClass = isDark ? "text-gray-100" : "text-gray-700";
 
   return (
-    <header className={`fixed left-0 right-0 top-0 z-10 h-24 md:pr-10 ${backgroundClass} flex align-middle`}>
+    <header className={`fixed left-0 right-0 top-0 z-10 h-24 ${backgroundClass} flex align-middle`}>
       <Navbar
         isBordered
         isMenuOpen={isMenuOpen}
@@ -63,7 +63,7 @@ const SplashHeader = ({ variant = "dark" }: SplashHeaderProps) => {
           </NavbarBrand>
         </NavbarContent>
 
-        <NavbarContent className="hidden md:flex" justify="end">
+        <NavbarContent className="hidden md:flex mr-10" justify="end">
           {navLinks.map((link) => {
             const active = isNavActive(pathname, link.to);
             return (

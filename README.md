@@ -11,7 +11,6 @@ A wine club and loyalty platform for Commerce7 and Shopify. Built with React Rou
 ## ⚡ Recent Architecture Update (October 2025)
 
 **LiberoVino has moved to a club-based architecture!** We've replaced the tag and coupon approach with Commerce7's native Clubs, Promotions, and Loyalty features.
-test
 
 **What's New:**
 - ✅ **Auto-applying Promotions** - Discounts apply automatically at checkout (no more manual coupons!)

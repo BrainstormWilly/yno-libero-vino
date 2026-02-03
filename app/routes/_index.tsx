@@ -46,7 +46,7 @@ export default function Index() {
                   <DropdownItem key="shopify" onPress={() => {}}>Shopify (coming soon)</DropdownItem>
                 </DropdownMenu>
               </Dropdown>
-              <Button color="secondary" onPress={() => {}}>Learn More</Button>
+              <Button as={Link} href="/learn" color="secondary">Learn More</Button>
             </div>
           </div>
         </section>
