@@ -335,7 +335,7 @@ export default function TierDetails() {
     setMinPurchaseOverride(
       tier.min_purchase_amount !== parseFloat(calc) ? String(tier.min_purchase_amount) : ''
     );
-  }, [tier.id, tier.name, tier.duration_months, tier.min_ltv_amount, tier.min_purchase_amount, tier.upgradable, tier.initial_qualification_allowed]);
+  }, [tier]);
   
   // Reset feedback visibility when actionData changes
   useEffect(() => {
