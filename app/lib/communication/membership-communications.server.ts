@@ -1459,7 +1459,7 @@ async function triggerSendGridMonthlyStatus(options: {
   };
   
   // Render template (use DB template if available, otherwise use template type to load base)
-  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl, undefined, undefined, options.clientId);
 
   const text = `Your ${clientName} Membership Status
 
@@ -1579,7 +1579,7 @@ async function triggerSendGridExpiration(options: {
   };
   
   // Render template (use DB template if available, otherwise use template type to load base)
-  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl, undefined, undefined, options.clientId);
 
   const text = `Your ${options.tier.name} Membership Has Expired
 
@@ -1698,7 +1698,7 @@ async function triggerSendGridUpgrade(options: {
   };
   
   // Render template (use DB template if available, otherwise use template type to load base)
-  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl, undefined, undefined, options.clientId);
 
   const text = `Congratulations on Your Tier Upgrade!
 
@@ -2204,7 +2204,7 @@ async function triggerSendGridExpirationWarning(options: {
   };
   
   // Render template (use DB template if available, otherwise use template type to load base)
-  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl);
+  const html = await renderSendGridTemplate(template, variables, customContent, headerUrl, footerUrl, undefined, undefined, options.clientId);
 
   const text = `Your Membership Expires in ${options.daysRemaining} Day${options.daysRemaining === 1 ? '' : 's'}
 

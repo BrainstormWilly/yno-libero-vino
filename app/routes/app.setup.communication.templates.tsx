@@ -371,7 +371,7 @@ export default function ProviderTemplates() {
                         onClick={() => handleRemoveImage('header')}
                         loading={uploading === 'header'}
                         disabled={uploading !== null}
-                        variant="primary"
+                        variant="plain"
                       >
                         Use Default
                       </Button>

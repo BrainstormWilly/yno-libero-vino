@@ -7,6 +7,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
@@ -43,7 +44,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
     
     const tier = await db.getClubStageWithDetails(tierId);
-    if (!tier?.c7_club_id) {
+    if (!tier) {
+      return {
+        success: false,
+        message: 'Tier not found. Please save tier details first.',
+      };
+    }
+    if (!tier.c7_club_id) {
       return {
         success: false,
         message: 'Tier must be synced to C7 first. Save tier details to create C7 club.',
@@ -92,6 +99,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       crmType: session.crmType,
       title: createdPromotion.title,
     }]);
+    
+    // Recalculate setup progress
+    await recalculateAndUpdateSetupComplete(session.clientId);
     
     return {
       success: true,

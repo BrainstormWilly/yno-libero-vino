@@ -14,6 +14,7 @@ import {
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
 import { addSessionToUrl } from '~/util/session';
 import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
 import type { CommunicationConfig } from '~/lib/communication';
@@ -119,6 +120,9 @@ export async function action({ request }: ActionFunctionArgs) {
           )
         );
       }
+      
+      // Recalculate setup progress
+      await recalculateAndUpdateSetupComplete(session.clientId);
 
       console.log('[Communication Setup] Provider saved successfully:', { emailProvider, smsProvider });
       return {

@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, useNavigate, Form, useActionData } from 'react-router';
+import { useLoaderData, useNavigate, Form, useActionData, useSubmit } from 'react-router';
 import { useEffect, useState } from 'react';
 import { 
   Page, 
@@ -20,6 +20,8 @@ import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
+import { deletePromotion as crmDeletePromotion } from '~/lib/crm/index.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -81,45 +83,20 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const actionType = formData.get('action') as string;
   
-  if (actionType === 'create_tier') {
-    const existingProgram = await db.getClubProgram(session.clientId);
-    if (!existingProgram) {
-      return {
-        success: false,
-        message: 'Club program not found',
-      };
-    }
-    
-    // Get current tier count for order
-    const tierCount = existingProgram.club_stages?.length || 0;
-    
-    // Create a new blank tier (with default minLtvAmount that calculates to minPurchaseAmount)
-    const defaultMinLtv = 600; // $600 annual LTV
-    const defaultDuration = 3; // 3 months
-    const calculatedMinPurchase = defaultMinLtv * (defaultDuration / 12); // $150
-    
-    const newTiers = await db.createClubStages(existingProgram.id, [{
-      name: `New Tier ${tierCount + 1}`,
-      durationMonths: defaultDuration,
-      minPurchaseAmount: calculatedMinPurchase,
-      minLtvAmount: defaultMinLtv,
-      stageOrder: tierCount + 1,
-      tierType: 'discount',
-    }]);
-    
-    // Redirect to edit the new tier with 'new' flag
-    return {
-      success: true,
-      redirect: addSessionToUrl(`/app/setup/tiers/${newTiers[0].id}?new=true`, session.id),
-    };
-  }
   
   if (actionType === 'delete_tier') {
     const tierId = formData.get('tier_id') as string;
-    
     try {
-      // For now, just delete from DB (we'll add C7 cleanup later)
+      const promotions = await db.getStagePromotions(tierId);
+      for (const promo of promotions) {
+        if (promo.crm_type === 'commerce7' && promo.crm_id) {
+          await crmDeletePromotion(session, promo.crm_id);
+        }
+      }
       await db.deleteClubStage(tierId);
+      
+      // Recalculate setup progress
+      await recalculateAndUpdateSetupComplete(session.clientId);
       
       return {
         success: true,
@@ -219,16 +196,17 @@ export default function SetupTiers() {
   const { clubProgram, tiers, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
+  const submit = useSubmit();
   const [viewMode, setViewMode] = useState<'active' | 'inactive'>('active');
   
   useEffect(() => {
     setupAutoResize();
   }, []);
   
-  // Handle redirect from action
+  // Handle redirect from action (for delete/reorder actions)
   useEffect(() => {
-    if (actionData?.success && actionData.redirect) {
-      navigate(actionData.redirect);
+    if (actionData?.success && (actionData as any).redirect) {
+      navigate((actionData as any).redirect);
     }
   }, [actionData, navigate]);
   
@@ -418,16 +396,23 @@ export default function SetupTiers() {
                                 {viewMode === 'active' ? 'Edit' : 'View Details'}
                               </Button>
                               {viewMode === 'active' && (
-                                <Form method="post">
-                                  <input type="hidden" name="action" value="delete_tier" />
-                                  <input type="hidden" name="tier_id" value={tier.id} />
-                                  <Button
-                                    tone="critical"
-                                    submit
-                                  >
-                                    Delete
-                                  </Button>
-                                </Form>
+                                <Button
+                                  tone="critical"
+                                  onClick={() => {
+                                    const promoCount = tier.promotionCount ?? 0;
+                                    const promoWarning = promoCount > 0
+                                      ? ` Deleting this tier will also permanently delete its ${promoCount} promotion(s) in Commerce7.`
+                                      : '';
+                                    if (confirm(`Are you sure you want to delete this tier?${promoWarning} This cannot be undone.`)) {
+                                      const fd = new FormData();
+                                      fd.set('action', 'delete_tier');
+                                      fd.set('tier_id', tier.id);
+                                      submit(fd, { method: 'post' });
+                                    }
+                                  }}
+                                >
+                                  Delete
+                                </Button>
                               )}
                             </InlineStack>
                           </InlineStack>
@@ -446,12 +431,16 @@ export default function SetupTiers() {
               
               {/* Add Tier Button (only show for active view) */}
               {viewMode === 'active' && (
-                <Form method="post">
-                  <input type="hidden" name="action" value="create_tier" />
-                  <Button submit size="large">
-                    + Add Tier
-                  </Button>
-                </Form>
+                <Button 
+                  size="large"
+                  onClick={() => {
+                    // Generate a temporary UUID client-side for new tier
+                    const tempTierId = crypto.randomUUID();
+                    navigate(addSessionToUrl(`/app/setup/tiers/${tempTierId}`, session.id));
+                  }}
+                >
+                  + Add Tier
+                </Button>
               )}
             </BlockStack>
           </Card>

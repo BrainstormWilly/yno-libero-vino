@@ -114,10 +114,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let footerUrl: string | null = null;
   
   if (templateType === 'club-signup' || templateType === 'monthly-status' || templateType === 'expiration-warning' || templateType === 'upgrade' || templateType === 'expiration') {
-    // For club-signup, monthly-status, expiration-warning, upgrade, and expiration templates, use client's header image if available, otherwise null to show text fallback
-    // Footer will use powered-by-dark.png automatically via renderSendGridTemplate
+    // For club-signup, monthly-status, expiration-warning, upgrade, and expiration templates, use client's header/footer images if available
     headerUrl = client.email_header_image_url || null;
-    footerUrl = null; // Will use powered-by-dark.png via the render function
+    footerUrl = client.email_footer_image_url || null; // Fallback to powered-by-dark.png in renderSendGridTemplate when null
   } else {
     // For other templates, use client's images or defaults
     headerUrl = client.email_header_image_url || await getDefaultHeaderImageUrl();
@@ -147,7 +146,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       headerUrl,
       footerUrl,
       request.url,
-      session.id
+      session.id,
+      session.clientId
     );
   } else {
     // Klaviyo/Mailchimp: Use default images for preview
@@ -162,7 +162,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       defaultHeaderUrl, // Use default header for preview
       defaultFooterUrl, // Use powered-by-dark footer
       request.url,
-      session.id
+      session.id,
+      session.clientId
     );
   }
 

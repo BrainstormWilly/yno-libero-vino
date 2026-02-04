@@ -4,6 +4,7 @@ import { Box, Button, InlineStack } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
 import { sendClientTestEmail } from '~/lib/communication/communication.service.server';
 import { getEmailProviderComponent } from '~/components/communication/providers';
 import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
@@ -266,6 +267,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
           emailProviderConfirmed: true,
         });
         
+        // Recalculate setup progress
+        await recalculateAndUpdateSetupComplete(session.clientId);
+        
         let message: string;
         let smsResult: { success: boolean; message?: string } | null = null;
         
@@ -389,7 +393,7 @@ export default function ProviderSetup() {
           
           <Button
             onClick={handleContinue}
-            disabled={!isConfirmed}
+            disabled={provider !== 'sendgrid' && !isConfirmed}
           >
             Continue to Templates →
           </Button>

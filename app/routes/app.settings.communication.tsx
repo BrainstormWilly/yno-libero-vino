@@ -5,7 +5,7 @@
  * including email/SMS providers and email settings.
  */
 
-import { type LoaderFunctionArgs, type ActionFunctionArgs, Form, useLoaderData, useActionData, useLocation, useSubmit, useNavigation } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, Form, useLoaderData, useActionData, useLocation, useSubmit, useNavigation, redirect } from 'react-router';
 import { useState, useEffect } from 'react';
 import { 
   Page,
@@ -28,6 +28,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import { getMainNavigationActions } from '~/util/navigation';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete, getClient } from '~/lib/db/supabase.server';
 import { sendClientTestEmail, sendClientTestSMS } from '~/lib/communication/communication.service.server';
 import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
 import type { Database } from '~/types/supabase';
@@ -154,6 +155,15 @@ export async function action({ request }: ActionFunctionArgs) {
             'sendgrid'
           )
         );
+      }
+
+      // Recalculate setup progress - if it drops below 100%, setup_complete will be set to false
+      await recalculateAndUpdateSetupComplete(session.clientId);
+
+      // Check if setup is now incomplete - if so, redirect to setup instead of staying in settings
+      const client = await getClient(session.clientId);
+      if (!client?.setup_complete) {
+        throw redirect(addSessionToUrl('/app/setup/communication', session.id));
       }
 
       return { success: true, message: 'Provider settings updated successfully' };

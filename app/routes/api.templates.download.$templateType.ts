@@ -32,7 +32,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   try {
     const html = await downloadTemplateForProvider(
       templateType,
-      provider as 'klaviyo' | 'mailchimp'
+      provider as 'klaviyo' | 'mailchimp',
+      session.clientId
     );
 
     const templateName = templateType.replace('-', '_');

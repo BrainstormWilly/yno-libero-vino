@@ -1211,6 +1211,20 @@ html[data-theme="dark"] .enrollment-progress-bar .enrollment-connector.completed
   border-radius: 2px;
 }
 
+/* Setup Progress Bar - dark mode progress color override */
+html.dark .Polaris-ProgressBar__Indicator,
+html[data-theme="dark"] .Polaris-ProgressBar__Progress {
+  background-color: rgb(34 197 94) !important; /* green-500 - green progress color */
+}
+
+/* Alternative: Use blue instead of green - uncomment below and comment out above */
+/*
+html.dark .Polaris-ProgressBar__Progress,
+html[data-theme="dark"] .Polaris-ProgressBar__Progress {
+  background-color: rgb(59 130 246) !important;
+}
+*/
+
 /* Autocomplete dropdown list - dark mode */
 html.dark .Polaris-Autocomplete,
 html[data-theme="dark"] .Polaris-Autocomplete {
@@ -1646,8 +1660,9 @@ html[data-theme="dark"] .Polaris-Tabs__Tab:not(.Polaris-Tabs__Tab--active) {
   height: 80px;
   position: relative;
   z-index: 10;
-  margin: 100px;
-  margin-top: 40px;
+  margin-top: 20px;
+  flex-grow: 1;
+  max-width: 950px;
 }
 
 .footer-button a {

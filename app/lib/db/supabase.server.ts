@@ -140,6 +140,60 @@ export async function markSetupComplete(clientId: string) {
     .eq('id', clientId);
 }
 
+export async function recalculateAndUpdateSetupComplete(clientId: string): Promise<void> {
+  // Calculate progress based on saved data existence
+  const clubProgram = await getClubProgram(clientId);
+  const commConfig = await getCommunicationConfig(clientId);
+  
+  let progress = 0;
+  
+  // Club program exists: 25%
+  if (clubProgram) {
+    progress += 25;
+    
+    // At least one tier exists: 25%
+    const savedTiers = (clubProgram.club_stages || []).filter((tier: any) => {
+      // Filter out unsaved tiers (those with default "New Tier X" names)
+      return tier.name && !tier.name.match(/^New Tier \d+$/);
+    });
+    
+    if (savedTiers.length > 0) {
+      progress += 25;
+      
+      // At least one promotion exists: 25%
+      let hasPromotion = false;
+      for (const tier of savedTiers) {
+        const promotions = await getStagePromotions(tier.id);
+        if (promotions.length > 0) {
+          hasPromotion = true;
+          break;
+        }
+      }
+      
+      if (hasPromotion) {
+        progress += 25;
+      }
+    }
+  }
+  
+  // Communication config exists with email_provider: 25%
+  if (commConfig && commConfig.email_provider) {
+    progress += 25;
+  }
+  
+  // Update setup_complete based on progress
+  const setupComplete = progress === 100;
+  
+  const supabase = getSupabaseClient();
+  await supabase
+    .from('clients')
+    .update({ 
+      setup_complete: setupComplete,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', clientId);
+}
+
 export async function updateClientEmailImages(
   clientId: string,
   images: {
@@ -369,6 +423,16 @@ export async function getClubStageWithDetails(stageId: string): Promise<ClubStag
   if (error) return null;
   
   return stage;
+}
+
+export async function getEnrollmentCountForStage(stageId: string): Promise<number> {
+  const supabase = getSupabaseClient();
+  const { count, error } = await supabase
+    .from('club_enrollments')
+    .select('*', { count: 'exact', head: true })
+    .eq('club_stage_id', stageId);
+  if (error) return 0;
+  return count ?? 0;
 }
 
 // ============================================

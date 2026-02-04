@@ -16,6 +16,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await getAppSession(request);
@@ -66,6 +67,9 @@ export async function action({ request }: ActionFunctionArgs) {
       await db.createClubProgram(session.clientId, clubName, clubDescription);
     }
     
+    // Recalculate setup progress
+    await recalculateAndUpdateSetupComplete(session.clientId);
+    
     // Redirect to tiers page
     return {
       success: true,
@@ -87,7 +91,7 @@ export default function SetupIndex() {
   // Compute initial values deterministically to avoid hydration mismatch
   const initialClubName = existingProgram?.name || (client.org_name ? `${client.org_name} Wine Club` : 'Wine Club');
   const initialClubDescription = existingProgram?.description || 
-    'Liberate your wine buying experience. Enjoy member pricing on your schedule - no forced shipments, no surprises.';
+    `This is a message from the ${initialClubName}. Our wine benefits program is designed to liberate your wine buying experience. Enjoy member pricing on your schedule—choose what you want, when you want it, with no obligations.`;
   
   const [clubName, setClubName] = useState(initialClubName);
   const [clubDescription, setClubDescription] = useState(initialClubDescription);
@@ -168,12 +172,12 @@ export default function SetupIndex() {
                 />
                 
                 <TextField
-                  label="Club Description"
+                  label="Messaging"
                   value={clubDescription}
                   onChange={setClubDescription}
                   multiline={4}
                   autoComplete="off"
-                  helpText="Describe what makes your club special and emphasize the freedom LiberoVino provides"
+                  helpText="This messaging will be included as a preamble in all email templates (SendGrid, Mailchimp, and Klaviyo)."
                 />
                 
                 <input type="hidden" name="club_name" value={clubName} />

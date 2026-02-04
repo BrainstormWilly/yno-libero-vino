@@ -7,6 +7,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
@@ -66,6 +67,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
       // Delete from DB
       const supabase = db.getSupabaseClient();
       await supabase.from('club_stage_promotions').delete().eq('id', promoId);
+      
+      // Recalculate setup progress - if it drops below 100%, setup_complete will be set to false
+      await recalculateAndUpdateSetupComplete(session.clientId);
       
       return {
         success: true,

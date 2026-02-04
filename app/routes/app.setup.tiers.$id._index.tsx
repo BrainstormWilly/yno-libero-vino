@@ -1,5 +1,5 @@
 import { type ActionFunctionArgs } from 'react-router';
-import { Form, useNavigate, useActionData, useRouteLoaderData } from 'react-router';
+import { Form, useNavigate, useActionData, useRouteLoaderData, useSubmit } from 'react-router';
 import { useState, useEffect, useMemo } from 'react';
 import { 
   Page, 
@@ -13,15 +13,16 @@ import {
   Checkbox,
   Divider,
   Box,
-  Select,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
-import { crmManager } from '~/lib/crm/index.server';
+import { getSupabaseClient, recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
+import { crmManager, deletePromotion as crmDeletePromotion } from '~/lib/crm/index.server';
 import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
+import TierDetailsForm from '~/components/TierDetailsForm';
 
 // Type for enriched promotions from the parent loader
 type EnrichedPromotion = {
@@ -54,13 +55,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
   try {
     if (actionType === 'delete_tier') {
-      // Delete tier and redirect to tiers list
+      const promotions = await db.getStagePromotions(tierId);
+      for (const promo of promotions) {
+        if (promo.crm_type === 'commerce7' && promo.crm_id) {
+          try {
+            await crmDeletePromotion(session, promo.crm_id);
+          } catch (err) {
+            console.error('Failed to delete C7 promotion:', promo.crm_id, err);
+            return {
+              success: false,
+              error: `Failed to delete promotion in Commerce7: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
+            };
+          }
+        }
+      }
       await db.deleteClubStage(tierId);
+      
+      // Recalculate setup progress
+      await recalculateAndUpdateSetupComplete(session.clientId);
       
       const redirectUrl = addSessionToUrl('/app/setup/tiers', session.id) + 
         '&toast=' + encodeURIComponent('Tier deleted successfully') +
         '&toastType=success';
-      
       return {
         success: true,
         redirect: redirectUrl,
@@ -73,44 +89,115 @@ export async function action({ request, params }: ActionFunctionArgs) {
       const minLtvAmount = parseFloat(formData.get('min_ltv_amount') as string) || 0;
       const upgradable = formData.get('upgradable') === 'true';
       const tierType = formData.get('tier_type') as string || 'discount';
+      const initialQualificationAllowed = formData.get('initial_qualification_allowed') !== 'false';
+      const overrideRaw = formData.get('min_purchase_amount_override') as string;
       
       // Initial purchase = min_ltv_amount / 12 (LTV/12)
-      const minPurchaseAmount = minLtvAmount / 12;
+      const calculated = minLtvAmount / 12;
+      const minPurchaseAmount =
+        overrideRaw !== '' && overrideRaw != null && !Number.isNaN(parseFloat(overrideRaw))
+          ? Math.max(0, parseFloat(overrideRaw))
+          : calculated;
       
-      // Update tier details in DB
-      await db.updateClubStage(tierId, {
-        name: tierName,
-        durationMonths,
-        minPurchaseAmount,
-        minLtvAmount,
-        upgradable,
-        tierType,
-      });
+      // Check if tier exists - if not, create it
+      const existingTier = await db.getClubStageWithDetails(tierId);
+      const existingProgram = await db.getClubProgram(session.clientId);
+      if (!existingProgram) {
+        return {
+          action: 'update_tier_details',
+          error: 'Club program not found',
+        };
+      }
       
-      // Sync with CRM
-      const tier = await db.getClubStageWithDetails(tierId);
-      if (tier) {
-        const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
+      if (!existingTier) {
+        // Create new tier with the temp UUID as the actual ID
+        const tierCount = existingProgram.club_stages?.length || 0;
+        const supabase = getSupabaseClient();
         
-        // Idempotent upsert - creates or updates as needed
-        const result = await provider.upsertClub({
-          id: tier.id,
+        const insert: any = {
+          id: tierId, // Use the temp UUID as the actual tier ID
+          club_program_id: existingProgram.id,
           name: tierName,
-          c7ClubId: tier.c7_club_id,
+          duration_months: durationMonths,
+          min_purchase_amount: minPurchaseAmount,
+          min_ltv_amount: minLtvAmount,
+          stage_order: tierCount + 1,
+          is_active: true,
+          upgradable,
+          tier_type: tierType,
+          initial_qualification_allowed: initialQualificationAllowed,
+        };
+        
+        const { data: newTiers, error } = await supabase
+          .from('club_stages')
+          .insert(insert)
+          .select();
+        
+        if (error) {
+          return {
+            action: 'update_tier_details',
+            error: `Failed to create tier: ${error.message}`,
+          };
+        }
+        
+        if (!newTiers || newTiers.length === 0) {
+          return {
+            action: 'update_tier_details',
+            error: 'Failed to create tier: No data returned',
+          };
+        }
+        
+        // Sync with CRM
+        const createdTier = newTiers[0];
+        const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
+        const result = await provider.upsertClub({
+          id: createdTier.id,
+          name: tierName,
+          c7ClubId: null,
+        });
+        
+        // Save CRM club ID
+        await db.updateClubStage(tierId, {
+          c7ClubId: result.crmClubId,
+        });
+        
+        // Recalculate setup progress
+        await recalculateAndUpdateSetupComplete(session.clientId);
+      } else {
+        // Update existing tier
+        await db.updateClubStage(tierId, {
+          name: tierName,
+          durationMonths,
+          minPurchaseAmount,
+          minLtvAmount,
+          upgradable,
+          tierType,
+          initialQualificationAllowed,
+        });
+        
+        // Sync with CRM
+        const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
+        const result = await provider.upsertClub({
+          id: existingTier.id,
+          name: tierName,
+          c7ClubId: existingTier.c7_club_id,
         });
         
         // Save CRM club ID if it was just created
-        if (!tier.c7_club_id) {
+        if (!existingTier.c7_club_id) {
           await db.updateClubStage(tierId, {
             c7ClubId: result.crmClubId,
           });
         }
       }
       
+      // Recalculate setup progress
+      await recalculateAndUpdateSetupComplete(session.clientId);
+      
       // Return success feedback (stays on same route - no scroll)
       return {
         action: 'update_tier_details',
-        success: 'Tier details updated successfully',
+        success: existingTier ? 'Tier details updated successfully' : 'Tier created successfully',
       };
     }
     
@@ -195,19 +282,26 @@ export default function TierDetails() {
   const parentData = useRouteLoaderData<typeof tierLayoutLoader>('routes/app.setup.tiers.$id');
   if (!parentData) throw new Error('Parent loader data not found');
   
-  const { tier, promotions: rawPromotions, loyalty, session } = parentData;
+  const { tier, promotions: rawPromotions, loyalty, session, isNewTier } = parentData;
   const promotions = rawPromotions as EnrichedPromotion[];
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
-  
-  // Check if this is a newly created tier (not yet customized)
-  const isNewTier = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') === 'true';
+  const submit = useSubmit();
   
   const [tierName, setTierName] = useState(tier.name);
   const [durationMonths, setDurationMonths] = useState(tier.duration_months.toString());
   const [minLtvAmount, setMinLtvAmount] = useState(tier.min_ltv_amount?.toString() || '0');
   const [upgradable, setUpgradable] = useState(tier.upgradable ?? true);
   const [tierType, setTierType] = useState((tier as any).tier_type || 'discount');
+  const [initialQualificationAllowed, setInitialQualificationAllowed] = useState(
+    tier.initial_qualification_allowed ?? true
+  );
+  const [minPurchaseOverride, setMinPurchaseOverride] = useState(() => {
+    const calc = tier.min_ltv_amount ? (tier.min_ltv_amount / 12).toFixed(2) : '0.00';
+    return tier.min_purchase_amount !== parseFloat(calc)
+      ? String(tier.min_purchase_amount)
+      : '';
+  });
   
   // Initial purchase = min_ltv_amount / 12 (LTV/12)
   const calculatedMinPurchase = useMemo(() => {
@@ -229,6 +323,20 @@ export default function TierDetails() {
   // Track feedback banner visibility
   const [showFeedback, setShowFeedback] = useState(true);
   
+  // Reset form only when tier id or tier data actually changes (not on object reference change)
+  useEffect(() => {
+    setTierName(tier.name);
+    setDurationMonths(tier.duration_months.toString());
+    setMinLtvAmount(tier.min_ltv_amount?.toString() || '0');
+    setUpgradable(tier.upgradable ?? true);
+    setTierType((tier as any).tier_type || 'discount');
+    setInitialQualificationAllowed(tier.initial_qualification_allowed ?? true);
+    const calc = tier.min_ltv_amount ? (tier.min_ltv_amount / 12).toFixed(2) : '0.00';
+    setMinPurchaseOverride(
+      tier.min_purchase_amount !== parseFloat(calc) ? String(tier.min_purchase_amount) : ''
+    );
+  }, [tier.id, tier.name, tier.duration_months, tier.min_ltv_amount, tier.min_purchase_amount, tier.upgradable, tier.initial_qualification_allowed]);
+  
   // Reset feedback visibility when actionData changes
   useEffect(() => {
     if (actionData?.action === 'update_tier_details') {
@@ -245,7 +353,15 @@ export default function TierDetails() {
     durationMonths !== tier.duration_months.toString() ||
     minLtvAmount !== (tier.min_ltv_amount?.toString() || '0') ||
     upgradable !== (tier.upgradable ?? true) ||
-    tierType !== ((tier as any).tier_type || 'discount');
+    tierType !== ((tier as any).tier_type || 'discount') ||
+    initialQualificationAllowed !== (tier.initial_qualification_allowed ?? true) ||
+    (() => {
+      const calc = tier.min_ltv_amount ? (tier.min_ltv_amount / 12).toFixed(2) : '0.00';
+      const expectedOverride = tier.min_purchase_amount !== parseFloat(calc)
+        ? String(tier.min_purchase_amount)
+        : '';
+      return minPurchaseOverride !== expectedOverride;
+    })();
   
   // Track if loyalty settings have been modified
   const loyaltyChanged = 
@@ -319,117 +435,55 @@ export default function TierDetails() {
               {/* Tier Basic Info */}
               <section>
                 <Card>
-                  <BlockStack gap="400">
-                    <Text variant="headingMd" as="h3">
-                      Tier Details
-                    </Text>
-                    
-                    <Form method="post">
-                      <input type="hidden" name="action" value="update_tier_details" />
-                      <BlockStack gap="400">
-                        <TextField
-                          label="Tier Name"
-                          value={tierName}
-                          onChange={setTierName}
-                          name="tier_name"
-                          autoComplete="off"
-                          helpText="e.g., 'Bronze', 'Silver', 'Gold'"
-                          disabled={!tier.is_active}
-                        />
-                        
-                        <InlineStack gap="400">
-                          <div style={{ flex: 1 }}>
-                            <TextField
-                              label="Duration (months)"
-                              value={durationMonths}
-                              onChange={setDurationMonths}
-                              name="duration_months"
-                              type="number"
-                              autoComplete="off"
-                              disabled={!tier.is_active}
-                            />
-                          </div>
-                          
-                          <div style={{ flex: 1 }}>
-                            <TextField
-                              label="Min Purchase ($)"
-                              value={calculatedMinPurchase}
-                              name="min_purchase_amount"
-                              type="number"
-                              autoComplete="off"
-                              disabled={true}
-                              helpText="Automatically calculated from Min LTV and Duration"
-                            />
-                          </div>
-                          
-                          <div style={{ flex: 1 }}>
-                            <TextField
-                              label="Min Annual LTV ($)"
-                              value={minLtvAmount}
-                              onChange={setMinLtvAmount}
-                              name="min_ltv_amount"
-                              type="number"
-                              autoComplete="off"
-                              helpText="Minimum annualized lifetime value required for this tier"
-                              disabled={!tier.is_active}
-                            />
-                          </div>
-                        </InlineStack>
-                        
-                        <Select
-                          label="Tier Type"
-                          options={[
-                            { label: 'Discount', value: 'discount' },
-                            { label: 'Allocation', value: 'allocation' },
-                          ]}
-                          value={tierType}
-                          onChange={setTierType}
-                          name="tier_type"
-                          helpText="Discount: Discount-based benefits (may have product restrictions). Allocation: Product access only (0% discount, cumulative products)."
-                          disabled={!tier.is_active}
-                        />
-                        
-                        <input type="hidden" name="tier_type" value={tierType} />
-                        
-                        <Checkbox
-                          label="Members can upgrade to this tier"
-                          checked={upgradable}
-                          onChange={setUpgradable}
-                          helpText="If unchecked, this tier can only be assigned manually (e.g., for high-value customers). Automatic tier progression will skip non-upgradable tiers."
-                          disabled={!tier.is_active}
-                        />
-                        
-                        <input type="hidden" name="upgradable" value={upgradable.toString()} />
-                        
-                        {tier.is_active && (
-                          <InlineStack align="end">
-                            <Button 
-                              submit 
-                              variant="primary"
-                              disabled={!tierDetailsChanged}
-                            >
-                              Save Details
-                            </Button>
-                          </InlineStack>
-                        )}
-                      </BlockStack>
-                    </Form>
-                    
-                    {!isNewTier && tier.is_active && (
-                      <>
-                        <Divider />
-                        <Form method="post">
-                          <input type="hidden" name="action" value="delete_tier" />
-                          <Button 
-                            submit 
+                  <Form method="post">
+                    <BlockStack gap="400">
+                      <TierDetailsForm
+                        tierName={tierName}
+                        durationMonths={durationMonths}
+                        minLtvAmount={minLtvAmount}
+                        upgradable={upgradable}
+                        initialQualificationAllowed={initialQualificationAllowed}
+                        minPurchaseOverride={minPurchaseOverride}
+                        calculatedMinPurchase={calculatedMinPurchase}
+                        tierType={tierType}
+                        onTierNameChange={setTierName}
+                        onDurationMonthsChange={setDurationMonths}
+                        onMinLtvAmountChange={setMinLtvAmount}
+                        onUpgradableChange={setUpgradable}
+                        onInitialQualificationAllowedChange={setInitialQualificationAllowed}
+                        onMinPurchaseOverrideChange={setMinPurchaseOverride}
+                        onTierTypeChange={setTierType}
+                        actionName="update_tier_details"
+                        disabled={!tier.is_active}
+                        showTierType={true}
+                        showMinPurchaseInline={true}
+                        tierNameHelpText="e.g., 'Bronze', 'Silver', 'Gold'"
+                        submitButtonLabel="Save Details"
+                        submitButtonDisabled={!tier.is_active || !tierDetailsChanged}
+                      />
+                      {!isNewTier && tier.is_active && (
+                        <>
+                          <Divider />
+                          <Button
                             tone="critical"
+                            onClick={() => {
+                              const promoCount = promotions.length;
+                              const promoWarning = promoCount > 0
+                                ? ` Deleting this tier will also permanently delete its ${promoCount} promotion(s) in Commerce7.`
+                                : '';
+                              if (confirm(`Are you sure you want to delete this tier?${promoWarning} This cannot be undone.`)) {
+                                const fd = new FormData();
+                                fd.set('action', 'delete_tier');
+                                submit(fd, { method: 'post' });
+                              }
+                            }}
                           >
                             Delete Tier
                           </Button>
-                        </Form>
-                      </>
-                    )}
-                  </BlockStack>
+                        </>
+                      )}
+                    </BlockStack>
+                  </Form>
                 </Card>
               </section>
               
@@ -441,12 +495,17 @@ export default function TierDetails() {
                       <Text variant="headingMd" as="h3">
                         Promotions ({promotions.length})
                       </Text>
-                      {tier.is_active && (
+                      {tier.is_active && !isNewTier && (
                         <Button
                           onClick={() => navigate(addSessionToUrl(`/app/setup/tiers/${tier.id}/promotions/new`, session.id))}
                         >
                           + Add Promotion
                         </Button>
+                      )}
+                      {isNewTier && (
+                        <Banner tone="info">
+                          Save tier details before adding promotions.
+                        </Banner>
                       )}
                     </InlineStack>
                     
@@ -509,8 +568,13 @@ export default function TierDetails() {
                         checked={loyaltyEnabled}
                         onChange={setLoyaltyEnabled}
                         helpText="Members automatically earn points on all purchases"
-                        disabled={!tier.is_active}
+                        disabled={!tier.is_active || isNewTier}
                       />
+                      {isNewTier && (
+                        <Banner tone="info">
+                          Save tier details before configuring loyalty rewards.
+                        </Banner>
+                      )}
                       
                       {loyaltyEnabled && (
                         <BlockStack gap="300">

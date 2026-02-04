@@ -236,6 +236,9 @@ export default function MarketingSetup() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
+            <Text variant="bodyMd" as="p" tone="subdued">
+              Select products to feature in member emails and marketing. These recommended products appear in monthly status and other messages for members who have opted into marketing—helping you highlight specific wines or offers. You can change your selections anytime in Settings → Marketing.
+            </Text>
             {/* Navigation */}
             <Box paddingBlockEnd="400">
               <InlineStack align="space-between">

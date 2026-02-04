@@ -8,7 +8,6 @@ import {
   Text, 
   BlockStack,
   Banner,
-  TextField,
   InlineStack,
   Box,
   InlineGrid,
@@ -16,13 +15,15 @@ import {
   useBreakpoints,
   Link,
   List,
-  Checkbox,
 } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
 import { getMainNavigationActions } from '~/util/navigation';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
+import * as crm from '~/lib/crm/index.server';
 import type { loader as tierLayoutLoader } from './app.settings.club_tiers.$id';
+import TierDetailsForm from '~/components/TierDetailsForm';
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const session = await getAppSession(request);
@@ -64,10 +65,38 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   
   if (actionType === 'delete_tier') {
-    // Delete tier and redirect to tiers list
+    const enrollmentCount = await db.getEnrollmentCountForStage(tierId);
+    if (enrollmentCount > 0) {
+      return {
+        success: false,
+        message: 'Cannot delete a tier that has members. Move or remove members first.',
+      };
+    }
+
+    const promotions = await db.getStagePromotions(tierId);
+    for (const promo of promotions) {
+      if (promo.crm_type === 'commerce7' && promo.crm_id) {
+        try {
+          await crm.deletePromotion(session, promo.crm_id);
+        } catch (err) {
+          console.error('Failed to delete C7 promotion:', promo.crm_id, err);
+          return {
+            success: false,
+            message: `Failed to delete promotion in Commerce7: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
+          };
+        }
+      }
+    }
+
     await db.deleteClubStage(tierId);
     
-    const redirectUrl = addSessionToUrl('/app/settings/club_tiers', session.id);
+    // Recalculate setup progress - if it drops below 100%, setup_complete will be set to false
+    await recalculateAndUpdateSetupComplete(session.clientId);
+    
+    // Check if setup is now incomplete - if so, redirect to setup instead of settings
+    const client = await db.getClient(session.clientId);
+    const redirectPath = client?.setup_complete ? '/app/settings/club_tiers' : '/app/setup/tiers';
+    const redirectUrl = addSessionToUrl(redirectPath, session.id);
     
     return {
       success: true,
@@ -85,7 +114,7 @@ export default function TierDetail() {
   const parentData = useRouteLoaderData<typeof tierLayoutLoader>('routes/app.settings.club_tiers.$id');
   if (!parentData) throw new Error('Parent loader data not found');
   
-  const { session, tier, promotions } = parentData;
+  const { session, tier, promotions, enrollmentCount } = parentData;
   const actionData = useActionData<typeof action>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -146,22 +175,38 @@ export default function TierDetail() {
           sessionId: session.id,
           currentPath: location.pathname,
         }),
-        {
-          content: 'Delete Tier',
-          destructive: true,
-          onAction: () => {
-            if (confirm('Are you sure you want to delete this tier? This action cannot be undone.')) {
-              const formData = new FormData();
-              formData.append('action', 'delete_tier');
-              submit(formData, { method: 'post' });
-            }
-          },
-        },
+        ...(enrollmentCount > 0
+          ? [{
+              content: 'Delete Tier',
+              destructive: true,
+              disabled: true,
+              helpText: 'Cannot delete a tier that has members.',
+            }]
+          : [{
+              content: 'Delete Tier',
+              destructive: true,
+              onAction: () => {
+                const promoCount = promotions.length;
+                const promoWarning = promoCount > 0
+                  ? ` Deleting this tier will also permanently delete its ${promoCount} promotion(s) in Commerce7.`
+                  : '';
+                if (confirm(`Are you sure you want to delete this tier?${promoWarning} This cannot be undone.`)) {
+                  const formData = new FormData();
+                  formData.append('action', 'delete_tier');
+                  submit(formData, { method: 'post' });
+                }
+              },
+            }]),
       ]}
     >
       <BlockStack gap={{ xs: "800", sm: "400" }}>
         {actionData && (
           <Banner tone={actionData.success ? 'success' : 'critical'} title={actionData.message} />
+        )}
+        {enrollmentCount > 0 && (
+          <Banner tone="warning">
+            This tier has members and cannot be deleted. Move or remove members first.
+          </Banner>
         )}
         
         {/* Tier Information Section */}
@@ -182,93 +227,25 @@ export default function TierDetail() {
           </Box>
           <Card roundedAbove="sm">
             <Form method="post">
-              <input type="hidden" name="action" value="update_tier" />
-              <input type="hidden" name="tier_name" value={tierName} />
-              <input type="hidden" name="duration_months" value={durationMonths === '' ? '3' : durationMonths} />
-              <input type="hidden" name="min_ltv_amount" value={minLtvAmount === '' ? '600' : minLtvAmount} />
-              <input type="hidden" name="min_purchase_amount_override" value={initialQualificationAllowed ? minPurchaseOverride : ''} />
-              <input type="hidden" name="initial_qualification_allowed" value={initialQualificationAllowed ? 'true' : 'false'} />
-              <input type="hidden" name="upgradable" value={upgradable ? 'true' : 'false'} />
-              
-              <BlockStack gap="400">
-                <Text variant="headingMd" as="h3">
-                  Tier Details
-                </Text>
-                
-                <TextField
-                  label="Tier Name"
-                  id="tier_name"
-                  value={tierName}
-                  onChange={setTierName}
-                  autoComplete="off"
-                  helpText="Enter a descriptive name for this membership tier"
-                />
-                
-                <TextField
-                  label="Duration (months)"
-                  id="duration_months"
-                  value={durationMonths ?? ''}
-                  onChange={(value) => setDurationMonths(value == null ? '' : String(value))}
-                  autoComplete="off"
-                  helpText="How long the membership lasts (1-24 months). Whole numbers only."
-                />
-                
-                <TextField
-                  label="Minimum Annual LTV"
-                  id="min_ltv_amount"
-                  value={minLtvAmount ?? ''}
-                  onChange={(value) => setMinLtvAmount(value == null ? '' : String(value))}
-                  autoComplete="off"
-                  prefix="$"
-                  helpText="Minimum annual lifetime value required for this tier"
-                />
-                
-                <Checkbox
-                  label="Available for initial signup"
-                  checked={initialQualificationAllowed}
-                  onChange={setInitialQualificationAllowed}
-                  disabled={!upgradable}
-                  helpText={!upgradable
-                    ? 'Must be checked when tier is not upgradable (so members can join at signup).'
-                    : 'When unchecked, this tier can only be applied via upgrade, not at initial signup.'}
-                />
-                
-                {initialQualificationAllowed && (
-                  <TextField
-                    label="Initial purchase amount"
-                    id="min_purchase_amount_override"
-                    value={minPurchaseOverride}
-                    onChange={(value) => setMinPurchaseOverride(value == null ? '' : String(value))}
-                    autoComplete="off"
-                    prefix="$"
-                    placeholder={calculatedMinPurchase}
-                    helpText="Leave blank to use suggested value (ALTV ÷ 12). Set a value to override."
-                  />
-                )}
-                
-                <Checkbox
-                  label="Upgradable"
-                  checked={upgradable}
-                  onChange={setUpgradable}
-                  disabled={!initialQualificationAllowed}
-                  helpText={!initialQualificationAllowed
-                    ? 'Must be checked for upgrade-only tiers (so members can reach this tier).'
-                    : 'When checked, members in lower tiers can upgrade to this tier. Uncheck for top-tier only.'}
-                />
-                
-                <Box paddingBlockStart="200">
-                  <InlineStack gap="200">
-                    <Button variant="primary" submit>
-                      Save Changes
-                    </Button>
-                    <Button 
-                      url={addSessionToUrl('/app/settings/club_tiers', session.id)}
-                    >
-                      Cancel
-                    </Button>
-                  </InlineStack>
-                </Box>
-              </BlockStack>
+              <TierDetailsForm
+                tierName={tierName}
+                durationMonths={durationMonths}
+                minLtvAmount={minLtvAmount}
+                upgradable={upgradable}
+                initialQualificationAllowed={initialQualificationAllowed}
+                minPurchaseOverride={minPurchaseOverride}
+                calculatedMinPurchase={calculatedMinPurchase}
+                onTierNameChange={setTierName}
+                onDurationMonthsChange={setDurationMonths}
+                onMinLtvAmountChange={setMinLtvAmount}
+                onUpgradableChange={setUpgradable}
+                onInitialQualificationAllowedChange={setInitialQualificationAllowed}
+                onMinPurchaseOverrideChange={setMinPurchaseOverride}
+                actionName="update_tier"
+                useHiddenInputs={true}
+                showCancelButton={true}
+                cancelButtonUrl={addSessionToUrl('/app/settings/club_tiers', session.id)}
+              />
             </Form>
           </Card>
         </InlineGrid>

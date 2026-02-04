@@ -31,8 +31,41 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   
   const tierId = params.id!;
   const tier = await db.getClubStageWithDetails(tierId);
+  
+  // If tier doesn't exist, it's a new tier - return default values
   if (!tier) {
-    throw new Response('Tier not found', { status: 404 });
+    const existingProgram = await db.getClubProgram(session.clientId);
+    if (!existingProgram) {
+      throw new Response('Club program not found', { status: 404 });
+    }
+    
+    // Return default tier structure for new tier
+    const defaultMinLtv = 600; // $600 annual LTV
+    const defaultDuration = 3; // 3 months
+    const calculatedMinPurchase = defaultMinLtv / 12; // $50
+    
+    return {
+      session,
+      tier: {
+        id: tierId,
+        club_program_id: existingProgram.id,
+        name: '',
+        duration_months: defaultDuration,
+        min_purchase_amount: calculatedMinPurchase,
+        min_ltv_amount: defaultMinLtv,
+        stage_order: null,
+        tier_type: 'discount',
+        upgradable: true,
+        initial_qualification_allowed: true,
+        is_active: true,
+        c7_club_id: null,
+        created_at: null,
+        updated_at: null,
+      } as any,
+      promotions: [],
+      loyalty: null,
+      isNewTier: true,
+    };
   }
   
   const promotions = await db.getStagePromotions(tierId);
@@ -59,6 +92,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     tier,
     promotions: enrichedPromotions as EnrichedPromotion[],
     loyalty,
+    isNewTier: false,
   };
 }
 
@@ -74,9 +108,9 @@ export default function TierLayout() {
         </main>
       </Layout.Section>
 
-      {/* Summary Panel - Right Side */}
+      {/* Summary Panel - Right Side - aligned with top of Tier Details card */}
       <Layout.Section variant="oneThird">
-        <aside>
+        <aside className="md:pt-35">
           <TierSummary 
             tier={tier} 
             promotions={promotions.map(p => ({

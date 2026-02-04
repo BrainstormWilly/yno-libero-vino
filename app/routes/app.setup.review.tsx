@@ -313,8 +313,8 @@ export async function action({ request }: ActionFunctionArgs) {
         );
       }
       
-      // Mark setup as complete
-      await db.markSetupComplete(session.clientId);
+      // Recalculate setup_complete based on progress (will be set to true if progress is 100%)
+      await db.recalculateAndUpdateSetupComplete(session.clientId);
       
       // Redirect to app home with success message
       const successUrl = addSessionToUrl('/app', session.id) + 

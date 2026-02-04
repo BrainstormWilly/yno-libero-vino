@@ -16,8 +16,10 @@ import {
   handleExistingSession,
   checkSetupRedirect
 } from '~/lib/app-loader-helpers.server';
-import { getClubProgram } from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
+import { calculateSetupProgress } from '~/lib/setup-progress.server';
 import { scrollToTop } from '~/util/iframe-helper';
+import SetupWizard from '~/components/SetupWizard';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -37,36 +39,24 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // Add setup progress for dev mode too
     let setupProgress = null;
     if (!devResult.client.setup_complete) {
-      const clubProgram = await getClubProgram(devResult.client.id);
-      let progress = 0;
-      let currentStep = '';
-      
-      if (clubProgram?.name) {
-        progress += 25;
-        currentStep = 'Create membership tiers';
-      }
-      
-      if (clubProgram?.club_stages && clubProgram.club_stages.length > 0) {
-        progress += 25;
-        currentStep = 'Configure tier promotions';
-        
-        if (url.pathname.includes('/setup/review')) {
-          progress += 50;
-          currentStep = 'Review and launch';
-        }
-      } else if (!clubProgram) {
-        currentStep = 'Create club program';
-      }
+      const progressData = await calculateSetupProgress(devResult.client.id);
+      await recalculateAndUpdateSetupComplete(devResult.client.id);
       
       setupProgress = {
-        progress: progress,
-        currentStep,
+        progress: progressData.progress,
+        progressData: {
+          hasClubProgram: progressData.hasClubProgram,
+          hasTier: progressData.hasTier,
+          hasPromo: progressData.hasPromo,
+          hasCommConfig: progressData.hasCommConfig,
+        },
       };
     }
     
     return {
       ...devResult,
-      setupProgress: setupProgress as { progress: number; currentStep: string } | null,
+      setupProgress: setupProgress as { progress: number; progressData: { hasClubProgram: boolean; hasTier: boolean; hasPromo: boolean; hasCommConfig: boolean } } | null,
+      currentRoute: url.pathname,
     };
   }
 
@@ -81,48 +71,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Check if setup is incomplete and redirect (but not if already on setup route)
   checkSetupRedirect(client, url, session.id);
 
-  // Calculate setup progress if setup is incomplete
+  // Calculate setup progress based on data (not routes)
   let setupProgress = null;
   if (!client.setup_complete) {
-    const clubProgram = await getClubProgram(client.id);
+    const progressData = await calculateSetupProgress(client.id);
     
-    // Calculate progress:
-    // - Has club program name: 25%
-    // - Has at least one tier: 25%
-    // - All tiers have promotions: 50%
-    let progress = 0;
-    let currentStep = '';
-    
-    if (clubProgram?.name) {
-      progress += 25;
-      currentStep = 'Create membership tiers';
-    }
-    
-    if (clubProgram?.club_stages && clubProgram.club_stages.length > 0) {
-      progress += 25;
-      currentStep = 'Configure tier promotions';
-      
-      // Check if all tiers have promotions (need to query separately)
-      const allTiersConfigured = clubProgram.club_stages.every((tier: any) => {
-        // We'll check this in the UI instead since we need to fetch promotions
-        return true; // Placeholder for now
-      });
-      
-      if (clubProgram.club_stages.length > 0) {
-        // Assume configured if we're past tiers page
-        const hasPromotions = url.pathname.includes('/setup/review');
-        if (hasPromotions) {
-          progress += 50;
-          currentStep = 'Review and launch';
-        }
-      }
-    } else if (!clubProgram) {
-      currentStep = 'Create club program';
-    }
+    // Recalculate and update setup_complete flag based on progress
+    await recalculateAndUpdateSetupComplete(client.id);
     
     setupProgress = {
-      progress: progress, // ProgressBar expects 0-100
-      currentStep,
+      progress: progressData.progress,
+      progressData: {
+        hasClubProgram: progressData.hasClubProgram,
+        hasTier: progressData.hasTier,
+        hasPromo: progressData.hasPromo,
+        hasCommConfig: progressData.hasCommConfig,
+      },
     };
   }
 
@@ -131,13 +95,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     client,
     session,
     isDev: false,
-    setupProgress: setupProgress as { progress: number; currentStep: string } | null,
+    setupProgress: setupProgress as { progress: number; progressData: { hasClubProgram: boolean; hasTier: boolean; hasPromo: boolean; hasCommConfig: boolean } } | null,
+    currentRoute: url.pathname,
   };
 }
 
 export default function AppLayout() {
   const loaderData = useLoaderData<typeof loader>();
-  const { client, session, setupProgress } = loaderData;
+  const { client, session, setupProgress, currentRoute } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
   const isSetupIncomplete = !client.setup_complete;
   const theme = session?.theme || 'light';
@@ -185,7 +150,7 @@ export default function AppLayout() {
           ? 'bg-[#161C27]' 
           : 'bg-white'
       }`}>
-      {/* Setup Progress Bar */}
+      {/* Setup Wizard */}
       {isSetupIncomplete && setupProgress && (
         <div className="container mx-auto px-4 mb-6">
           <Banner tone="info">
@@ -193,19 +158,11 @@ export default function AppLayout() {
               <Text variant="bodyMd" as="p">
                 <strong>Setup in Progress</strong> - Complete the setup wizard to unlock all features
               </Text>
-              <BlockStack gap="200">
-                <Text variant="bodySm" as="p" tone="subdued">
-                  Current step: {setupProgress.currentStep}
-                </Text>
-                <ProgressBar 
-                  progress={setupProgress.progress} 
-                  size="small"
-                  tone="primary"
-                />
-                <Text variant="bodySm" as="p" tone="subdued">
-                  {setupProgress.progress}% complete
-                </Text>
-              </BlockStack>
+              <SetupWizard 
+                currentRoute={currentRoute || ''}
+                progressData={setupProgress.progressData}
+                progress={setupProgress.progress}
+              />
             </BlockStack>
           </Banner>
         </div>
@@ -215,18 +172,20 @@ export default function AppLayout() {
       <Outlet />
 
       {/* Footer button */}
-      <div className="footer-button">
-        <a
-          href="https://liberovino.wine"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img 
-            key={theme}
-            src={theme === 'dark' ? '/media/powered-by-dark.png' : '/media/powered-by-light.png'} 
-            alt="Powered by LiberoVino" 
-          />
-        </a>
+      <div className="flex justify-center">
+        <div className="footer-button">
+          <a
+            href="https://liberovino.wine"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <img 
+              style={{ objectFit: 'contain' }}
+              src={theme === 'dark' ? '/media/powered-by-dark.png' : '/media/powered-by-light.png'} 
+              alt="Powered by LiberoVino" 
+            />
+          </a>
+        </div>
       </div>
     </div>
     </>

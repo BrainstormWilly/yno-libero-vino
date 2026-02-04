@@ -16,11 +16,13 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
   
   const promotions = await db.getStagePromotions(tierId);
+  const enrollmentCount = await db.getEnrollmentCountForStage(tierId);
   
   return {
     session,
     tier,
     promotions,
+    enrollmentCount,
   };
 }
 

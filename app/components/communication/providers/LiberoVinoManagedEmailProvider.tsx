@@ -112,15 +112,12 @@ export default function LiberoVinoManagedEmailProvider({ existingConfig, actionD
                 {hasSms && <input type="hidden" name="test_phone" value={testPhone} />}
 
                 <InlineStack gap="200">
-                  {actionData?.confirmed ? (
-                    <Button variant="primary" onClick={onContinue}>
-                      Continue to Templates →
-                    </Button>
-                  ) : (
-                    <Button submit variant="primary" loading={isSubmitting} disabled={isSubmitting}>
-                      {isSubmitting ? (hasSms && testPhone ? 'Sending test email and SMS...' : 'Sending test email...') : 'Confirm Provider'}
-                    </Button>
-                  )}
+                  <Button variant="primary" onClick={onContinue}>
+                    Continue to Templates →
+                  </Button>
+                  <Button submit variant="secondary" loading={isSubmitting} disabled={isSubmitting}>
+                    {isSubmitting ? (hasSms && testPhone ? 'Sending test email and SMS...' : 'Sending test email...') : 'Send test first'}
+                  </Button>
                 </InlineStack>
               </BlockStack>
             </Form>

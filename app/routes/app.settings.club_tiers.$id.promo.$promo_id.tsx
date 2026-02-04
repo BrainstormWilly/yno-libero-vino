@@ -7,6 +7,7 @@ import { getAppSession } from '~/lib/sessions.server';
 import { addSessionToUrl } from '~/util/session';
 import { getMainNavigationActions } from '~/util/navigation';
 import * as db from '~/lib/db/supabase.server';
+import { recalculateAndUpdateSetupComplete, getClient } from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
@@ -74,9 +75,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
       // Delete from DB
       await db.deleteStagePromotion(promoId);
       
+      // Recalculate setup progress - if it drops below 100%, setup_complete will be set to false
+      await recalculateAndUpdateSetupComplete(session.clientId);
+      
+      // Check if setup is now incomplete - if so, redirect to setup instead of settings
+      const client = await getClient(session.clientId);
+      const redirectPath = client?.setup_complete ? `/app/settings/club_tiers/${tierId}` : `/app/setup/tiers/${tierId}`;
+      
       return {
         success: true,
-        redirect: addSessionToUrl(`/app/settings/club_tiers/${tierId}`, session.id),
+        redirect: addSessionToUrl(redirectPath, session.id),
       };
     }
     

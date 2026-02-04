@@ -88,7 +88,8 @@ export async function renderSendGridTemplate(
   headerUrl: string | null | undefined,
   footerUrl: string | null | undefined,
   requestUrl?: string,
-  sessionId?: string
+  sessionId?: string,
+  clientId?: string
 ): Promise<string> {
   // Load template - if it's a string, use it directly (from DB), otherwise load from file
   const template = typeof templateOrType === 'string' && templateOrType.includes('<!doctype html>')
@@ -126,10 +127,14 @@ export async function renderSendGridTemplate(
   // Build footer image block
   let footerImageBlock = '';
   if (usesNewTemplateFormat || isMonthlyStatus || isExpirationWarning || isUpgradeTemplate || isExpirationTemplate) {
-    // Use powered-by-dark.png for club-signup, monthly-status, expiration-warning, upgrade, and expiration template formats
-    const poweredByUrl = await getPoweredByDarkImageUrl();
-    const proxiedPoweredByUrl = convertImageUrlToProxy(poweredByUrl, requestUrl, sessionId);
-    footerImageBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 0;"><img src="${proxiedPoweredByUrl}" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" /></div>`;
+    // Use client's footer image if provided, otherwise powered-by-dark.png
+    if (proxiedFooterUrl) {
+      footerImageBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 0;"><img src="${proxiedFooterUrl}" alt="${variables.client_name || 'Winery'}" style="width: 600px; height: 80px; display: block; margin: 0 auto; object-fit: contain;" /></div>`;
+    } else {
+      const poweredByUrl = await getPoweredByDarkImageUrl();
+      const proxiedPoweredByUrl = convertImageUrlToProxy(poweredByUrl, requestUrl, sessionId);
+      footerImageBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 0;"><img src="${proxiedPoweredByUrl}" alt="Powered by LiberoVino" style="width: 600px; height: 80px; display: block; margin: 0 auto;" /></div>`;
+    }
   } else if (proxiedFooterUrl) {
     footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${proxiedFooterUrl}" alt="${variables.client_name || 'Winery'}" style="max-width: 600px; height: auto;" /></div>`;
   }
@@ -138,6 +143,24 @@ export async function renderSendGridTemplate(
   const customContentBlock = customContent
     ? `<div style="margin: 20px 0; padding: 16px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;"><p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">${escapeHtml(customContent)}</p></div>`
     : '';
+  
+  // Build club description block
+  let clubDescriptionBlock = '';
+  if (clientId) {
+    try {
+      const { getClubProgram } = await import('~/lib/db/supabase.server');
+      const clubProgram = await getClubProgram(clientId);
+      if (clubProgram?.description) {
+        const safeDescription = escapeHtml(clubProgram.description);
+        clubDescriptionBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">${safeDescription}</p>
+        </div>`;
+      }
+    } catch (error) {
+      // If fetching fails, continue without club description block
+      console.warn('Failed to fetch club description for template:', error);
+    }
+  }
   
   // Check if this is a monthly-status template and build conditional blocks
   let extensionStatusBlock = '';
@@ -236,6 +259,7 @@ export async function renderSendGridTemplate(
     header_image_block: headerBlock, // Keep for backward compatibility
     footer_image_block: footerImageBlock,
     custom_content_block: customContentBlock,
+    club_description_block: clubDescriptionBlock,
     extension_status_block: extensionStatusBlock,
     upgrade_offer_block: upgradeOfferBlock,
     upgrade_info_block: upgradeInfoBlock,
@@ -283,7 +307,8 @@ export function getTemplateVariables(templateType: TemplateType) {
  */
 export async function downloadTemplateForProvider(
   templateType: TemplateType,
-  provider: 'klaviyo' | 'mailchimp'
+  provider: 'klaviyo' | 'mailchimp',
+  clientId?: string
 ): Promise<string> {
   let template = loadBaseTemplate(templateType);
   
@@ -296,10 +321,30 @@ export async function downloadTemplateForProvider(
   const headerImageBlock = `<div style="width: 100%; text-align: center; margin-bottom: 20px;"><img src="${headerUrl}" alt="${clientName}" style="max-width: 600px; height: auto;" /></div>`;
   const footerImageBlock = `<div style="width: 100%; text-align: center; margin-top: 40px;"><img src="${footerUrl}" alt="${clientName}" style="max-width: 600px; height: auto;" /></div>`;
   
+  // Build club description block if clientId provided
+  let clubDescriptionBlock = '';
+  if (clientId) {
+    try {
+      const { getClubProgram } = await import('~/lib/db/supabase.server');
+      const clubProgram = await getClubProgram(clientId);
+      if (clubProgram?.description) {
+        const safeDescription = escapeHtml(clubProgram.description);
+        clubDescriptionBlock = `<div style="max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #ffffff;">
+          <p style="margin: 0; font-size: 16px; line-height: 1.6; color: #202124;">${safeDescription}</p>
+        </div>`;
+      }
+    } catch (error) {
+      // If fetching fails, continue without club description block
+      console.warn('Failed to fetch club description for template download:', error);
+    }
+  }
+  
   // Replace image blocks with actual URLs
   template = template.replace('{{header_image_block}}', headerImageBlock);
+  template = template.replace('{{header_block}}', headerImageBlock); // Also handle header_block for newer templates
   template = template.replace('{{footer_image_block}}', footerImageBlock);
   template = template.replace('{{custom_content_block}}', '');
+  template = template.replace('{{club_description_block}}', clubDescriptionBlock);
   
   // Convert variable syntax based on provider
   if (provider === 'klaviyo') {
