@@ -6,7 +6,7 @@ interface EnrollmentSummaryProps {
   currentStep: 'qualify' | 'customer' | 'address' | 'payment' | 'review';
 }
 
-export default function EnrollmentSummary({ draft, currentStep }: EnrollmentSummaryProps) {
+export default function EnrollmentSummary({ draft, currentStep: _currentStep }: EnrollmentSummaryProps) {
   return (
     <BlockStack gap="400">
       {/* Customer Card */}

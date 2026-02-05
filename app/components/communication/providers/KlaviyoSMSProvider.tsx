@@ -1,7 +1,7 @@
 import { Card, BlockStack, Text, Banner } from '@shopify/polaris';
 import type { SMSProviderComponentProps } from './types';
 
-export default function KlaviyoSMSProvider({ existingConfig }: SMSProviderComponentProps) {
+export default function KlaviyoSMSProvider({ existingConfig: _existingConfig }: SMSProviderComponentProps) {
   return (
     <BlockStack gap="400">
       {/* Main Configuration Form */}
@@ -31,7 +31,7 @@ export default function KlaviyoSMSProvider({ existingConfig }: SMSProviderCompon
                 Not Using SMS?
               </Text>
               <Text as="p" variant="bodySm">
-                If you don't want to use SMS for cost or other reasons, you'll need to manually remove the SMS steps from your flows in the Klaviyo UI. 
+                If you don&apos;t want to use SMS for cost or other reasons, you&apos;ll need to manually remove the SMS steps from your flows in the Klaviyo UI. 
                 The flows are created with SMS steps by default, but you can edit them in Klaviyo to remove SMS if needed.
               </Text>
             </BlockStack>

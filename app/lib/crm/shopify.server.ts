@@ -1,6 +1,5 @@
 import type { CrmProvider, CrmCustomer, CrmProduct, CrmCollection, CrmOrder, CrmDiscount, WebhookPayload, WebhookTopic, WebhookRegistration } from '~/types/crm';
 import { CrmNames, CrmSlugs } from '~/types/crm';
-import { redirect } from 'react-router';
 import crypto from 'crypto';
 
 export class ShopifyProvider implements CrmProvider {

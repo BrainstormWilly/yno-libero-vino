@@ -12,7 +12,6 @@ import {
   Banner,
   Badge,
   Box,
-  Divider,
   ButtonGroup,
 } from '@shopify/polaris';
 
@@ -193,7 +192,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function SetupTiers() {
-  const { clubProgram, tiers, session } = useLoaderData<typeof loader>();
+  const { clubProgram: _clubProgram, tiers, session } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   const submit = useSubmit();

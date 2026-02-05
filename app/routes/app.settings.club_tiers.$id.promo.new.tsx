@@ -1,7 +1,7 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
 import { useActionData, useNavigate, useLoaderData } from 'react-router';
 import { useEffect } from 'react';
-import { Page, BlockStack, Box, Button } from '@shopify/polaris';
+import { Page, BlockStack } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
 import { addSessionToUrl } from '~/util/session';

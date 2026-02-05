@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs } from 'react-router';
-import { Outlet, useLoaderData } from 'react-router';
+import { Outlet } from 'react-router';
 import { getAppSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 

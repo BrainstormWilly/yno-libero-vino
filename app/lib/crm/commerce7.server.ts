@@ -10,8 +10,6 @@ import type {
   WebhookRegistration,
 } from "~/types/crm";
 import { CrmNames, CrmSlugs } from "~/types/crm";
-import { redirect } from "react-router";
-import crypto from "crypto";
 import type { C7CouponPayload } from "~/types/discount-commerce7";
 import type { C7Tag } from "~/types/tag";
 import { C7TagObjectType } from "~/types/tag";

@@ -4,7 +4,7 @@ import { Card, BlockStack, Text, Banner, TextField, InlineStack, Button } from '
 import EmailPreferencesForm from '../EmailPreferencesForm';
 import type { EmailProviderComponentProps } from './types';
 
-export default function LiberoVinoManagedEmailProvider({ existingConfig, actionData, hasSms, onContinue, client }: EmailProviderComponentProps) {
+export default function LiberoVinoManagedEmailProvider({ existingConfig, actionData, hasSms, onContinue, client: _client }: EmailProviderComponentProps) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === 'submitting';
   

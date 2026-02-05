@@ -106,7 +106,7 @@ export default function NewTier() {
   const [initialQualificationAllowed, setInitialQualificationAllowed] = useState(true);
   const [upgradable, setUpgradable] = useState(true);
   
-  const durationNum = durationMonths === '' ? 0 : parseInt(durationMonths, 10) || 0;
+  const _durationNum = durationMonths === '' ? 0 : parseInt(durationMonths, 10) || 0;
   const minLtvNum = minLtvAmount === '' ? 0 : parseFloat(minLtvAmount) || 0;
   const calculatedMinPurchase = (minLtvNum / 12).toFixed(2);
   

@@ -2,7 +2,6 @@ import { type LoaderFunctionArgs } from 'react-router';
 import { Outlet, useLoaderData, useSearchParams } from 'react-router';
 import { useEffect } from 'react';
 import { 
-  ProgressBar,
   Banner,
   BlockStack,
   Text,

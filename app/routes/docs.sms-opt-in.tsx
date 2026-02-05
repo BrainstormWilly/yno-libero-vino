@@ -5,7 +5,6 @@ import {
   Card,
   Text,
   BlockStack,
-  InlineStack,
   Divider,
   List,
   Banner,

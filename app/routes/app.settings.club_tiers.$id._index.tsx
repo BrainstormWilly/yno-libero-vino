@@ -8,7 +8,6 @@ import {
   Text, 
   BlockStack,
   Banner,
-  InlineStack,
   Box,
   InlineGrid,
   Divider,
@@ -135,7 +134,7 @@ export default function TierDetail() {
   );
   const [upgradable, setUpgradable] = useState(tier.upgradable ?? true);
   
-  const durationNum = durationMonths === '' ? 0 : parseInt(durationMonths, 10) || 0;
+  const _durationNum = durationMonths === '' ? 0 : parseInt(durationMonths, 10) || 0;
   const minLtvNum = minLtvAmount === '' ? 0 : parseFloat(minLtvAmount) || 0;
   const calculatedMinPurchase = useMemo(() => {
     if (minLtvNum > 0) {

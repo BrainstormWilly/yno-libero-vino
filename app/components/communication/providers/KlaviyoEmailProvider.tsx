@@ -12,7 +12,7 @@ export default function KlaviyoEmailProvider({ existingConfig, actionData }: Ema
   const config = existingConfig;
   const providerData = (config?.provider_data as Record<string, unknown> | null) ?? null;
   
-  const readProviderBoolean = (key: string, fallback = false) => {
+  const _readProviderBoolean = (key: string, fallback = false) => {
     const value = providerData?.[key];
     return typeof value === 'boolean' ? (value as boolean) : fallback;
   };
@@ -71,7 +71,7 @@ export default function KlaviyoEmailProvider({ existingConfig, actionData }: Ema
                   2. Go to <strong>Account → Settings → API Keys</strong>
                 </Text>
                 <Text as="p" variant="bodySm">
-                  3. Click <strong>"Create Private API Key"</strong> (if you don't have one)
+                  3. Click <strong>&quot;Create Private API Key&quot;</strong> (if you don&apos;t have one)
                 </Text>
                 <Text as="p" variant="bodySm">
                   4. Copy the key (starts with <code>pk_</code>) and paste it below

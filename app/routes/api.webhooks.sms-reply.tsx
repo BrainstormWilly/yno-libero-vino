@@ -150,7 +150,7 @@ function detectProvider(request: Request, body: any): 'sendgrid' | 'klaviyo' | '
 function parseSMSWebhook(
   provider: 'sendgrid' | 'klaviyo' | 'mailchimp',
   body: any,
-  request: Request
+  _request: Request
 ): { from: string; message: string; provider: string } | null {
   switch (provider) {
     case 'sendgrid':
@@ -161,15 +161,15 @@ function parseSMSWebhook(
         provider: 'sendgrid',
       };
       
-    case 'klaviyo':
+    case 'klaviyo': {
       // Klaviyo SMS webhook format
-      // Klaviyo sends webhooks in their standard format
       const attributes = body.data?.attributes || body.attributes || {};
       return {
         from: attributes.phone_number || attributes.from || body.phone || '',
         message: attributes.message || attributes.body || body.message || '',
         provider: 'klaviyo',
       };
+    }
       
     case 'mailchimp':
       // Mailchimp SMS webhook format
