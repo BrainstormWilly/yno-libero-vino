@@ -20,7 +20,8 @@ import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
 import { getSupabaseClient, recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
-import { crmManager, deletePromotion as crmDeletePromotion } from '~/lib/crm/index.server';
+import { crmManager } from '~/lib/crm/index.server';
+import { deleteTierCrmResources } from '~/lib/club-tier-promotions.server';
 import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
 import TierDetailsForm from '~/components/TierDetailsForm';
 
@@ -55,19 +56,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
   
   try {
     if (actionType === 'delete_tier') {
-      const promotions = await db.getStagePromotions(tierId);
-      for (const promo of promotions) {
-        if (promo.crm_type === 'commerce7' && promo.crm_id) {
-          try {
-            await crmDeletePromotion(session, promo.crm_id);
-          } catch (err) {
-            console.error('Failed to delete C7 promotion:', promo.crm_id, err);
-            return {
-              success: false,
-              error: `Failed to delete promotion in Commerce7: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
-            };
-          }
-        }
+      try {
+        await deleteTierCrmResources(session, tierId);
+      } catch (err) {
+        return {
+          success: false,
+          error: `Failed to delete tier in CRM: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
+        };
       }
       await db.deleteClubStage(tierId);
       

@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useActionData, useNavigate, useLoaderData } from 'react-router';
+import { useActionData, useNavigate, useLoaderData, useNavigation } from 'react-router';
 import { useEffect } from 'react';
 import { Page, BlockStack } from '@shopify/polaris';
 
@@ -8,6 +8,7 @@ import { addSessionToUrl } from '~/util/session';
 import { getMainNavigationActions } from '~/util/navigation';
 import * as db from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
+import { createPromotionForTier } from '~/lib/club-tier-promotions.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
 
@@ -60,14 +61,30 @@ export async function action({ request, params }: ActionFunctionArgs) {
       };
     }
     
-    const tier = await db.getClubStageWithDetails(tierId);
+    let tier = await db.getClubStageWithDetails(tierId);
+    if (!tier) {
+      return { success: false, message: 'Tier not found.' };
+    }
+
+    // If tier has no C7 club ID (e.g. created in settings), sync to C7 first
+    if (!tier.c7_club_id && session.crmType === 'commerce7') {
+      const provider = crm.crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
+      const result = await provider.upsertClub({
+        id: tier.id,
+        name: tier.name,
+        c7ClubId: null,
+      });
+      await db.updateClubStage(tierId, { c7ClubId: result.crmClubId });
+      tier = await db.getClubStageWithDetails(tierId);
+    }
+
     if (!tier?.c7_club_id) {
       return {
         success: false,
         message: 'Tier must be synced to C7 first. Save tier details to create C7 club.',
       };
     }
-    
+
     // Build Discount object
     const discount: Discount = {
       title,
@@ -97,19 +114,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       },
     };
     
-    // Create in CRM
-    const createdPromotion = await crm.createPromotion(
-      session,
-      discount,
-      tier.c7_club_id
-    );
     
-    // Save to DB
-    await db.createStagePromotions(tierId, [{
-      crmId: createdPromotion.id,
-      crmType: session.crmType,
-      title: createdPromotion.title,
-    }]);
+    const createdPromotion = await createPromotionForTier(session, tierId, discount);
     
     return {
       success: true,
@@ -127,7 +133,9 @@ export default function NewPromotion() {
   const { session, tier } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
-  
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === 'submitting';
+
   // Handle redirect
   useEffect(() => {
     if (actionData?.success && actionData.redirect) {
@@ -151,8 +159,10 @@ export default function NewPromotion() {
         <PromotionForm
           mode="create"
           session={session}
+          titleHelpText={`Enter a descriptive title (e.g. '${tier.name} - 20% Off', '${tier.name} - Free Shipping')`}
           onCancel={() => navigate(addSessionToUrl(`/app/settings/club_tiers/${tier.id}`, session.id))}
           actionData={actionData}
+          submitButtonLoading={isSubmitting}
         />
       </BlockStack>
     </Page>

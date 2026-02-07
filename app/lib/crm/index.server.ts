@@ -1,4 +1,4 @@
-import type { CrmProvider } from '~/types/crm';
+import type { CrmProvider, CreatePromotionTierContext } from '~/types/crm';
 import { ShopifyProvider } from './shopify.server';
 import { Commerce7Provider } from './commerce7.server';
 import type { AppSessionData } from '~/lib/session-storage.server';
@@ -32,28 +32,108 @@ export const crmManager = new CrmManager();
 // Promotion Service Functions
 // ============================================
 
+export type { CreatePromotionTierContext } from '~/types/crm';
+
 /**
- * Create a promotion in the CRM
+ * Create a promotion in the CRM. For Commerce7, when tierContext is passed and tier has 2+ promos (including this one),
+ * the provider creates/updates the promotion set and attaches all promos; returns promotionSetId for the route to persist on the tier.
  * @param session - App session with tenant info
  * @param discount - Abstract Discount object
  * @param clubId - CRM club ID to link promotion to
- * @returns Created promotion with CRM ID and title
+ * @param tierContext - Optional tier context (tierName, existingSetId, existingPromoIds) so C7 can sync promotion set
+ * @returns Created promotion with id, title, and optional promotionSetId when a set was created/used
  */
 import { toC7Promotion, fromC7Promotion } from '~/types/discount-commerce7';
 
 export async function createPromotion(
   session: AppSessionData,
   discount: Discount,
-  clubId: string
-): Promise<{ id: string; title: string }> {
+  clubId: string,
+  tierContext?: CreatePromotionTierContext
+): Promise<{ id: string; title: string; promotionSetId?: string }> {
   if (session.crmType === 'commerce7') {
     const provider = new Commerce7Provider(session.tenantShop);
-    const c7Payload = toC7Promotion(discount, clubId);
-    const c7Promotion = await provider.createPromotion(c7Payload);
-    return { id: c7Promotion.id, title: c7Promotion.title };
+    const c7Payload = toC7Promotion(discount, clubId); // no set on create; provider attaches set after if needed
+    const result = await provider.createPromotion(c7Payload, tierContext);
+    return {
+      id: result.id,
+      title: result.title,
+      ...(result.promotionSetId != null && { promotionSetId: result.promotionSetId }),
+    };
   }
   
   // Add Shopify support later
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Create a promotion set in the CRM (Commerce7 only). Set is created with title only;
+ * add promos via promotion-set-x-promotion, then conclude with updatePromotionSet(setId, { title }).
+ * @param session - App session
+ * @param title - Set title (e.g. "${tier.name} benefits")
+ * @returns Created set with id
+ */
+export async function createPromotionSet(
+  session: AppSessionData,
+  title: string
+): Promise<{ id: string }> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    const set = await provider.createPromotionSet({ title });
+    return { id: set.id };
+  }
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Update a promotion set (Commerce7 only). Send { title } to conclude after addPromotionToSet or removePromotionFromSet.
+ * @param session - App session
+ * @param setId - Promotion set ID
+ * @param title - Set title (e.g. "${tier.name} benefits")
+ */
+export async function updatePromotionSet(
+  session: AppSessionData,
+  setId: string,
+  title: string
+): Promise<void> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    await provider.updatePromotionSet(setId, { title });
+    return;
+  }
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Remove a promotion from a set (Commerce7 only). DELETE promotion-set-x-promotion. Then call updatePromotionSet(setId, title) to conclude.
+ */
+export async function removePromotionFromSet(
+  session: AppSessionData,
+  promotionId: string,
+  promotionSetId: string
+): Promise<void> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    await provider.removePromotionFromSet(promotionId, promotionSetId);
+    return;
+  }
+  throw new Error(`Unsupported CRM type: ${session.crmType}`);
+}
+
+/**
+ * Delete a promotion set (Commerce7 only).
+ * @param session - App session
+ * @param setId - Promotion set ID
+ */
+export async function deletePromotionSet(
+  session: AppSessionData,
+  setId: string
+): Promise<void> {
+  if (session.crmType === 'commerce7') {
+    const provider = new Commerce7Provider(session.tenantShop);
+    await provider.deletePromotionSet(setId);
+    return;
+  }
   throw new Error(`Unsupported CRM type: ${session.crmType}`);
 }
 

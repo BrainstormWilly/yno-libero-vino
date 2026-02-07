@@ -149,11 +149,13 @@ const fromC7Status = (status: C7PromotionStatus): DiscountStatus => {
  * 
  * @param discount - The unified discount object
  * @param clubId - The C7 club ID to link this promotion to
+ * @param promotionSetId - Optional C7 promotion-set ID so this promo is in the set (multi-promo tier)
  * @returns C7PromotionCreateRequest payload
  */
 export const toC7Promotion = (
   discount: Discount,
-  clubId: string
+  clubId: string,
+  promotionSetId?: string
 ): C7PromotionCreateRequest => {
   // Determine promotion type (Product or Shipping)
   const type: C7PromotionType = discount.appliesTo.target === "shipping" 
@@ -223,8 +225,13 @@ export const toC7Promotion = (
     cartRequirementMaximum: null,
     cartRequirementCountType: "All Items",
     
-    // Usage limits
-    usageLimitType: discount.platformData?.usageLimitType === 'Unlimited' ? "Unlimited" : "Limited",
+    // Usage limits (form: Unlimited | Store | Customer → C7: Unlimited | Per Store | Per Customer)
+    usageLimitType:
+      discount.platformData?.usageLimitType === 'Unlimited'
+        ? "Unlimited"
+        : discount.platformData?.usageLimitType === 'Store'
+          ? "Per Store"
+          : "Per Customer",
     usageLimit: discount.platformData?.usageLimitType === 'Unlimited' ? null : (discount.platformData?.usageLimit || null),
     
     // Availability - linked to club
@@ -234,8 +241,8 @@ export const toC7Promotion = (
     clubFrequencies: [],
     // channels: ["All"],
     
-    // Promotion sets
-    promotionSets: [],
+    // Promotion sets (when tier has multiple promos); C7 expects [{ id }] not [id]
+    promotionSets: promotionSetId ? [{ id: promotionSetId }] : [],
     
     // Timing
     startDate: discount.startsAt instanceof Date 
@@ -317,7 +324,7 @@ export const fromC7Promotion = (c7Promotion: C7Promotion): Discount => {
     };
   }
 
-  // Parse customer segments (from availableToObjectIds - club IDs)
+      // Parse customer segments (from availableToObjectIds - club IDs)
   const customerSegments = c7Promotion.availableToObjectIds
     ? c7Promotion.availableToObjectIds.map(id => ({ id, name: "" }))
     : [];
@@ -340,9 +347,13 @@ export const fromC7Promotion = (c7Promotion: C7Promotion): Discount => {
     platformData: {
       promotionSets: c7Promotion.promotionSets,
       actionMessage: c7Promotion.actionMessage,
-      // Map C7 usageLimitType back to our form values
-      // C7 only has "Unlimited" | "Limited", so we default "Limited" to "Customer"
-      usageLimitType: c7Promotion.usageLimitType === "Unlimited" ? "Unlimited" : "Customer",
+      // Map C7 usageLimitType back to our form values (Unlimited | Per Store | Per Customer)
+      usageLimitType:
+        c7Promotion.usageLimitType === "Unlimited"
+          ? "Unlimited"
+          : c7Promotion.usageLimitType === "Per Store"
+            ? "Store"
+            : "Customer",
       usageLimit: c7Promotion.usageLimit,
     },
   };

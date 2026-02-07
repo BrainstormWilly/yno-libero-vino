@@ -8,7 +8,7 @@ import { setupAutoResize } from '~/util/iframe-helper';
 import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
 import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
-import * as crm from '~/lib/crm/index.server';
+import { createPromotionForTier } from '~/lib/club-tier-promotions.server';
 import { PromotionForm } from '~/components/promotions/PromotionForm';
 import type { Discount, PlatformType } from '~/types';
 import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
@@ -86,19 +86,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       },
     };
     
-    // Create in CRM
-    const createdPromotion = await crm.createPromotion(
-      session,
-      discount,
-      tier.c7_club_id
-    );
-    
-    // Save to DB
-    await db.createStagePromotions(tierId, [{
-      crmId: createdPromotion.id,
-      crmType: session.crmType,
-      title: createdPromotion.title,
-    }]);
+    const createdPromotion = await createPromotionForTier(session, tierId, discount);
     
     // Recalculate setup progress
     await recalculateAndUpdateSetupComplete(session.clientId);

@@ -39,12 +39,19 @@ interface TierDetailsFormProps {
   // Button configuration
   submitButtonLabel?: string;
   submitButtonDisabled?: boolean;
+  submitButtonLoading?: boolean;
   showCancelButton?: boolean;
   cancelButtonUrl?: string;
   cancelButtonLabel?: string;
   
   // Help text customization
   tierNameHelpText?: string;
+
+  // Validation errors (optional, for inline field errors)
+  tierNameError?: string;
+  durationMonthsError?: string;
+  minLtvAmountError?: string;
+  minPurchaseOverrideError?: string;
 }
 
 export default function TierDetailsForm({
@@ -70,10 +77,15 @@ export default function TierDetailsForm({
   useHiddenInputs = false,
   submitButtonLabel = 'Save Changes',
   submitButtonDisabled = false,
+  submitButtonLoading = false,
   showCancelButton = false,
   cancelButtonUrl,
   cancelButtonLabel = 'Cancel',
   tierNameHelpText = "Enter a descriptive name for this membership tier",
+  tierNameError,
+  durationMonthsError,
+  minLtvAmountError,
+  minPurchaseOverrideError,
 }: TierDetailsFormProps) {
   return (
     <>
@@ -103,6 +115,7 @@ export default function TierDetailsForm({
           autoComplete="off"
           helpText={tierNameHelpText}
           disabled={disabled}
+          error={tierNameError}
         />
         
         {showMinPurchaseInline ? (
@@ -116,6 +129,7 @@ export default function TierDetailsForm({
                 type="number"
                 autoComplete="off"
                 disabled={disabled}
+                error={durationMonthsError}
               />
             </div>
             
@@ -129,6 +143,7 @@ export default function TierDetailsForm({
                 autoComplete="off"
                 helpText="Minimum annualized lifetime value required for this tier"
                 disabled={disabled}
+                error={minLtvAmountError}
               />
             </div>
           </InlineStack>
@@ -140,9 +155,11 @@ export default function TierDetailsForm({
               name={useHiddenInputs ? undefined : 'duration_months'}
               value={durationMonths ?? ''}
               onChange={(value) => onDurationMonthsChange(value == null ? '' : String(value))}
+              type="number"
               autoComplete="off"
-              helpText="How long the membership lasts (1-24 months). Whole numbers only."
+              helpText="How long the membership lasts (1-12 months). Whole numbers only."
               disabled={disabled}
+              error={durationMonthsError}
             />
             
             <TextField
@@ -151,10 +168,12 @@ export default function TierDetailsForm({
               name={useHiddenInputs ? undefined : 'min_ltv_amount'}
               value={minLtvAmount ?? ''}
               onChange={(value) => onMinLtvAmountChange(value == null ? '' : String(value))}
+              type="number"
               autoComplete="off"
               prefix="$"
               helpText="Minimum annual lifetime value required for this tier"
               disabled={disabled}
+              error={minLtvAmountError}
             />
           </>
         )}
@@ -197,8 +216,9 @@ export default function TierDetailsForm({
             autoComplete="off"
             prefix="$"
             placeholder={calculatedMinPurchase}
-            helpText="Leave blank to use suggested value (ALTV ÷ 12). Set a value to override."
+            helpText="Leave blank to use suggested value (ALTV ÷ 12). Must be ≤ Minimum Annual LTV."
             disabled={disabled}
+            error={minPurchaseOverrideError}
           />
         )}
         
@@ -227,6 +247,7 @@ export default function TierDetailsForm({
               variant="primary" 
               submit
               disabled={submitButtonDisabled}
+              loading={submitButtonLoading}
             >
               {submitButtonLabel}
             </Button>

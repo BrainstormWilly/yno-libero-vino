@@ -14,6 +14,7 @@ import {
   Badge,
   Checkbox,
   Icon,
+  Banner,
 } from '@shopify/polaris';
 import { SearchIcon, DeleteIcon } from '@shopify/polaris-icons';
 import { useDebounce } from '~/hooks/useDebounce';
@@ -40,6 +41,7 @@ export function ProductCollectionPicker({
 }: ProductCollectionPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showList, setShowList] = useState(false);
+  const [errorDismissed, setErrorDismissed] = useState(false);
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
   
   const isProduct = type === 'product';
@@ -48,16 +50,22 @@ export function ProductCollectionPicker({
   const getItems = isProduct ? crm?.getProducts : crm?.getCollections;
   
   // Debug log
-  if (typeof window !== 'undefined') {
-    console.log('[ProductCollectionPicker]', { type, crm, items, loading });
-  }
+  // if (typeof window !== 'undefined') {
+  //   console.log('[ProductCollectionPicker]', { type, crm, items, loading });
+  // }
   
   // Auto-load items when search query changes
   useEffect(() => {
-    if (showList) {
+    if (showList && getItems) {
       getItems({ q: debouncedSearchQuery.trim() || undefined, limit: 25 });
     }
-  }, [debouncedSearchQuery, showList]);
+  }, [debouncedSearchQuery, showList, getItems]);
+
+  // Re-show banner when error message changes (e.g. after a new failed request)
+  const apiError = isProduct ? crm?.productsError : crm?.collectionsError;
+  useEffect(() => {
+    if (apiError) setErrorDismissed(false);
+  }, [apiError]);
   
   const handleToggle = (item: Item) => {
     const isSelected = selected.some(i => i.id === item.id);
@@ -78,9 +86,14 @@ export function ProductCollectionPicker({
   
   const label = isProduct ? 'Products' : 'Collections';
   const badgeTone = isProduct ? 'info' : 'success';
-  
+
   return (
     <BlockStack gap="300">
+      {apiError && !errorDismissed && (
+        <Banner tone="critical" onDismiss={() => setErrorDismissed(true)}>
+          {apiError}
+        </Banner>
+      )}
       {/* Selected Items */}
       {selected.length > 0 && (
         <Box>
@@ -131,7 +144,7 @@ export function ProductCollectionPicker({
               setSearchQuery('');
             } else {
               setShowList(true);
-              getItems({ limit: 25 });
+              if (getItems) getItems({ limit: 25 });
             }
           }}
           loading={loading}

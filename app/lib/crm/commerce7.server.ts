@@ -8,6 +8,7 @@ import type {
   WebhookPayload,
   WebhookTopic,
   WebhookRegistration,
+  CreatePromotionTierContext,
 } from "~/types/crm";
 import { CrmNames, CrmSlugs } from "~/types/crm";
 import type { C7CouponPayload } from "~/types/discount-commerce7";
@@ -20,6 +21,8 @@ import type {
   C7Promotion,
   C7PromotionSetCreateRequest,
   C7PromotionSet,
+  C7PromotionSetUpdateRequest,
+  C7PromotionSetXPromotionRequest,
   C7LoyaltyTierCreateRequest,
   C7LoyaltyTier,
   C7LoyaltyTransactionCreateRequest,
@@ -2135,13 +2138,15 @@ export class Commerce7Provider implements CrmProvider {
   // Linked to clubs for tier-specific discounts
 
   /**
-   * Create a promotion
-   * @param data - Promotion creation data
+   * Create a promotion. When tierContext is provided and tier will have 2+ promos (existing + this one),
+   * creates/updates the promotion set and attaches all promos via promotionSets; returns promotionSetId for the caller to persist on the tier.
+   * @param data - Promotion creation data (promotionSets left empty on create; we attach after if needed)
+   * @param tierContext - Optional tier context so we can create/attach promotion set
    */
   async createPromotion(
-    data: C7PromotionCreateRequest
-  ): Promise<C7Promotion> {
-    console.log('############# createPromotion', data);
+    data: C7PromotionCreateRequest,
+    tierContext?: CreatePromotionTierContext
+  ): Promise<C7Promotion & { promotionSetId?: string }> {
     const response = await fetch(`${API_URL}/promotion`, {
       method: "POST",
       headers: {
@@ -2156,6 +2161,29 @@ export class Commerce7Provider implements CrmProvider {
     const result = await response.json();
     handleC7ApiError(result, 'creating promotion');
 
+    const newPromoId = result.id ?? (result as { data?: { id?: string } }).data?.id;
+    if (newPromoId && !result.id) {
+      result.id = newPromoId;
+    }
+    const allPromoIds = tierContext && newPromoId
+      ? [...tierContext.existingPromoIds, newPromoId].filter(Boolean)
+      : [];
+    if (allPromoIds.length >= 2) {
+      const setTitle = `${tierContext!.tierName} benefits`;
+      let setId = tierContext!.existingSetId ?? undefined;
+      if (!setId) {
+        const set = await this.createPromotionSet({ title: setTitle });
+        setId = set.id;
+        for (const promoId of allPromoIds) {
+          await this.addPromotionToSet(promoId, setId);
+        }
+        await this.updatePromotionSet(setId, { title: setTitle });
+      } else {
+        await this.addPromotionToSet(newPromoId, setId);
+        await this.updatePromotionSet(setId, { title: setTitle });
+      }
+      return { ...result, promotionSetId: setId };
+    }
     return result;
   }
 
@@ -2252,14 +2280,12 @@ export class Commerce7Provider implements CrmProvider {
   // Without a set, only the highest value discount applies
 
   /**
-   * Create a promotion set
-   * Used when tier has multiple promotions (e.g., 20% off + free shipping)
-   * @param data - Promotion set creation data
+   * Create a promotion set (title only). Then add promos via addPromotionToSet, then conclude with updatePromotionSet(setId, { title }).
    */
   async createPromotionSet(
     data: C7PromotionSetCreateRequest
   ): Promise<C7PromotionSet> {
-    const response = await fetch(`${API_URL}/promo-set`, {
+    const response = await fetch(`${API_URL}/promotion-set`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -2267,13 +2293,51 @@ export class Commerce7Provider implements CrmProvider {
         Authorization: getApiAuth(),
         tenant: this.tenantId,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ title: data.title }),
     });
 
     const result = await response.json();
     handleC7ApiError(result, 'creating promotion set');
-
     return result;
+  }
+
+  /**
+   * Link a promotion to a set. POST promotion-set-x-promotion.
+   */
+  async addPromotionToSet(promotionId: string, promotionSetId: string): Promise<void> {
+    const payload: C7PromotionSetXPromotionRequest = { promotionId, promotionSetId };
+    const response = await fetch(`${API_URL}/promotion-set-x-promotion`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    handleC7ApiError(result, 'adding promotion to set');
+  }
+
+  /**
+   * Unlink a promotion from a set. DELETE promotion-set-x-promotion. Call before or after deleting the promo; then conclude with updatePromotionSet(setId, { title }).
+   */
+  async removePromotionFromSet(promotionId: string, promotionSetId: string): Promise<void> {
+    const payload: C7PromotionSetXPromotionRequest = { promotionId, promotionSetId };
+    const response = await fetch(`${API_URL}/promotion-set-x-promotion`, {
+      method: "DELETE",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (response.status === 204) return;
+    const result = await response.json();
+    handleC7ApiError(result, 'removing promotion from set');
   }
 
   /**
@@ -2281,7 +2345,7 @@ export class Commerce7Provider implements CrmProvider {
    * @param setId - The promotion set's ID
    */
   async getPromotionSet(setId: string): Promise<C7PromotionSet> {
-    const response = await fetch(`${API_URL}/promo-set/${setId}`, {
+    const response = await fetch(`${API_URL}/promotion-set/${setId}`, {
       headers: {
         Accept: "application/json",
         Authorization: getApiAuth(),
@@ -2296,11 +2360,51 @@ export class Commerce7Provider implements CrmProvider {
   }
 
   /**
+   * Update a promotion set. Only { title } is supported; use addPromotionToSet/removePromotionFromSet to change members, then call this to conclude.
+   */
+  async updatePromotionSet(
+    setId: string,
+    data: Pick<C7PromotionSetUpdateRequest, 'title'>
+  ): Promise<C7PromotionSet> {
+    if (data.title == null) {
+      throw new Error('updatePromotionSet requires title');
+    }
+    const body = { title: data.title };
+    const response = await fetch(`${API_URL}/promotion-set/${setId}`, {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Authorization: getApiAuth(),
+        tenant: this.tenantId,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      let err: unknown;
+      try {
+        err = JSON.parse(text);
+      } catch {
+        err = { message: text, status: response.status };
+      }
+      console.warn('updatePromotionSet failed', { setId, status: response.status, err });
+      throw new Error(
+        `Failed to update promotion set: ${response.status} ${text.slice(0, 200)}`
+      );
+    }
+
+    const result = await response.json();
+    return result;
+  }
+
+  /**
    * Delete a promotion set
    * @param setId - The promotion set's ID
    */
   async deletePromotionSet(setId: string): Promise<void> {
-    const response = await fetch(`${API_URL}/promo-set/${setId}`, {
+    const response = await fetch(`${API_URL}/promotion-set/${setId}`, {
       method: "DELETE",
       headers: {
         Accept: "application/json",
@@ -2538,7 +2642,6 @@ export class Commerce7Provider implements CrmProvider {
         promoPayload.cartRequirement = firstPromo.minimumCartAmount * 100; // Convert to cents
       }
       
-      console.log('Creating C7 promotion with payload:', JSON.stringify(promoPayload, null, 2));
       const firstPromotion = await this.createPromotion(promoPayload as C7PromotionCreateRequest);
 
       createdPromotions.push({
@@ -2546,29 +2649,21 @@ export class Commerce7Provider implements CrmProvider {
         title: firstPromotion.title,
       });
 
-      // If we have more promotions, create a set and link them
+      // If we have more promotions, create a set and link them via promotion-set-x-promotion
       if (promotions.length > 1) {
-        // Create promotion set
-        const promotionSet = await this.createPromotionSet({
-          title: `${firstPromo.title} Benefits`,
-        });
+        const setTitle = `${firstPromo.title} Benefits`;
+        const promotionSet = await this.createPromotionSet({ title: setTitle });
         promotionSetId = promotionSet.id;
 
-        // Update first promotion with set
-        await this.updatePromotion(firstPromotion.id, {
-          promotionSets: [promotionSetId],
-        } as any);
+        await this.addPromotionToSet(firstPromotion.id, promotionSetId);
 
-        // Create remaining promotions with set
         for (let i = 1; i < promotions.length; i++) {
           const promo = promotions[i];
           try {
-            // Determine promotion type (Product or Shipping)
             const isProductPromo = promo.productDiscountType && promo.productDiscountType !== "No Discount";
             const promoType = isProductPromo ? "Product" : "Shipping";
             const discountType = isProductPromo ? promo.productDiscountType : promo.shippingDiscountType;
             const discountAmount = isProductPromo ? promo.productDiscount : promo.shippingDiscount;
-            
             const promoPayload: any = {
               title: promo.title,
               actionMessage: "",
@@ -2592,29 +2687,21 @@ export class Commerce7Provider implements CrmProvider {
               availableTo: "Club",
               availableToObjectIds: [clubId],
               clubFrequencies: [],
-              promotionSets: [promotionSetId], // Include set!
               startDate: new Date().toISOString(),
               endDate: null,
             };
-            
-            // Add minimum cart requirement if specified
             if (promo.minimumCartAmount) {
               promoPayload.cartRequirementType = "Minimum Amount";
               promoPayload.cartRequirement = promo.minimumCartAmount * 100;
             }
-            
-            console.log(`Creating C7 promotion ${i + 1} with payload:`, JSON.stringify(promoPayload, null, 2));
             const promotion = await this.createPromotion(promoPayload);
-
-            createdPromotions.push({
-              id: promotion.id,
-              title: promotion.title,
-            });
+            createdPromotions.push({ id: promotion.id, title: promotion.title });
+            await this.addPromotionToSet(promotion.id, promotionSetId);
           } catch (error) {
             console.warn(`Failed to create promotion ${i + 1}:`, error);
-            // Continue with other promotions (graceful degradation)
           }
         }
+        await this.updatePromotionSet(promotionSetId, { title: setTitle });
       }
 
       return createdPromotions;

@@ -3,7 +3,7 @@
  * Shared form UI for creating and editing promotions
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Form } from 'react-router';
 import {
   Card,
@@ -26,21 +26,25 @@ type PromotionFormProps = {
   mode: PromotionFormMode;
   initialDiscount?: Discount;
   session: AppSessionData;
+  titleHelpText?: string | undefined;
   onCancel: () => void;
   onDelete?: () => void;
   actionData?: {
     success?: boolean;
     message?: string;
   };
+  submitButtonLoading?: boolean;
 };
 
 export function PromotionForm({
   mode,
   initialDiscount,
   session,
+  titleHelpText,
   onCancel,
   onDelete,
   actionData,
+  submitButtonLoading = false,
 }: PromotionFormProps) {
   // Initialize state from initialDiscount if in edit mode
   const [title, setTitle] = useState(initialDiscount?.title || '');
@@ -126,12 +130,70 @@ export function PromotionForm({
   const crm = useCrmProvider(session);
   
   // Compute selected IDs for hidden form field
-  const selectedIds = appliesTo === 'Product' 
-    ? selectedProducts.map(p => p.id)
-    : appliesTo === 'Collection'
-    ? selectedCollections.map(c => c.id)
-    : [];
-  
+  const selectedIds = useMemo(
+    () =>
+      appliesTo === 'Product'
+        ? selectedProducts.map(p => p.id)
+        : appliesTo === 'Collection'
+          ? selectedCollections.map(c => c.id)
+          : [],
+    [appliesTo, selectedProducts, selectedCollections]
+  );
+
+  // Validation: title required; discount value required and numeric (0 ok) when not Free Shipping
+  const validation = useMemo(() => {
+    const titleValid = title.trim() !== '';
+    const showDiscountAmount = discountType !== 'Free Shipping';
+    let discountAmountValid = true;
+    let discountAmountError: string | undefined;
+    if (showDiscountAmount) {
+      const trimmed = discountAmount.trim();
+      if (trimmed === '') {
+        discountAmountValid = false;
+        discountAmountError = 'Discount value is required';
+      } else {
+        const num = Number(trimmed);
+        if (Number.isNaN(num)) {
+          discountAmountValid = false;
+          discountAmountError = 'Enter a valid number';
+        }
+      }
+    }
+    return {
+      isValid: titleValid && discountAmountValid,
+      titleError: titleValid ? undefined : 'Title is required',
+      discountAmountError,
+    };
+  }, [title, discountAmount, discountType]);
+
+  const isDirty = useMemo(() => {
+    if (mode === 'create') {
+      return title.trim() !== '';
+    }
+    if (!initialDiscount) return true;
+    const sameTitle = title === initialDiscount.title;
+    const sameAppliesTo = appliesTo === (initialDiscount.appliesTo.target === 'shipping' ? 'Shipping' : initialDiscount.appliesTo.scope === 'all' ? 'Store' : initialDiscount.appliesTo.products.length > 0 ? 'Product' : 'Collection');
+    const sameMinCart = minCartAmount === (initialDiscount.minimumRequirement.amount ? (initialDiscount.minimumRequirement.amount / 100).toString() : '');
+    const sameUsageType = usageLimitType === (initialDiscount.platformData?.usageLimitType ?? 'Unlimited');
+    const sameUsageLimit = (usageLimitType === 'Unlimited' ? '' : usageLimit) === (initialDiscount.platformData?.usageLimit?.toString() ?? '');
+    const sameProductIds = appliesTo === 'Product' && selectedIds.length === initialDiscount.appliesTo.products.length && selectedIds.every((id, i) => id === initialDiscount!.appliesTo.products[i]?.id);
+    const sameCollectionIds = appliesTo === 'Collection' && selectedIds.length === initialDiscount.appliesTo.collections.length && selectedIds.every((id, i) => id === initialDiscount!.appliesTo.collections[i]?.id);
+    const discountTypeMatch = () => {
+      if (initialDiscount.appliesTo.target === 'shipping') {
+        if (initialDiscount.value.type === 'percentage' && initialDiscount.value.percentage === 100) return discountType === 'Free Shipping';
+        if (initialDiscount.value.type === 'fixed-amount') return discountType === 'Flat Rate';
+      }
+      return discountType === (initialDiscount.value.type === 'percentage' ? 'Percentage Off' : 'Dollar Off');
+    };
+    const amountMatch = () => {
+      if (initialDiscount.value.type === 'percentage') {
+        return discountAmount === (initialDiscount.value.percentage?.toString() ?? '');
+      }
+      return discountAmount === (initialDiscount.value.amount ? (initialDiscount.value.amount / 100).toString() : '');
+    };
+    return !sameTitle || !sameAppliesTo || !sameMinCart || !sameUsageType || !sameUsageLimit || !discountTypeMatch() || !amountMatch() || (appliesTo === 'Product' && !sameProductIds) || (appliesTo === 'Collection' && !sameCollectionIds);
+  }, [mode, title, initialDiscount, appliesTo, minCartAmount, usageLimitType, usageLimit, selectedIds, discountType, discountAmount]);
+
   // Update discountTarget when appliesTo changes
   useEffect(() => {
     if (appliesTo === 'Shipping') {
@@ -169,7 +231,9 @@ export function PromotionForm({
                 onChange={setTitle}
                 name="title"
                 autoComplete="off"
-                helpText={mode === 'create' ? "e.g., 'Silver - 20% Off', 'Silver - Free Shipping'" : undefined}
+                helpText={titleHelpText}
+                error={validation.titleError}
+                requiredIndicator
               />
               
               <Divider />
@@ -253,6 +317,8 @@ export function PromotionForm({
                       type="number"
                       autoComplete="off"
                       suffix={discountType === 'Percentage Off' ? '%' : undefined}
+                      error={validation.discountAmountError}
+                      requiredIndicator
                     />
                   </div>
                 )}
@@ -290,8 +356,8 @@ export function PromotionForm({
                 label=""
                 options={[
                   { label: 'Unlimited', value: 'Unlimited' },
-                  { label: 'Customer', value: 'Customer' },
                   { label: 'Store', value: 'Store' },
+                  { label: 'Customer', value: 'Customer' },
                 ]}
                 value={usageLimitType}
                 onChange={(val) => {
@@ -333,7 +399,12 @@ export function PromotionForm({
                   </Button>
                 )}
                 
-                <Button submit variant="primary">
+                <Button
+                  submit
+                  variant="primary"
+                  loading={submitButtonLoading}
+                  disabled={!validation.isValid || !isDirty || submitButtonLoading}
+                >
                   {mode === 'create' ? 'Create Promotion' : 'Save Promotion'}
                 </Button>
               </InlineStack>

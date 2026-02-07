@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, useActionData, useLocation, useSubmit } from 'react-router';
-import { useState } from 'react';
+import { useLoaderData, useActionData, useLocation, useSubmit, useNavigation } from 'react-router';
+import { useState, useEffect } from 'react';
 import { 
   Page, 
   Card, 
@@ -276,6 +276,20 @@ export default function Settings() {
   const [orgContact, setOrgContact] = useState(client.org_contact);
   const [shopUrl, setShopUrl] = useState(client.shop_url || (client.website_url ? `${client.website_url}/shop` : ''));
 
+  const navigation = useNavigation();
+  const isSubmittingOrg =
+    navigation.state === 'submitting' && navigation.formData?.get('action') === 'update_organization';
+  const isOrgDirty =
+    orgName !== client.org_name ||
+    orgContact !== client.org_contact ||
+    shopUrl !== (client.shop_url || (client.website_url ? `${client.website_url}/shop` : ''));
+
+  useEffect(() => {
+    setOrgName(client.org_name);
+    setOrgContact(client.org_contact);
+    setShopUrl(client.shop_url || (client.website_url ? `${client.website_url}/shop` : ''));
+  }, [client.org_name, client.org_contact, client.shop_url, client.website_url]);
+
   const handleSubmitOrg = () => {
     const formData = new FormData();
     formData.append('action', 'update_organization');
@@ -363,7 +377,12 @@ export default function Settings() {
                     requiredIndicator
                     disabled
                   />
-                  <Button variant="primary" submit>
+                  <Button
+                    variant="primary"
+                    submit
+                    loading={isSubmittingOrg}
+                    disabled={!isOrgDirty || isSubmittingOrg}
+                  >
                     Save Changes
                   </Button>
                 </FormLayout.Group>

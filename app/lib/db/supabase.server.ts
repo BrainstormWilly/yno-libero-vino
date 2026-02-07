@@ -363,6 +363,7 @@ export async function updateClubStage(
     minLtvAmount?: number;
     stageOrder?: number | null; // Allow null for inactive tiers
     c7ClubId?: string;
+    c7PromoSetId?: string | null;
     upgradable?: boolean;
     isActive?: boolean;
     tierType?: string;
@@ -381,6 +382,7 @@ export async function updateClubStage(
   if (data.minLtvAmount !== undefined) updateData.min_ltv_amount = data.minLtvAmount;
   if (data.stageOrder !== undefined) updateData.stage_order = data.stageOrder; // Can be null
   if (data.c7ClubId) updateData.c7_club_id = data.c7ClubId;
+  if (data.c7PromoSetId !== undefined) updateData.c7_promo_set_id = data.c7PromoSetId;
   if (data.upgradable !== undefined) updateData.upgradable = data.upgradable;
   if (data.tierType) updateData.tier_type = data.tierType;
   if (data.initialQualificationAllowed !== undefined) updateData.initial_qualification_allowed = data.initialQualificationAllowed;

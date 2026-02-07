@@ -1,5 +1,6 @@
-import { type LoaderFunctionArgs } from 'react-router';
-import { useLoaderData, useLocation } from 'react-router';
+import { type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
+import { useLoaderData, useLocation, useActionData, useNavigation, Form } from 'react-router';
+import { useState, useEffect } from 'react';
 import { 
   Page, 
   Card, 
@@ -13,6 +14,9 @@ import {
   Divider,
   useBreakpoints,
   Link,
+  TextField,
+  Button,
+  Banner,
 } from '@shopify/polaris';
 import { getAppSession } from '~/lib/sessions.server';
 import { getMainNavigationActions } from '~/util/navigation';
@@ -56,10 +60,66 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const session = await getAppSession(request);
+  if (!session) {
+    throw new Error('Session not found');
+  }
+
+  const clubProgram = await db.getClubProgram(session.clientId);
+  if (!clubProgram) {
+    return { success: false, message: 'Club program not found.' };
+  }
+
+  const formData = await request.formData();
+  if (formData.get('action') !== 'update_club') {
+    return { success: false, message: 'Invalid action' };
+  }
+
+  const name = (formData.get('club_name') as string)?.trim() ?? '';
+  const description = (formData.get('club_message') as string)?.trim() ?? '';
+
+  if (!name) {
+    return { success: false, message: 'Club name is required.' };
+  }
+
+  try {
+    await db.updateClubProgram(clubProgram.id, name, description);
+    return { success: true, message: 'Club details updated.' };
+  } catch (err) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Failed to update club details.',
+    };
+  }
+}
+
 export default function ClubTiersIndex() {
   const { session, clubProgram, tiersWithDetails } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
   const location = useLocation();
+  const navigation = useNavigation();
   const { smUp } = useBreakpoints();
+
+  const [clubName, setClubName] = useState(clubProgram?.name ?? '');
+  const [clubMessage, setClubMessage] = useState(clubProgram?.description ?? '');
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  const isClubFormSubmitting =
+    navigation.state === 'submitting' && navigation.formData?.get('action') === 'update_club';
+  const isClubDirty =
+    clubName !== (clubProgram?.name ?? '') || clubMessage !== (clubProgram?.description ?? '');
+
+  useEffect(() => {
+    if (clubProgram) {
+      setClubName(clubProgram.name);
+      setClubMessage(clubProgram.description ?? '');
+    }
+  }, [clubProgram]);
+
+  useEffect(() => {
+    if (actionData) setBannerDismissed(false);
+  }, [actionData]);
   
   return (
     <Page 
@@ -78,6 +138,13 @@ export default function ClubTiersIndex() {
       })}
     >
       <BlockStack gap={{ xs: "800", sm: "400" }}>
+        {actionData && !bannerDismissed && (
+          <Banner
+            tone={actionData.success ? 'success' : 'critical'}
+            title={actionData.message}
+            onDismiss={() => setBannerDismissed(true)}
+          />
+        )}
         {/* Club Information Section */}
         {clubProgram && (
           <>
@@ -97,21 +164,42 @@ export default function ClubTiersIndex() {
                 </BlockStack>
               </Box>
               <Card roundedAbove="sm">
-                <BlockStack gap="400">
-                  <Text variant="headingMd" as="h3">
-                    Club Details
-                  </Text>
-                  <BlockStack gap="300">
-                    <Text variant="bodyMd" as="p">
-                      <strong>Club Name:</strong> {clubProgram.name}
+                <Form method="post">
+                  <input type="hidden" name="action" value="update_club" />
+                  <BlockStack gap="400">
+                    <Text variant="headingMd" as="h3">
+                      Club Details
                     </Text>
-                    {clubProgram.description && (
-                      <Text variant="bodyMd" as="p" tone="subdued">
-                        {clubProgram.description}
-                      </Text>
-                    )}
+                    <BlockStack gap="300">
+                      <TextField
+                        label="Club name"
+                        name="club_name"
+                        value={clubName}
+                        onChange={setClubName}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Message"
+                        name="club_message"
+                        value={clubMessage}
+                        onChange={setClubMessage}
+                        multiline={3}
+                        autoComplete="off"
+                        helpText="Optional description or message for your wine club program."
+                      />
+                      <InlineStack gap="200">
+                        <Button
+                          submit
+                          variant="primary"
+                          loading={isClubFormSubmitting}
+                          disabled={!isClubDirty || isClubFormSubmitting}
+                        >
+                          Save
+                        </Button>
+                      </InlineStack>
+                    </BlockStack>
                   </BlockStack>
-                </BlockStack>
+                </Form>
               </Card>
             </InlineGrid>
             {smUp ? <Divider /> : null}

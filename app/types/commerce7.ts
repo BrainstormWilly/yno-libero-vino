@@ -76,7 +76,7 @@ export type C7PromotionType = "Product" | "Shipping";
 export type C7PromotionAppliesTo = "Store" | "Product" | "Collection";
 export type C7PromotionAvailableTo = "Everyone" | "Club" | "Customer";
 export type C7PromotionDiscountType = "Percentage Off" | "Dollar Off";
-export type C7PromotionUsageLimitType = "Unlimited" | "Limited";
+export type C7PromotionUsageLimitType = "Unlimited" | "Per Store" | "Per Customer";
 export type C7PromotionStatus = "Enabled" | "Disabled";
 export type C7PromotionDollarOffApplies = "Once Per Order" | "Each Item";
 export type C7PromotionCartRequirementType = "None" | "Minimum Amount" | "Minimum Quantity";
@@ -115,8 +115,8 @@ export interface C7PromotionCreateRequest {
   clubFrequencies?: string[];
   channels?: string[];                         // ["All"]
   
-  // Promotion sets (for combining multiple promos)
-  promotionSets?: string[];
+  // Promotion sets (for combining multiple promos); C7 expects array of { id }
+  promotionSets?: Array<{ id: string }>;
   
   // Timing
   startDate?: string;
@@ -164,8 +164,9 @@ export interface C7Promotion {
  * Without a set, only the highest value discount applies
  */
 
+/** Create set with title only; add promos via promotion-set-x-promotion, then conclude with update { title }. */
 export interface C7PromotionSetCreateRequest {
-  title: string;                              // e.g., "Silver Tier Benefits"
+  title: string;
 }
 
 export interface C7PromotionSet {
@@ -173,8 +174,20 @@ export interface C7PromotionSet {
   title: string;
   createdAt: string;
   updatedAt: string;
-  coupons: any[];                             // Coupon objects (if any)
-  promotions: any[];                          // Promotion objects (if any)
+  coupons: any[];
+  promotions: any[];
+}
+
+/** Link a promotion to a set. POST to promotion-set-x-promotion. */
+export interface C7PromotionSetXPromotionRequest {
+  promotionId: string;
+  promotionSetId: string;
+}
+
+/** Update set: send { title } to conclude after adding promos. */
+export interface C7PromotionSetUpdateRequest {
+  title?: string;
+  promotions?: Array<{ id: string }> | string[];
 }
 
 /**

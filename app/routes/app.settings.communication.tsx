@@ -280,7 +280,11 @@ export default function CommunicationSettings() {
   
   const navigation = useNavigation();
   const isSubmittingProvider = navigation.state === 'submitting' && navigation.formData?.get('intent') === 'update_providers';
-  
+  const isSubmittingEmailSettings =
+    navigation.state === 'submitting' && navigation.formData?.get('intent') === 'update_email_settings';
+  const isEmailSettingsDirty =
+    warningDaysBefore !== String(communicationConfig?.warning_days_before || 7);
+
   // Provider API key fields (for Klaviyo and Mailchimp)
   const providerData = (communicationConfig?.provider_data as Record<string, unknown> | null) ?? null;
   const [klaviyoApiKey, setKlaviyoApiKey] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_api_key ?? '' : '');
@@ -656,7 +660,12 @@ export default function CommunicationSettings() {
                           </Box>
                           <input type="hidden" name="warning_days_before" value={warningDaysBefore} />
 
-                            <Button submit variant="primary">
+                            <Button
+                              submit
+                              variant="primary"
+                              loading={isSubmittingEmailSettings}
+                              disabled={!isEmailSettingsDirty || isSubmittingEmailSettings}
+                            >
                               Save
                             </Button>
                         </InlineStack>

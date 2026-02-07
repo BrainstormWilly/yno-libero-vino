@@ -1,5 +1,5 @@
 import { type ActionFunctionArgs } from 'react-router';
-import { useRouteLoaderData, Form, useActionData, useLocation, useNavigate, useSubmit } from 'react-router';
+import { useRouteLoaderData, Form, useActionData, useLocation, useNavigate, useSubmit, useNavigation } from 'react-router';
 import { useState, useMemo, useEffect } from 'react';
 import { 
   Page, 
@@ -21,6 +21,7 @@ import { addSessionToUrl } from '~/util/session';
 import * as db from '~/lib/db/supabase.server';
 import { recalculateAndUpdateSetupComplete } from '~/lib/db/supabase.server';
 import * as crm from '~/lib/crm/index.server';
+import { deleteTierCrmResources } from '~/lib/club-tier-promotions.server';
 import type { loader as tierLayoutLoader } from './app.settings.club_tiers.$id';
 import TierDetailsForm from '~/components/TierDetailsForm';
 
@@ -35,19 +36,43 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const actionType = formData.get('action') as string;
   
   if (actionType === 'update_tier') {
-    const tierName = formData.get('tier_name') as string;
-    const durationMonths = parseInt(formData.get('duration_months') as string) || 3;
-    const minLtvAmount = parseFloat(formData.get('min_ltv_amount') as string) || 600;
+    const tierName = (formData.get('tier_name') as string)?.trim() ?? '';
+    const durationMonthsRaw = formData.get('duration_months') as string;
+    const minLtvAmountRaw = formData.get('min_ltv_amount') as string;
+    const durationMonths = parseInt(durationMonthsRaw, 10);
+    const minLtvAmount = parseFloat(minLtvAmountRaw);
     const overrideRaw = formData.get('min_purchase_amount_override') as string;
     const initialQualificationAllowed = formData.get('initial_qualification_allowed') !== 'false';
     const upgradable = formData.get('upgradable') !== 'false';
-    
+
+    if (!tierName) {
+      return { success: false, message: 'Tier name is required.' };
+    }
+    if (Number.isNaN(durationMonths) || durationMonths < 1 || durationMonths > 12) {
+      return { success: false, message: 'Duration must be between 1 and 12 months.' };
+    }
+    if (Number.isNaN(minLtvAmount) || minLtvAmount <= 0) {
+      return { success: false, message: 'Minimum Annual LTV is required and must be greater than 0.' };
+    }
+    if (initialQualificationAllowed && overrideRaw !== '' && overrideRaw != null) {
+      const overrideNum = parseFloat(overrideRaw);
+      if (Number.isNaN(overrideNum)) {
+        return { success: false, message: 'Initial purchase amount must be a number.' };
+      }
+      if (overrideNum > minLtvAmount) {
+        return {
+          success: false,
+          message: 'Initial purchase amount cannot exceed Minimum Annual LTV.',
+        };
+      }
+    }
+
     const calculated = minLtvAmount / 12;
     const minPurchaseAmount =
       overrideRaw !== '' && overrideRaw != null && !Number.isNaN(parseFloat(overrideRaw))
         ? Math.max(0, parseFloat(overrideRaw))
         : calculated;
-    
+
     await db.updateClubStage(tierId, {
       name: tierName,
       durationMonths,
@@ -56,13 +81,25 @@ export async function action({ request, params }: ActionFunctionArgs) {
       initialQualificationAllowed,
       upgradable,
     });
-    
+
+    // Sync tier to C7 if missing (e.g. tier was created in settings before sync)
+    const updatedTier = await db.getClubStageWithDetails(tierId);
+    if (updatedTier && !updatedTier.c7_club_id && session.crmType === 'commerce7') {
+      const provider = crm.crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
+      const result = await provider.upsertClub({
+        id: tierId,
+        name: tierName,
+        c7ClubId: null,
+      });
+      await db.updateClubStage(tierId, { c7ClubId: result.crmClubId });
+    }
+
     return {
       success: true,
       message: 'Tier updated successfully',
     };
   }
-  
+
   if (actionType === 'delete_tier') {
     const enrollmentCount = await db.getEnrollmentCountForStage(tierId);
     if (enrollmentCount > 0) {
@@ -72,19 +109,13 @@ export async function action({ request, params }: ActionFunctionArgs) {
       };
     }
 
-    const promotions = await db.getStagePromotions(tierId);
-    for (const promo of promotions) {
-      if (promo.crm_type === 'commerce7' && promo.crm_id) {
-        try {
-          await crm.deletePromotion(session, promo.crm_id);
-        } catch (err) {
-          console.error('Failed to delete C7 promotion:', promo.crm_id, err);
-          return {
-            success: false,
-            message: `Failed to delete promotion in Commerce7: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
-          };
-        }
-      }
+    try {
+      await deleteTierCrmResources(session, tierId);
+    } catch (err) {
+      return {
+        success: false,
+        message: `Failed to delete tier in CRM: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
+      };
     }
 
     await db.deleteClubStage(tierId);
@@ -118,6 +149,7 @@ export default function TierDetail() {
   const location = useLocation();
   const navigate = useNavigate();
   const submit = useSubmit();
+  const navigation = useNavigation();
   const { smUp } = useBreakpoints();
   
   const [tierName, setTierName] = useState(tier.name);
@@ -134,15 +166,91 @@ export default function TierDetail() {
   );
   const [upgradable, setUpgradable] = useState(tier.upgradable ?? true);
   
-  const _durationNum = durationMonths === '' ? 0 : parseInt(durationMonths, 10) || 0;
-  const minLtvNum = minLtvAmount === '' ? 0 : parseFloat(minLtvAmount) || 0;
+  const durationNum = durationMonths === '' ? NaN : parseInt(durationMonths.trim(), 10);
+  const minLtvNum = minLtvAmount === '' ? NaN : parseFloat(minLtvAmount.trim());
+  const minPurchaseOverrideNum =
+    minPurchaseOverride === '' ? null : parseFloat(minPurchaseOverride.trim());
+
+  const validation = useMemo(() => {
+    const errors: {
+      tierName?: string;
+      durationMonths?: string;
+      minLtvAmount?: string;
+      minPurchaseOverride?: string;
+    } = {};
+    const nameTrimmed = (tierName ?? '').trim();
+    if (!nameTrimmed) errors.tierName = 'Tier name is required.';
+    
+    if (durationMonths === '' || durationMonths.trim() === '') {
+      errors.durationMonths = 'Duration is required.';
+    } else if (Number.isNaN(durationNum)) {
+      errors.durationMonths = 'Duration must be a number.';
+    } else if (durationNum < 1 || durationNum > 12) {
+      errors.durationMonths = 'Duration must be between 1 and 12 months.';
+    }
+    
+    if (minLtvAmount === '' || minLtvAmount.trim() === '') {
+      errors.minLtvAmount = 'Minimum Annual LTV is required.';
+    } else if (Number.isNaN(minLtvNum)) {
+      errors.minLtvAmount = 'Minimum Annual LTV must be a number.';
+    } else if (minLtvNum <= 0) {
+      errors.minLtvAmount = 'Minimum Annual LTV must be greater than 0.';
+    }
+    
+    if (initialQualificationAllowed && minPurchaseOverride !== '' && minPurchaseOverride.trim() !== '') {
+      if (minPurchaseOverrideNum === null || Number.isNaN(minPurchaseOverrideNum)) {
+        errors.minPurchaseOverride = 'Must be a number.';
+      } else if (minLtvNum > 0 && minPurchaseOverrideNum > minLtvNum) {
+        errors.minPurchaseOverride = 'Initial purchase amount cannot exceed Minimum Annual LTV.';
+      }
+    }
+    const isValid =
+      !!nameTrimmed &&
+      !Number.isNaN(durationNum) &&
+      durationNum >= 1 &&
+      durationNum <= 12 &&
+      !Number.isNaN(minLtvNum) &&
+      minLtvNum > 0 &&
+      (!initialQualificationAllowed ||
+        minPurchaseOverride === '' ||
+        minPurchaseOverride.trim() === '' ||
+        (minPurchaseOverrideNum !== null &&
+          !Number.isNaN(minPurchaseOverrideNum) &&
+          minPurchaseOverrideNum <= minLtvNum));
+    return { errors, isValid };
+  }, [
+    tierName,
+    durationMonths,
+    durationNum,
+    minLtvAmount,
+    minLtvNum,
+    initialQualificationAllowed,
+    minPurchaseOverride,
+    minPurchaseOverrideNum,
+  ]);
+
   const calculatedMinPurchase = useMemo(() => {
-    if (minLtvNum > 0) {
+    if (!Number.isNaN(minLtvNum) && minLtvNum > 0) {
       return (minLtvNum / 12).toFixed(2);
     }
     return '0.00';
   }, [minLtvNum]);
-  
+
+  const tierDetailsChanged =
+    tierName !== tier.name ||
+    durationMonths !== String(tier.duration_months) ||
+    minLtvAmount !== (tier.min_ltv_amount ?? 600).toString() ||
+    upgradable !== (tier.upgradable ?? true) ||
+    initialQualificationAllowed !== (tier.initial_qualification_allowed ?? true) ||
+    (() => {
+      const calc = tier.min_ltv_amount ? (tier.min_ltv_amount / 12).toFixed(2) : '0.00';
+      const expectedOverride =
+        tier.min_purchase_amount !== parseFloat(calc) ? String(tier.min_purchase_amount) : '';
+      return minPurchaseOverride !== expectedOverride;
+    })();
+  const isTierFormSubmitting =
+    navigation.state === 'submitting' && navigation.formData?.get('action') === 'update_tier';
+
   // Reset form only when tier id or tier data actually changes (not on object reference change)
   useEffect(() => {
     setTierName(tier.name);
@@ -225,7 +333,12 @@ export default function TierDetail() {
             </BlockStack>
           </Box>
           <Card roundedAbove="sm">
-            <Form method="post">
+            <Form
+              method="post"
+              onSubmit={(e) => {
+                if (!validation.isValid) e.preventDefault();
+              }}
+            >
               <TierDetailsForm
                 tierName={tierName}
                 durationMonths={durationMonths}
@@ -244,6 +357,14 @@ export default function TierDetail() {
                 useHiddenInputs={true}
                 showCancelButton={true}
                 cancelButtonUrl={addSessionToUrl('/app/settings/club_tiers', session.id)}
+                submitButtonDisabled={
+                  !validation.isValid || !tierDetailsChanged || isTierFormSubmitting
+                }
+                submitButtonLoading={isTierFormSubmitting}
+                tierNameError={validation.errors.tierName}
+                durationMonthsError={validation.errors.durationMonths}
+                minLtvAmountError={validation.errors.minLtvAmount}
+                minPurchaseOverrideError={validation.errors.minPurchaseOverride}
               />
             </Form>
           </Card>

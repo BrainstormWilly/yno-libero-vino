@@ -1,5 +1,5 @@
-import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, useActionData, useNavigate, useLocation } from 'react-router';
+import { type LoaderFunctionArgs, type ActionFunctionArgs, redirect } from 'react-router';
+import { useLoaderData, useActionData, useNavigate, useLocation, useNavigation } from 'react-router';
 import { useEffect } from 'react';
 import { Page, BlockStack, Banner } from '@shopify/polaris';
 
@@ -66,6 +66,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
   try {
     if (actionType === 'delete_promotion') {
       const promotion = await db.getStagePromotion(promoId);
+      const tier = await db.getClubStageWithDetails(tierId);
       
       if (promotion) {
         // Delete from CRM
@@ -75,17 +76,30 @@ export async function action({ request, params }: ActionFunctionArgs) {
       // Delete from DB
       await db.deleteStagePromotion(promoId);
       
+      // Commerce7: sync promotion set — remove link via DELETE promotion-set-x-promotion, then UPDATE set with { title }
+      if (session.crmType === 'commerce7' && tier) {
+        const tierWithSet = tier as { c7_promo_set_id?: string | null };
+        const remainingPromos = await db.getStagePromotions(tierId);
+        if (remainingPromos.length === 0) {
+          if (tierWithSet.c7_promo_set_id) {
+            await crm.deletePromotionSet(session, tierWithSet.c7_promo_set_id);
+            await db.updateClubStage(tierId, { c7PromoSetId: null });
+          }
+        } else if (tierWithSet.c7_promo_set_id && promotion) {
+          const setId = tierWithSet.c7_promo_set_id;
+          const setTitle = `${tier.name} benefits`;
+          await crm.removePromotionFromSet(session, promotion.crm_id, setId);
+          await crm.updatePromotionSet(session, setId, setTitle);
+        }
+      }
+      
       // Recalculate setup progress - if it drops below 100%, setup_complete will be set to false
       await recalculateAndUpdateSetupComplete(session.clientId);
       
-      // Check if setup is now incomplete - if so, redirect to setup instead of settings
+      // Redirect so full-page form submit navigates (avoids 404 from staying on deleted promo URL)
       const client = await getClient(session.clientId);
       const redirectPath = client?.setup_complete ? `/app/settings/club_tiers/${tierId}` : `/app/setup/tiers/${tierId}`;
-      
-      return {
-        success: true,
-        redirect: addSessionToUrl(redirectPath, session.id),
-      };
+      return redirect(addSessionToUrl(redirectPath, session.id));
     }
     
     if (actionType === 'update_promotion') {
@@ -173,7 +187,9 @@ export default function PromotionDetail() {
   const actionData = useActionData<typeof action>();
   const location = useLocation();
   const navigate = useNavigate();
-  
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === 'submitting';
+
   // Handle redirect
   useEffect(() => {
     if (actionData?.success && actionData.redirect) {
@@ -236,6 +252,7 @@ export default function PromotionDetail() {
             onCancel={() => navigate(addSessionToUrl(`/app/settings/club_tiers/${tier.id}`, session.id))}
             onDelete={handleDelete}
             actionData={actionData}
+            submitButtonLoading={isSubmitting}
           />
         ) : (
           <Banner tone="warning" title="Could not load promotion details from CRM. The promotion may have been deleted." />

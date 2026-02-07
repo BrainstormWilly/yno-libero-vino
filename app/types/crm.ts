@@ -117,6 +117,13 @@ export interface WebhookRegistration {
   createdAt?: string;
 }
 
+/** Tier context for createPromotion so Commerce7 can create/attach promotion set when tier has 2+ promos */
+export type CreatePromotionTierContext = {
+  tierName: string;
+  existingSetId?: string | null;
+  existingPromoIds: string[];
+};
+
 // CRM Provider Interface
 export interface CrmProvider {
   name: CrmNames;
