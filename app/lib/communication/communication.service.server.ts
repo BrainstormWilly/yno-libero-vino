@@ -4,7 +4,9 @@ import type {
   EmailResult,
   TrackEventParams,
   TrackEventResult,
- SMSParams, SMSResult } from '~/types/communication';
+  SMSParams,
+  SMSResult,
+} from '~/types/communication';
 
 import { createCommunicationManager } from './communication-manager.server';
 import { KLAVIYO_METRICS } from './klaviyo.constants';
@@ -51,6 +53,9 @@ export async function sendClientTestSMS(clientId: string, toPhone: string): Prom
     };
     return communicationManager.sendSMS(smsConfig, params);
   }
+
+  // Mailchimp: no in-app SMS test; they test SMS in their LiberoVino::Test flow in Mailchimp.
+  // Fall through to Twilio or fail when Mailchimp is selected (SMS Send Test button is disabled in UI).
 
   // Otherwise, use Twilio (automatic fallback)
   const smsConfig = ensureConfigForSMS(config);

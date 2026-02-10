@@ -31,6 +31,8 @@ import * as db from '~/lib/db/supabase.server';
 import { recalculateAndUpdateSetupComplete, getClient } from '~/lib/db/supabase.server';
 import { sendClientTestEmail, sendClientTestSMS } from '~/lib/communication/communication.service.server';
 import { normalizeConfigForCreate } from '~/lib/communication/communication-helpers';
+import { seedKlaviyoResources } from '~/lib/communication/klaviyo-seeding.server';
+import { seedMailchimpResourcesFindOnly } from '~/lib/communication/mailchimp-seeding.server';
 import type { Database } from '~/types/supabase';
 
 type ProviderDataJson =
@@ -109,9 +111,6 @@ export async function action({ request }: ActionFunctionArgs) {
         if (listId !== null) updateData.emailListId = listId || null;
       } else if (newEmailProvider === 'mailchimp') {
         const providerDataStr = formData.get('provider_data') as string | null;
-        const fromEmail = formData.get('email_from_address') as string | null;
-        const fromName = formData.get('email_from_name') as string | null;
-        
         if (providerDataStr) {
           try {
             updateData.providerData = JSON.parse(providerDataStr) as ProviderDataJson;
@@ -119,8 +118,6 @@ export async function action({ request }: ActionFunctionArgs) {
             console.error('Error parsing provider_data:', e);
           }
         }
-        if (fromEmail !== null) updateData.emailFromAddress = fromEmail || null;
-        if (fromName !== null) updateData.emailFromName = fromName || null;
       } else if (newEmailProvider === 'sendgrid') {
         // Clear email_api_key when switching to SendGrid (uses env var)
         updateData.emailApiKey = null;
@@ -155,6 +152,79 @@ export async function action({ request }: ActionFunctionArgs) {
             'sendgrid'
           )
         );
+      }
+
+      // Seed Klaviyo or Mailchimp resources when provider is Klaviyo/Mailchimp with valid credentials
+      const configAfterSave = await db.getCommunicationConfig(session.clientId);
+
+      if (newEmailProvider === 'klaviyo' && configAfterSave) {
+        const apiKey = configAfterSave.email_api_key;
+        const fromEmail = configAfterSave.email_from_address;
+        const fromName = configAfterSave.email_from_name;
+        const providerData = configAfterSave.provider_data as Record<string, unknown> | null;
+        const includeMarketing = (providerData?.includeMarketing as boolean) ?? false;
+
+        if (apiKey && fromEmail) {
+          try {
+            const seededData = await seedKlaviyoResources({
+              apiKey,
+              fromEmail,
+              fromName: fromName ?? 'LiberoVino',
+              includeMarketing,
+              includeSMS: true,
+            });
+            await db.updateCommunicationConfig(session.clientId, {
+              providerData: seededData as unknown as ProviderDataJson,
+              emailProviderConfirmed: true,
+            });
+          } catch (seedError) {
+            console.error('[Settings] Failed to seed Klaviyo resources:', seedError);
+            return {
+              success: false,
+              error: `Failed to create Klaviyo flows: ${seedError instanceof Error ? seedError.message : String(seedError)}`,
+            };
+          }
+        }
+      }
+
+      if (newEmailProvider === 'mailchimp' && configAfterSave) {
+        const providerData = configAfterSave.provider_data as Record<string, unknown> | null;
+        const serverPrefix = providerData?.serverPrefix as string | null | undefined;
+        const marketingAccessToken = providerData?.marketingAccessToken as string | null | undefined;
+        const audienceName = (providerData?.audienceName as string | null | undefined)?.trim();
+
+        if (!serverPrefix || !marketingAccessToken) {
+          return {
+            success: false,
+            error:
+              'Mailchimp requires a valid API key (e.g. xxxxx-us1) with server prefix. Please use a key that includes the server prefix (e.g. us1).',
+          };
+        }
+        if (!audienceName) {
+          return {
+            success: false,
+            error: 'Audience name is required. Enter the name of an existing audience in your Mailchimp account.',
+          };
+        }
+        try {
+          const seededData = await seedMailchimpResourcesFindOnly({
+            serverPrefix,
+            marketingAccessToken,
+            audienceName,
+            includeMarketing: false,
+          });
+          await db.updateCommunicationConfig(session.clientId, {
+            emailListId: seededData.audienceId ?? configAfterSave.email_list_id,
+            providerData: seededData as unknown as ProviderDataJson,
+            emailProviderConfirmed: true,
+          });
+        } catch (seedError) {
+          console.error('[Settings] Failed to seed Mailchimp resources:', seedError);
+          return {
+            success: false,
+            error: seedError instanceof Error ? seedError.message : String(seedError),
+          };
+        }
       }
 
       // Recalculate setup progress - if it drops below 100%, setup_complete will be set to false
@@ -287,6 +357,13 @@ export default function CommunicationSettings() {
 
   // Provider API key fields (for Klaviyo and Mailchimp)
   const providerData = (communicationConfig?.provider_data as Record<string, unknown> | null) ?? null;
+  // Klaviyo SMS: we seed flows with includeSMS true, so if provider_data has flows, SMS is available
+  const klaviyoSmsAvailable =
+    emailProvider === 'klaviyo' && providerData != null && typeof providerData.flows === 'object';
+  // Mailchimp: no in-app SMS Send Test; they test SMS in their LiberoVino::Test flow in Mailchimp.
+  const mailchimpSmsAvailable = false;
+  const smsTestEnabled = smsActivated || klaviyoSmsAvailable;
+
   const [klaviyoApiKey, setKlaviyoApiKey] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_api_key ?? '' : '');
   const [klaviyoFromEmail, setKlaviyoFromEmail] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_from_address ?? '' : '');
   const [klaviyoFromName, setKlaviyoFromName] = useState(communicationConfig?.email_provider === 'klaviyo' ? communicationConfig.email_from_name ?? '' : '');
@@ -295,11 +372,23 @@ export default function CommunicationSettings() {
   const [mailchimpAccessToken, setMailchimpAccessToken] = useState(
     communicationConfig?.email_provider === 'mailchimp' ? (providerData?.marketingAccessToken as string ?? '') : ''
   );
-  const [mailchimpFromEmail, setMailchimpFromEmail] = useState(communicationConfig?.email_provider === 'mailchimp' ? communicationConfig.email_from_address ?? '' : '');
-  const [mailchimpFromName, setMailchimpFromName] = useState(communicationConfig?.email_provider === 'mailchimp' ? communicationConfig.email_from_name ?? '' : '');
   const [mailchimpAudienceName, setMailchimpAudienceName] = useState(
     communicationConfig?.email_provider === 'mailchimp' ? (providerData?.audienceName as string ?? '') : ''
   );
+  const [mailchimpCheckboxAudienceCreated, setMailchimpCheckboxAudienceCreated] = useState(false);
+  const [mailchimpCheckboxTestMember, setMailchimpCheckboxTestMember] = useState(false);
+  const [mailchimpCheckboxFlowCreated, setMailchimpCheckboxFlowCreated] = useState(false);
+
+  // Mailchimp Send Test (email): only when we have audience id and user confirmed (b) + (c).
+  const mailchimpAudienceId =
+    communicationConfig?.email_list_id ??
+    (providerData as { audienceId?: string } | null)?.audienceId;
+  const mailchimpEmailTestEnabled =
+    emailProvider === 'mailchimp' &&
+    typeof (providerData as { serverPrefix?: string } | null)?.serverPrefix === 'string' &&
+    !!mailchimpAudienceId &&
+    mailchimpCheckboxTestMember &&
+    mailchimpCheckboxFlowCreated;
 
   // Sync state with loader data
   useEffect(() => {
@@ -318,8 +407,6 @@ export default function CommunicationSettings() {
       setKlaviyoListId(config.email_list_id ?? '');
     } else if (config?.email_provider === 'mailchimp') {
       setMailchimpAccessToken((pd?.marketingAccessToken as string) ?? '');
-      setMailchimpFromEmail(config.email_from_address ?? '');
-      setMailchimpFromName(config.email_from_name ?? '');
       setMailchimpAudienceName((pd?.audienceName as string) ?? '');
     }
   }, [communicationConfig]);
@@ -352,10 +439,20 @@ export default function CommunicationSettings() {
     (actionData.message?.includes('Email settings') || actionData.error?.includes('Email settings'))
     ? actionData 
     : null;
-  // Get provider save result
+  // Get provider save result - show any error/success from update_providers intent that isn't a test or email settings
+  // Check for provider-related errors or success messages
   const providerSaveResult = actionData && 
     !actionData.testType && 
-    (actionData.message?.includes('Provider settings') || actionData.error?.includes('Provider settings') || actionData.error?.includes('Email provider is required'))
+    !emailSettingsSaveResult &&
+    (actionData.message?.includes('Provider settings') || 
+     actionData.error?.includes('Provider settings') || 
+     actionData.error?.includes('Email provider is required') ||
+     actionData.error?.includes('Audience name') ||
+     actionData.error?.includes('No audience named') ||
+     actionData.error?.includes('Mailchimp requires') ||
+     actionData.error?.includes('Klaviyo') ||
+     actionData.error?.includes('API key') ||
+     (actionData.success && actionData.message?.includes('successfully')))
     ? actionData 
     : null;
 
@@ -529,37 +626,14 @@ export default function CommunicationSettings() {
                       requiredIndicator
                       helpText="OAuth access token or classic API key for Marketing API calls"
                     />
-                    
                     <TextField
-                      label="From Email Address"
-                      type="email"
-                      value={mailchimpFromEmail}
-                      onChange={setMailchimpFromEmail}
-                      autoComplete="email"
-                      requiredIndicator
-                      helpText="Must match a verified domain in Mailchimp"
-                    />
-                    <input type="hidden" name="email_from_address" value={mailchimpFromEmail} />
-                    
-                    <TextField
-                      label="From Name"
-                      value={mailchimpFromName}
-                      onChange={setMailchimpFromName}
-                      autoComplete="off"
-                      requiredIndicator
-                      helpText="Displayed sender name"
-                    />
-                    <input type="hidden" name="email_from_name" value={mailchimpFromName} />
-                    
-                    <TextField
-                      label="Audience Name (Optional)"
+                      label="Audience Name"
                       value={mailchimpAudienceName}
                       onChange={setMailchimpAudienceName}
                       autoComplete="off"
-                      helpText="Used as the default audience when seeding resources. Leave blank to use 'LiberoVino Members'."
+                      requiredIndicator
+                      helpText="Must match an existing audience (list) in your Mailchimp account. We'll verify and save its id; we don't create audiences."
                     />
-                    
-                    {/* Store Mailchimp data in provider_data */}
                     <input type="hidden" name="provider_data" value={JSON.stringify({
                       marketingAccessToken: mailchimpAccessToken,
                       audienceName: mailchimpAudienceName || null,
@@ -672,6 +746,29 @@ export default function CommunicationSettings() {
                       </BlockStack>
                     </Form>
 
+                    {emailProvider === 'mailchimp' && (
+                      <BlockStack gap="200">
+                        <Text variant="bodyMd" as="p" tone="subdued" fontWeight="semibold">
+                          Test Setup
+                        </Text>
+                        <Checkbox
+                          label="I've created an audience in Mailchimp with the name above."
+                          checked={mailchimpCheckboxAudienceCreated}
+                          onChange={setMailchimpCheckboxAudienceCreated}
+                        />
+                        <Checkbox
+                          label="I have a test member in that audience (email subscribed; SMS subscribed if I use SMS in my flow)."
+                          checked={mailchimpCheckboxTestMember}
+                          onChange={setMailchimpCheckboxTestMember}
+                        />
+                        <Checkbox
+                          label="I created a flow in Mailchimp triggered by tag LiberoVino::Test that sends a test email (and optionally SMS)."
+                          checked={mailchimpCheckboxFlowCreated}
+                          onChange={setMailchimpCheckboxFlowCreated}
+                        />
+                      </BlockStack>
+                    )}
+
                     <InlineStack gap="200">
                       <Button 
                         url={addSessionToUrl('/app/settings/communication/templates', session.id)}
@@ -679,7 +776,10 @@ export default function CommunicationSettings() {
                       >
                         Manage Templates
                       </Button>
-                      <Button onClick={() => setShowTestEmailModal(true)}>
+                      <Button
+                        onClick={() => setShowTestEmailModal(true)}
+                        disabled={emailProvider === 'mailchimp' && !mailchimpEmailTestEnabled}
+                      >
                         Send Test
                       </Button>
                     </InlineStack>
@@ -728,23 +828,35 @@ export default function CommunicationSettings() {
 
               <BlockStack gap="400">
                 <Checkbox
-                  label="Activated"
-                  checked={smsActivated}
+                  label={
+                    emailProvider === 'klaviyo' && klaviyoSmsAvailable
+                      ? 'SMS via Klaviyo'
+                      : emailProvider === 'mailchimp' && mailchimpSmsAvailable
+                        ? 'SMS via Mailchimp'
+                        : 'Activated'
+                  }
+                  checked={smsActivated || klaviyoSmsAvailable || mailchimpSmsAvailable}
                   onChange={handleSmsActivatedChange}
                   disabled={emailProvider !== 'sendgrid'}
                   helpText={
-                    emailProvider !== 'sendgrid' 
-                      ? "SMS is only available with LiberoVino Managed email provider"
-                      : smsActivated 
-                        ? "SMS is activated and ready to send messages" 
-                        : "Enable SMS to send messages to members"
+                    emailProvider === 'klaviyo' && klaviyoSmsAvailable
+                      ? 'SMS is sent through your Klaviyo Test flow. Send a test to verify.'
+                      : emailProvider === 'klaviyo'
+                        ? 'Complete Klaviyo setup and save to enable SMS test.'
+                        : emailProvider === 'mailchimp'
+                          ? 'SMS cannot be tested from this page. Test SMS using a contact with SMS subscribed in your LiberoVino::Test flow in Mailchimp.'
+                          : emailProvider !== 'sendgrid'
+                              ? 'SMS is only available with LiberoVino Managed email provider'
+                              : smsActivated
+                                ? 'SMS is activated and ready to send messages'
+                                : 'Enable SMS to send messages to members'
                   }
                 />
 
                 <InlineStack gap="200">
                   <Button 
                     onClick={() => setShowTestSmsModal(true)}
-                    disabled={!smsActivated}
+                    disabled={!smsTestEnabled}
                   >
                     Send Test
                   </Button>

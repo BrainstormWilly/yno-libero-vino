@@ -80,7 +80,8 @@ export class CommunicationManager {
           config?.email_from_address ??
           this.options.defaultMailchimpFromEmail ??
           this.options.defaultSendgridFromEmail ??
-          '',
+          process.env.MAILCHIMP_DEFAULT_FROM_EMAIL ??
+          'support@ynosoftware.com',
         defaultFromName:
           config?.email_from_name ??
           this.options.defaultMailchimpFromName ??
@@ -175,7 +176,8 @@ export class CommunicationManager {
           config?.email_from_address ??
           this.options.defaultMailchimpFromEmail ??
           this.options.defaultSendgridFromEmail ??
-          '',
+          process.env.MAILCHIMP_DEFAULT_FROM_EMAIL ??
+          'support@ynosoftware.com',
         defaultFromName:
           config?.email_from_name ??
           this.options.defaultMailchimpFromName ??

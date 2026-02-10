@@ -175,8 +175,11 @@ export class MailchimpProvider implements CommunicationProvider {
       originalEmail: params.customer.email, // Log original for debugging
     });
 
-    // Build merge fields including event-specific date field
-    const mergeFields = this.buildMergeFields(params.customer.properties);
+    // Build merge fields including event-specific date field and phone (for SMS flows)
+    const mergeFields = this.buildMergeFields({
+      ...params.customer.properties,
+      ...(params.customer.phone ? { phone: normalizePhoneNumber(params.customer.phone) } : {}),
+    });
     if (params.event) {
       const eventMergeField = this.getEventMergeField(params.event);
       if (eventMergeField) {

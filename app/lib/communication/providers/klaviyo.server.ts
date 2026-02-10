@@ -867,16 +867,15 @@ export class KlaviyoProvider implements CommunicationProvider {
 
     // Add conditional split and SMS action if SMS is enabled
     if (params.includeSMS) {
-      // Conditional split: check if phone exists AND appropriate SMS preference is enabled
-      // Transactional flows check sms_transactional, marketing flows check sms_marketing
-      const smsPreferenceField = params.isTransactional ? 'sms_transactional' : 'sms_marketing';
-      
+      // Conditional split: use Klaviyo's profile-marketing-consent (documented format).
+      // Profile qualifies for SMS branch if they are subscribed to SMS marketing.
+      // Klaviyo will not send SMS without a phone number on the profile.
       actions.push({
         type: 'conditional-split',
         temporary_id: 'sms_conditional_split',
         links: {
-          next_if_true: 'send_sms_action', // If phone exists and SMS enabled, send SMS
-          next_if_false: null, // If not, end flow
+          next_if_true: 'send_sms_action',
+          next_if_false: null,
         },
         data: {
           profile_filter: {
@@ -884,16 +883,15 @@ export class KlaviyoProvider implements CommunicationProvider {
               {
                 conditions: [
                   {
-                    type: 'profile-property',
-                    field: 'phone_number', // Check if phone number exists
-                    operator: 'is_not_empty',
-                    value: null,
-                  },
-                  {
-                    type: 'profile-property',
-                    field: smsPreferenceField, // Check if SMS preference is enabled (transactional or marketing)
-                    operator: 'equals',
-                    value: true,
+                    type: 'profile-marketing-consent',
+                    consent: {
+                      channel: 'sms',
+                      can_receive_marketing: true,
+                      consent_status: {
+                        subscription: 'subscribed',
+                        filters: null,
+                      },
+                    },
                   },
                 ],
               },

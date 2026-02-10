@@ -523,6 +523,8 @@ export default function Settings() {
                           </Text>
                           {communicationConfig.sms_provider ? (
                             <Badge tone="success">{communicationConfig.sms_provider}</Badge>
+                          ) : communicationConfig.email_provider === 'mailchimp' || communicationConfig.email_provider === 'klaviyo' ? (
+                            <Badge tone="info">Managed by {communicationConfig.email_provider === 'mailchimp' ? 'Mailchimp' : 'Klaviyo'}</Badge>
                           ) : (
                             <Badge tone="attention">Not configured</Badge>
                           )}

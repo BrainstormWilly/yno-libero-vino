@@ -10,41 +10,43 @@ const BUCKET_NAME = 'sendgrid-email-images';
 const DEFAULT_IMAGES_FOLDER = '_defaults';
 const DEFAULT_FOOTER_IMAGE_NAME = 'powered-by-dark.png';
 
+function getPublicStorageBaseUrl(): string {
+  // In dev we may talk to a local Supabase instance (127.0.0.1),
+  // but emails (Klaviyo/Mailchimp/SendGrid previews) need publicly reachable URLs.
+  // If SUPABASE_PUBLIC_URL is set, prefer it for constructing public object URLs.
+  const base = (process.env.SUPABASE_PUBLIC_URL || process.env.SUPABASE_URL || '').trim();
+  return base.replace(/\/+$/, '');
+}
+
+function buildPublicObjectUrl(path: string): string {
+  const baseUrl = getPublicStorageBaseUrl();
+  if (!baseUrl) {
+    throw new Error('SUPABASE_URL (or SUPABASE_PUBLIC_URL) is required to build public storage URLs.');
+  }
+  const cleanPath = path.replace(/^\/+/, '');
+  return `${baseUrl}/storage/v1/object/public/${cleanPath}`;
+}
+
 /**
  * Get default LiberoVino header image URL
  * Default images are stored in a special '_defaults' folder
  */
 export async function getDefaultHeaderImageUrl(): Promise<string> {
-  const supabase = getSupabaseClient();
-  const { data: { publicUrl } } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(`${DEFAULT_IMAGES_FOLDER}/header.png`);
-  
-  return publicUrl;
+  return buildPublicObjectUrl(`${BUCKET_NAME}/${DEFAULT_IMAGES_FOLDER}/header.png`);
 }
 
 /**
  * Get default LiberoVino footer image URL
  */
 export async function getDefaultFooterImageUrl(): Promise<string> {
-  const supabase = getSupabaseClient();
-  const { data: { publicUrl } } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(`${DEFAULT_IMAGES_FOLDER}/footer.png`);
-  
-  return publicUrl;
+  return buildPublicObjectUrl(`${BUCKET_NAME}/${DEFAULT_IMAGES_FOLDER}/footer.png`);
 }
 
 /**
  * Get default LiberoVino powered-by-dark.png image URL
  */
 export async function getPoweredByDarkImageUrl(): Promise<string> {
-  const supabase = getSupabaseClient();
-  const { data: { publicUrl } } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(DEFAULT_FOOTER_IMAGE_NAME);
-  
-  return publicUrl;
+  return buildPublicObjectUrl(`${BUCKET_NAME}/${DEFAULT_FOOTER_IMAGE_NAME}`);
 }
 
 /**
@@ -88,11 +90,7 @@ export async function uploadSendGridClientImage(
   }
   
   // Get public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from(BUCKET_NAME)
-    .getPublicUrl(data.path);
-  
-  return publicUrl;
+  return buildPublicObjectUrl(`${BUCKET_NAME}/${data.path}`);
 }
 
 /**

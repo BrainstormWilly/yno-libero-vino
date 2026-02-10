@@ -109,6 +109,83 @@ export async function seedMailchimpResources(options: SeedMailchimpOptions): Pro
   };
 }
 
+export interface SeedMailchimpFindOnlyOptions {
+  serverPrefix: string;
+  marketingAccessToken?: string | null;
+  marketingApiKey?: string | null;
+  audienceName: string;
+  includeMarketing?: boolean;
+}
+
+/**
+ * Find audience by name only (no create). Throws if not found.
+ * Runs merge fields and template upload on the found audience.
+ */
+export async function seedMailchimpResourcesFindOnly(
+  options: SeedMailchimpFindOnlyOptions
+): Promise<MailchimpProviderData> {
+  if (!options.marketingAccessToken && !options.marketingApiKey) {
+    throw new Error(
+      'Mailchimp seeding requires either an OAuth marketing access token or a classic API key.'
+    );
+  }
+
+  const audienceName = options.audienceName?.trim();
+  if (!audienceName) {
+    throw new Error('Audience name is required.');
+  }
+
+  const client = new MailchimpSeedClient({
+    serverPrefix: options.serverPrefix,
+    accessToken: options.marketingAccessToken ?? undefined,
+    apiKey: options.marketingApiKey ?? undefined,
+  });
+
+  const audience = await client.findAudienceByName(audienceName);
+  if (!audience) {
+    throw new Error(
+      `No audience named "${audienceName}" found. Create an audience in Mailchimp with that name, then try again.`
+    );
+  }
+
+  await client.ensureMergeFields(audience.id);
+
+  const templates: Record<string, MailchimpTemplateSeedResult | undefined> = {};
+  const templateKeys = filterMarketingSequences(
+    MAILCHIMP_SEQUENCE_ORDER,
+    Boolean(options.includeMarketing ?? false)
+  );
+
+  for (const sequenceKey of templateKeys) {
+    const templateKey = sequenceKey as MailchimpTemplateKey;
+    const templateSeed = await buildTemplateSeed(templateKey);
+    const payload: MailchimpTemplatePayload = {
+      name: MAILCHIMP_TEMPLATE_NAMES[templateKey],
+      html: convertMergeTags(templateSeed.html),
+      text: convertMergeTags(templateSeed.text ?? ''),
+    };
+    const template = await client.ensureTemplate(payload);
+    templates[templateKey] = {
+      ...template,
+      seededAt: template.seededAt ?? new Date().toISOString(),
+    };
+  }
+
+  return {
+    seededAt: new Date().toISOString(),
+    includeMarketing: Boolean(options.includeMarketing),
+    serverPrefix: options.serverPrefix,
+    marketingAccessToken: options.marketingAccessToken ?? null,
+    audienceId: audience.id,
+    audienceName: audience.name,
+    audience: {
+      ...audience,
+      seededAt: (audience as { seededAt?: string }).seededAt ?? new Date().toISOString(),
+    },
+    templates,
+  };
+}
+
 function filterMarketingSequences(
   sequences: KlaviyoMetricKey[],
   includeMarketing: boolean
@@ -235,7 +312,7 @@ class MailchimpSeedClient {
     }
   }
 
-  private async findAudienceByName(name: string) {
+  async findAudienceByName(name: string) {
     const response = await this.request(`/lists?fields=lists.id,lists.name,lists.web_id&count=1000`, {
       method: 'GET',
     });
