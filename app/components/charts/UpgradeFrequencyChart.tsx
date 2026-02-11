@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ChartEmptyState from '~/components/charts/ChartEmptyState';
 import '~/styles/srOnly.css';
 
 export type UpgradeFrequencyChartData = {
@@ -20,6 +21,10 @@ const UpgradeFrequencyChart: FC<UpgradeFrequencyChartProps> = ({
   const chartTitle = data.length > 0 
     ? `${title}: ${data.reduce((sum, d) => sum + d.customerCount, 0)} customers`
     : `${title}: No data`;
+
+  if (data.length === 0) {
+    return <ChartEmptyState ariaLabel={chartTitle} message="No upgrade frequency data yet" />;
+  }
 
   return (
     <div role="img" aria-label={chartTitle}>

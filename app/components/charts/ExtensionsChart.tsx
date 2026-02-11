@@ -1,5 +1,6 @@
 import { type FC } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ChartEmptyState from '~/components/charts/ChartEmptyState';
 import '~/styles/srOnly.css';
 
 export type ExtensionsChartData = {
@@ -19,6 +20,10 @@ const ExtensionsChart: FC<ExtensionsChartProps> = ({
   const chartTitle = data.length > 0 
     ? `${title}: ${data.reduce((sum, d) => sum + d.count, 0)} total extensions`
     : `${title}: No data`;
+
+  if (data.length === 0) {
+    return <ChartEmptyState ariaLabel={chartTitle} message="No extensions in this period" />;
+  }
 
   return (
     <div role="img" aria-label={chartTitle}>
