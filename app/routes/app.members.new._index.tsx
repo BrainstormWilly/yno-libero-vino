@@ -1,5 +1,5 @@
 import { type LoaderFunctionArgs, type ActionFunctionArgs } from 'react-router';
-import { useLoaderData, Form, useActionData, useNavigate } from 'react-router';
+import { useLoaderData, Form, useActionData } from 'react-router';
 import { useState, useEffect } from 'react';
 import {
   Card,
@@ -19,7 +19,6 @@ import { SearchIcon } from '@shopify/polaris-icons';
 import { getAppSession, redirectWithSession } from '~/lib/sessions.server';
 import * as db from '~/lib/db/supabase.server';
 import { crmManager } from '~/lib/crm/index.server';
-import { addSessionToUrl } from '~/util/session';
 import { useDebounce } from '~/hooks/useDebounce';
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -118,8 +117,8 @@ export async function action({ request }: ActionFunctionArgs) {
         paymentVerified: false, // Reset - need to verify payment for enrollment
       });
       
-      // Existing customer goes to address step
-      throw redirectWithSession('/app/members/new/address', session.id);
+      // Existing customer goes to comm preferences step (LiberoVino opt-in)
+      throw redirectWithSession('/app/members/new/customer', session.id);
     } else {
       // New customer with manual purchase amount
       const purchaseAmount = parseFloat(manualPurchaseAmount || '0');
@@ -192,32 +191,33 @@ export default function QualifyTier() {
     if (recommendedTierId && !selectedTierId && purchaseAmountForQualification > 0) {
       setSelectedTierId(recommendedTierId);
     }
-  }, [recommendedTierId, purchaseAmountForQualification]);
+  }, [recommendedTierId, purchaseAmountForQualification, selectedTierId]);
   
   // Search for customers when debounced query changes
   useEffect(() => {
+    const handleSearchCustomers = async (query: string) => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(
+          `/api/customers?q=${encodeURIComponent(query)}&session=${session.id}`
+        );
+        const data = await response.json();
+        setSearchResults(data.customers || []);
+      } catch (error) {
+        console.error('Search failed:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
     if (debouncedSearchQuery.length >= 2 && !selectedCustomer) {
       handleSearchCustomers(debouncedSearchQuery);
     } else if (debouncedSearchQuery.length < 2) {
       setSearchResults([]);
     }
-  }, [debouncedSearchQuery, selectedCustomer]);
+  }, [debouncedSearchQuery, selectedCustomer, session.id]);
   
-  const handleSearchCustomers = async (query: string) => {
-    setIsSearching(true);
-    try {
-      const response = await fetch(
-        `/api/customers?q=${encodeURIComponent(query)}&session=${session.id}`
-      );
-      const data = await response.json();
-      setSearchResults(data.customers || []);
-    } catch (error) {
-      console.error('Search failed:', error);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+  
   
   const handleSelectCustomer = (customer: any) => {
     setSelectedCustomer(customer);
@@ -334,7 +334,6 @@ export default function QualifyTier() {
           )}
           
           <Form method="post">
-            <input type="hidden" name="tier_id" value={selectedTierId} />
             <input type="hidden" name="customer_crm_id" value={selectedCustomer?.id || ''} />
             <input type="hidden" name="manual_purchase_amount" value={manualPurchaseAmount} />
             
@@ -343,11 +342,12 @@ export default function QualifyTier() {
                 const qualified = purchaseAmountForQualification >= tier.min_purchase_amount;
                 const isSelected = selectedTierId === tier.id;
                 const isRecommended = tier.id === recommendedTierId;
+                const inputId = `tier-${tier.id}`;
                 
                 return (
-                  <div
+                  <label
                     key={tier.id}
-                    onClick={() => setSelectedTierId(tier.id)}
+                    htmlFor={inputId}
                     className={`tier-selection-card ${isSelected ? 'selected' : 'unselected'}`}
                     style={{
                       cursor: 'pointer',
@@ -355,8 +355,18 @@ export default function QualifyTier() {
                       border: isSelected ? '2px solid #008060' : '1px solid #e1e3e5',
                       borderRadius: '8px',
                       backgroundColor: isSelected ? '#f6f6f7' : 'transparent',
+                      display: 'block',
                     }}
                   >
+                    <input
+                      type="radio"
+                      id={inputId}
+                      name="tier_id"
+                      value={tier.id}
+                      checked={isSelected}
+                      onChange={() => setSelectedTierId(tier.id)}
+                      className="sr-only"
+                    />
                     <InlineStack align="space-between" blockAlign="start">
                       <BlockStack gap="200">
                         <InlineStack gap="200" blockAlign="center">
@@ -383,7 +393,7 @@ export default function QualifyTier() {
                         </Badge>
                       )}
                     </InlineStack>
-                  </div>
+                  </label>
                 );
               })}
               
@@ -393,7 +403,7 @@ export default function QualifyTier() {
                 disabled={!selectedTierId}
                 size="large"
               >
-                Continue to {selectedCustomer ? 'Address' : 'Customer Details'} →
+                Continue to {selectedCustomer ? 'Communication Preferences' : 'Customer Details'} →
               </Button>
             </BlockStack>
           </Form>

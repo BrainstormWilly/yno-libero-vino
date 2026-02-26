@@ -125,13 +125,20 @@ export async function action({ request }: ActionFunctionArgs) {
         cvv,
         isDefault: true,
       });
+
+      if (!paymentMethod.id) {
+        return {
+          success: false,
+          error: 'Payment method was created but no ID was returned. Please try again.',
+        };
+      }
       
       // Update draft with payment method ID and details
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         customer: {
           ...draft.customer!,
-          paymentMethodId: paymentMethod.id!,
+          paymentMethodId: paymentMethod.id,
         },
         payment: {
           last4: cardNumber.replace(/\D/g, '').slice(-4), // Last 4 digits

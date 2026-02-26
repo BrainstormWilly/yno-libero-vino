@@ -587,6 +587,25 @@ export async function getTierLoyaltyConfig(stageId: string): Promise<TierLoyalty
   return loyalty;
 }
 
+export async function updateTierLoyaltyConfig(
+  stageId: string,
+  updates: { earnRate?: number; initialPointsBonus?: number }
+) {
+  const supabase = getSupabaseClient();
+  const set: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (updates.earnRate !== undefined) set.earn_rate = updates.earnRate;
+  if (updates.initialPointsBonus !== undefined) set.initial_points_bonus = updates.initialPointsBonus;
+
+  const { error } = await supabase
+    .from('tier_loyalty_config')
+    .update(set)
+    .eq('club_stage_id', stageId);
+
+  if (error) {
+    throw new Error(`Failed to update tier loyalty config: ${error.message}`);
+  }
+}
+
 export async function deleteTierLoyaltyConfig(stageId: string) {
   const supabase = getSupabaseClient();
   

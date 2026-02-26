@@ -8,9 +8,7 @@ import {
   Text, 
   BlockStack,
   Banner,
-  TextField,
   InlineStack,
-  Checkbox,
   Divider,
   Box,
 } from '@shopify/polaris';
@@ -24,6 +22,7 @@ import { crmManager } from '~/lib/crm/index.server';
 import { deleteTierCrmResources } from '~/lib/club-tier-promotions.server';
 import type { loader as tierLayoutLoader } from './app.setup.tiers.$id';
 import TierDetailsForm from '~/components/TierDetailsForm';
+import { TierLoyaltySection } from '~/components/TierLoyaltySection';
 
 // Type for enriched promotions from the parent loader
 type EnrichedPromotion = {
@@ -205,10 +204,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         
         const tier = await db.getClubStageWithDetails(tierId);
         const existingLoyalty = await db.getTierLoyaltyConfig(tierId);
+        const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
         
         if (!existingLoyalty && tier?.c7_club_id) {
-          // Create new loyalty tier in CRM
-          const provider = crmManager.getProvider(session.crmType, session.tenantShop, session.accessToken);
           try {
             const loyaltyTier = await provider.createLoyaltyTier({
               title: `${tier.name} Rewards`,
@@ -217,8 +215,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
               earnRate,
               sortOrder: 0,
             });
-            
-            // Save to DB
             await db.createTierLoyaltyConfig({
               stageId: tierId,
               c7LoyaltyTierId: loyaltyTier.id,
@@ -228,7 +224,18 @@ export async function action({ request, params }: ActionFunctionArgs) {
             });
           } catch (error) {
             console.error('Failed to create loyalty tier:', error);
-            // Continue - loyalty is optional
+          }
+        } else if (existingLoyalty) {
+          try {
+            if (provider.updateLoyaltyTier) {
+              await provider.updateLoyaltyTier(existingLoyalty.c7_loyalty_tier_id, { earnRate });
+            }
+            await db.updateTierLoyaltyConfig(tierId, {
+              earnRate,
+              initialPointsBonus: bonus,
+            });
+          } catch (error) {
+            console.error('Failed to update loyalty tier:', error);
           }
         }
       } else {
@@ -307,14 +314,6 @@ export default function TierDetails() {
     return '0.00';
   }, [minLtvAmount]);
   
-  const [loyaltyEnabled, setLoyaltyEnabled] = useState(!!loyalty);
-  const [earnRate, setEarnRate] = useState(
-    loyalty && loyalty.earn_rate !== null ? (loyalty.earn_rate * 100).toString() : '2'
-  );
-  const [bonusPoints, setBonusPoints] = useState(
-    loyalty?.initial_points_bonus?.toString() || '0'
-  );
-  
   // Track feedback banner visibility
   const [showFeedback, setShowFeedback] = useState(true);
   
@@ -358,14 +357,6 @@ export default function TierDetails() {
       return minPurchaseOverride !== expectedOverride;
     })();
   
-  // Track if loyalty settings have been modified
-  const loyaltyChanged = 
-    loyaltyEnabled !== !!loyalty ||
-    (loyaltyEnabled && (
-      earnRate !== (loyalty && loyalty.earn_rate !== null ? (loyalty.earn_rate * 100).toString() : '2') ||
-      bonusPoints !== (loyalty?.initial_points_bonus?.toString() || '0')
-    ));
-  
   useEffect(() => {
     setupAutoResize();
   }, []);
@@ -390,26 +381,6 @@ export default function TierDetails() {
           </Banner>
         )}
         
-        {/* Banners at Top */}
-        {actionData?.action === 'update_tier_details' && showFeedback && (
-          <div
-            style={{
-              animation: 'slideDown 0.3s ease-out',
-            }}
-          >
-            {actionData.success && (
-              <Banner tone="success" onDismiss={() => setShowFeedback(false)}>
-                {actionData.success}
-              </Banner>
-            )}
-            {actionData.error && (
-              <Banner tone="critical" onDismiss={() => setShowFeedback(false)}>
-                {actionData.error}
-              </Banner>
-            )}
-          </div>
-        )}
-
         {/* Navigation Buttons at Top */}
         <Box paddingBlockEnd="400">
           <InlineStack align="space-between">
@@ -432,6 +403,20 @@ export default function TierDetails() {
                 <Card>
                   <Form method="post">
                     <BlockStack gap="400">
+                      {actionData?.action === 'update_tier_details' && showFeedback && (
+                        <>
+                          {actionData.success && (
+                            <Banner tone="success" onDismiss={() => setShowFeedback(false)}>
+                              {actionData.success}
+                            </Banner>
+                          )}
+                          {actionData.error && (
+                            <Banner tone="critical" onDismiss={() => setShowFeedback(false)}>
+                              {actionData.error}
+                            </Banner>
+                          )}
+                        </>
+                      )}
                       <TierDetailsForm
                         tierName={tierName}
                         durationMonths={durationMonths}
@@ -544,77 +529,7 @@ export default function TierDetails() {
                 </Card>
               </section>
               
-              {/* Loyalty Section */}
-              <section>
-                <Form method="post">
-                  <input type="hidden" name="action" value="toggle_loyalty" />
-                  <input type="hidden" name="loyalty_enabled" value={loyaltyEnabled.toString()} />
-                  <input type="hidden" name="earn_rate" value={earnRate} />
-                  <input type="hidden" name="bonus_points" value={bonusPoints} />
-                  
-                  <Card>
-                    <BlockStack gap="400">
-                      <Text variant="headingMd" as="h3">
-                        Loyalty Rewards
-                      </Text>
-                      
-                      <Checkbox
-                        label="Enable loyalty rewards for this tier"
-                        checked={loyaltyEnabled}
-                        onChange={setLoyaltyEnabled}
-                        helpText="Members automatically earn points on all purchases"
-                        disabled={!tier.is_active || isNewTier}
-                      />
-                      {isNewTier && (
-                        <Banner tone="info">
-                          Save tier details before configuring loyalty rewards.
-                        </Banner>
-                      )}
-                      
-                      {loyaltyEnabled && (
-                        <BlockStack gap="300">
-                          <Banner tone="info">
-                            Members in this tier will automatically earn points on ALL purchases (not just club purchases).
-                          </Banner>
-                          
-                          <TextField
-                            label="Points Earn Rate (%)"
-                            value={earnRate}
-                            onChange={setEarnRate}
-                            type="number"
-                            suffix="%"
-                            autoComplete="off"
-                            helpText="Percentage of purchase amount earned as points (e.g., 2% means $100 purchase = 2 points)"
-                            disabled={!tier.is_active}
-                          />
-                          
-                          <TextField
-                            label="Welcome Bonus Points"
-                            value={bonusPoints}
-                            onChange={setBonusPoints}
-                            type="number"
-                            autoComplete="off"
-                            helpText="Bonus points awarded when member joins this tier (optional)"
-                            disabled={!tier.is_active}
-                          />
-                          
-                          {tier.is_active && (
-                            <InlineStack align="end">
-                              <Button 
-                                submit 
-                                variant="primary"
-                                disabled={!loyaltyChanged}
-                              >
-                                Save Loyalty Config
-                              </Button>
-                            </InlineStack>
-                          )}
-                        </BlockStack>
-                      )}
-                    </BlockStack>
-                  </Card>
-                </Form>
-              </section>
+              <TierLoyaltySection loyalty={loyalty} tier={tier} isNewTier={isNewTier} />
               
       </BlockStack>
     </Page>

@@ -126,11 +126,17 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     
     // Validate we have all required IDs for Commerce7
-    if (session.crmType === 'commerce7' && (!draft.customer.billingAddressId || !draft.customer.shippingAddressId || !draft.customer.paymentMethodId)) {
-      return {
-        success: false,
-        error: 'Missing required address or payment information',
-      };
+    if (session.crmType === 'commerce7') {
+      const missingFields: string[] = [];
+      if (!draft.customer.billingAddressId) missingFields.push('billing address');
+      if (!draft.customer.shippingAddressId) missingFields.push('shipping address');
+      if (!draft.customer.paymentMethodId) missingFields.push('payment method');
+      if (missingFields.length > 0) {
+        return {
+          success: false,
+          error: `Missing required ${missingFields.join(', ')}. Please re-check the address and payment steps.`,
+        };
+      }
     }
     
     // Calculate enrollment dates

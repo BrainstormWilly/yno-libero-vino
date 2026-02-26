@@ -1,6 +1,6 @@
 import { type LoaderFunctionArgs } from 'react-router';
-import { useLoaderData, useNavigate, useSubmit, useLocation } from 'react-router';
-import { useEffect, useState, useCallback } from 'react';
+import { useLoaderData, useNavigate, useLocation, useNavigation } from 'react-router';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Page,
   Layout,
@@ -12,6 +12,8 @@ import {
   Select,
   InlineStack,
   BlockStack,
+  Spinner,
+  Box,
 } from '@shopify/polaris';
 
 import { getAppSession } from '~/lib/sessions.server';
@@ -59,59 +61,110 @@ export async function loader({ request }: LoaderFunctionArgs) {
   };
 }
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 export default function MembersPage() {
   const { session, customers, tiers, search: initialSearch, tierFilter: initialTierFilter, statusFilter: initialStatusFilter } = useLoaderData<typeof loader>();
   const location = useLocation();
   const navigate = useNavigate();
-  const submit = useSubmit();
+  const navigation = useNavigation();
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchValueRef = useRef(initialSearch);
 
   const [searchValue, setSearchValue] = useState(initialSearch);
+  searchValueRef.current = searchValue;
   const [tierFilterValue, setTierFilterValue] = useState(initialTierFilter);
   const [statusFilterValue, setStatusFilterValue] = useState(initialStatusFilter);
+
+  const isSearching = navigation.state === 'loading' && navigation.location?.pathname === '/app/members';
 
   useEffect(() => {
     setupAutoResize();
   }, []);
 
-  // Debounced search handler
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchValue(value);
-  }, []);
-
-  // Submit filters
-  const handleFilterSubmit = useCallback(() => {
+  // Build URL with current filters and navigate
+  const applyFilters = useCallback(() => {
     const params = new URLSearchParams();
     if (searchValue) params.set('search', searchValue);
     if (tierFilterValue) params.set('tier', tierFilterValue);
     if (statusFilterValue) params.set('status', statusFilterValue);
     params.set('session', session.id);
-    
     navigate(`/app/members?${params.toString()}`);
   }, [searchValue, tierFilterValue, statusFilterValue, session.id, navigate]);
 
+  // Sync local state when loader data changes (e.g. browser back, navigation)
+  useEffect(() => {
+    setSearchValue(initialSearch);
+    setTierFilterValue(initialTierFilter);
+    setStatusFilterValue(initialStatusFilter);
+  }, [initialSearch, initialTierFilter, initialStatusFilter]);
+
+  // Debounced search: navigate after user stops typing (pass value to avoid stale closure)
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      searchDebounceRef.current = null;
+      const params = new URLSearchParams();
+      if (value) params.set('search', value);
+      if (tierFilterValue) params.set('tier', tierFilterValue);
+      if (statusFilterValue) params.set('status', statusFilterValue);
+      params.set('session', session.id);
+      navigate(`/app/members?${params.toString()}`);
+    }, SEARCH_DEBOUNCE_MS);
+  }, [tierFilterValue, statusFilterValue, session.id, navigate]);
+
+  // On blur: flush debounce and search immediately with current value
+  const handleSearchBlur = useCallback(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+      const value = searchValueRef.current;
+      const params = new URLSearchParams();
+      if (value) params.set('search', value);
+      if (tierFilterValue) params.set('tier', tierFilterValue);
+      if (statusFilterValue) params.set('status', statusFilterValue);
+      params.set('session', session.id);
+      navigate(`/app/members?${params.toString()}`);
+    }
+  }, [tierFilterValue, statusFilterValue, session.id, navigate]);
+
+  // Cleanup debounce on unmount
+  useEffect(() => () => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+  }, []);
+
   // Handle tier filter change
   const handleTierFilterChange = useCallback((value: string) => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
     setTierFilterValue(value);
     const params = new URLSearchParams();
-    if (searchValue) params.set('search', searchValue);
+    if (searchValueRef.current) params.set('search', searchValueRef.current);
     if (value) params.set('tier', value);
     if (statusFilterValue) params.set('status', statusFilterValue);
     params.set('session', session.id);
-    
     navigate(`/app/members?${params.toString()}`);
-  }, [searchValue, statusFilterValue, session.id, navigate]);
+  }, [statusFilterValue, session.id, navigate]);
 
   // Handle status filter change
   const handleStatusFilterChange = useCallback((value: string) => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
     setStatusFilterValue(value);
     const params = new URLSearchParams();
-    if (searchValue) params.set('search', searchValue);
+    if (searchValueRef.current) params.set('search', searchValueRef.current);
     if (tierFilterValue) params.set('tier', tierFilterValue);
     if (value) params.set('status', value);
     params.set('session', session.id);
-    
     navigate(`/app/members?${params.toString()}`);
-  }, [searchValue, tierFilterValue, session.id, navigate]);
+  }, [tierFilterValue, session.id, navigate]);
 
   // Clear filters
   const handleClearFilters = useCallback(() => {
@@ -288,13 +341,18 @@ export default function MembersPage() {
                   label="Search"
                   value={searchValue}
                   onChange={handleSearchChange}
-                  onBlur={handleFilterSubmit}
+                  onBlur={handleSearchBlur}
                   placeholder="Search by name or email"
                   autoComplete="off"
                   labelHidden
                   clearButton
                   onClearButtonClick={() => {
+                    if (searchDebounceRef.current) {
+                      clearTimeout(searchDebounceRef.current);
+                      searchDebounceRef.current = null;
+                    }
                     setSearchValue('');
+                    searchValueRef.current = '';
                     const params = new URLSearchParams();
                     if (tierFilterValue) params.set('tier', tierFilterValue);
                     if (statusFilterValue) params.set('status', statusFilterValue);
@@ -328,6 +386,14 @@ export default function MembersPage() {
         {/* Members Table */}
         <Layout.Section>
           <Card>
+            {isSearching && (
+              <Box position="relative" padding="800">
+                <InlineStack gap="400" align="center" blockAlign="center">
+                  <Spinner size="small" />
+                  <span>Searching...</span>
+                </InlineStack>
+              </Box>
+            )}
             <BlockStack gap="400">
               {/* Table or Empty State */}
               {customers.length === 0 ? (
