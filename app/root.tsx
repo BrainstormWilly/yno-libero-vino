@@ -14,6 +14,72 @@ import "./app.css";
 import CookieBannerWrapper from "./components/splash/CookieBannerWrapper";
 import { PolarisThemeProvider } from "./components/PolarisThemeProvider";
 
+export const meta = () => {
+  return [
+    { title: "Yno LiberoVino | Wine Club and Loyalty Management Software" },
+    {
+      name: "description",
+      content: "Yno LiberoVino is a wine club and loyalty management platform for wineries using Commerce7 and Shopify. \
+      It automates club membership tracking, loyalty point management, and customer communications, helping wineries increase retention and lifetime customer value."
+    },
+    {
+      name: "keywords",
+      content: "wine, wine businesss, direct-to-consumer wineries, DtC wineries, D2C wineries, wine club, wine club software, wine club management, \
+      wine marketing, wine marketing software, wine marketing app, commerce7 app, wine app, wine loyalty, wine loyalty software, wine loyalty management"
+    },
+    {
+      name: "author",
+      content: "Yno Software"
+    },
+    {
+      name: "viewport",
+      content: "width=device-width, initial-scale=1"
+    },
+    {
+      property: "og:title",
+      content: "Yno LiberoVino"
+    },
+    {
+      property: "og:description",
+      content: "Yno LiberoVino is a wine club and loyalty management platform for wineries using Commerce7 and Shopify. \
+      It automates club membership tracking, loyalty point management, and customer communications, helping wineries increase retention and lifetime customer value."
+    },
+    {
+      property: "og:image",
+      content: "https://liberovino.wine/media/liberovino-og.jpg"
+    },
+    {
+      property: "og:url",
+      content: "https://liberovino.wine"
+    },
+    {
+      property: "og:type",
+      content: "website"
+    },
+    {
+      name: "twitter:card",
+      content: "summary_large_image"
+    },
+    {
+      name: "twitter:title",
+      content: "Yno LiberoVino | Wine Club and Loyalty Management Software"
+    },
+    {
+      name: "twitter:description",
+      content: "Yno LiberoVino is a wine club and loyalty management platform for wineries using Commerce7 and Shopify. \
+      It automates club membership tracking, loyalty point management, and customer communications, helping wineries increase retention and lifetime customer value."
+    },
+    {
+      name: "twitter:image",
+      content: "https://liberovino.wine/media/liberovino-og.jpg"
+    },
+    {
+      name: "twitter:url",
+      content: "https://liberovino.wine"
+    }
+  ]
+}
+
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
@@ -32,6 +98,34 @@ export const links: Route.LinksFunction = () => [
   {
     rel: "stylesheet",
     href: "https://fonts.googleapis.com/css2?family=Noto+Serif:ital,wght@0,100..900;1,100..900&display=swap",
+  },
+  {
+    rel: "icon",
+    href: "/favicon-16x16.png",
+    type: "image/png",
+  },
+  {
+    rel: "icon",
+    href: "/favicon.ico",
+    sizes: "any"
+  },
+  {
+    rel: "icon",
+    href: "/yno-logo-bug.svg",
+    type: "image/svg+xml"
+  },
+  {
+    rel: "apple-touch-icon",
+    href: "/apple-touch-icon.png"
+  },
+  {
+    rel: "mask-icon",
+    href: "/safari-pinned-tab.svg",
+    color: "#fbb315"
+  },
+  { 
+    rel: "manifest",
+    href: "/site.webmanifest"
   },
 ];
 
