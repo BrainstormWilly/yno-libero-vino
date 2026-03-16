@@ -1,6 +1,6 @@
 -- Create enrollment_drafts table to store in-progress member enrollments
 CREATE TABLE IF NOT EXISTS enrollment_drafts (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   session_id text UNIQUE NOT NULL,
   customer_data jsonb,
   tier_data jsonb,
