@@ -202,29 +202,35 @@ export class Commerce7Provider implements CrmProvider {
 
   async getCustomersWithLTV(params?: any): Promise<CrmCustomer[]> {
     const customers = await this.getCustomers(params);
-    
-    // Calculate LTV for each customer using conversion function
+
+    // Use orderInformation.lifetimeValue from C7 customer when present; otherwise fall back to summing orders
     const customersWithLtv = await Promise.all(
       customers.map(async (customer) => {
+        if (customer.ltv != null) {
+          return customer; // Already has LTV from orderInformation
+        }
         try {
           const orders = await this.getOrders({ customerId: customer.id });
-          const ltv = calculateC7LTV(orders); // Uses conversion helper
+          const ltv = calculateC7LTV(orders);
           return { ...customer, ltv };
         } catch {
           return { ...customer, ltv: 0 };
         }
       })
     );
-    
+
     return customersWithLtv;
   }
 
   async getCustomerWithLTV(id: string): Promise<CrmCustomer> {
     const customer = await this.getCustomer(id);
-    
+
+    if (customer.ltv != null) {
+      return customer; // Already has LTV from orderInformation.lifetimeValue
+    }
     try {
       const orders = await this.getOrders({ customerId: id });
-      const ltv = calculateC7LTV(orders); // Uses conversion helper
+      const ltv = calculateC7LTV(orders);
       return { ...customer, ltv };
     } catch {
       return { ...customer, ltv: 0 };
@@ -590,9 +596,19 @@ export class Commerce7Provider implements CrmProvider {
   }
 
   async getOrders(params?: any): Promise<CrmOrder[]> {
-    const { q = "", limit = 50 } = params || {};
+    const { q = "", limit = 50, customerId } = params || {};
 
-    const response = await fetch(`${API_URL}/order?q=${q}&limit=${limit}`, {
+    // When fetching by customer: try C7 contact orders endpoint first, fallback to global fetch + filter
+    if (customerId) {
+      const contactOrders = await this.fetchOrdersByContact(customerId);
+      if (contactOrders) return contactOrders;
+    }
+
+    const searchParams = new URLSearchParams();
+    searchParams.set("q", q);
+    searchParams.set("limit", String(customerId ? 2000 : limit));
+
+    const response = await fetch(`${API_URL}/order?${searchParams.toString()}`, {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -609,9 +625,47 @@ export class Commerce7Provider implements CrmProvider {
       );
     }
 
-    return data.orders.map((order: any) => ({
+    let orders = this.mapOrderResponse(data.orders || []);
+
+    if (customerId) {
+      orders = orders.filter((o: any) => o.customerId === customerId);
+    }
+
+    return orders;
+  }
+
+  /** Try C7 customer/contact orders endpoint - returns null if not supported */
+  private async fetchOrdersByContact(customerId: string): Promise<CrmOrder[] | null> {
+    const endpoints = [
+      `${API_URL}/customer/${customerId}/order`,
+      `${API_URL}/contact/${customerId}/order`,
+    ];
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, {
+          headers: {
+            Accept: "application/json",
+            Authorization: getApiAuth(),
+            tenant: this.tenantId,
+          },
+        });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data.errors?.length) continue;
+        const orderList = Array.isArray(data) ? data : data.orders || data.order || [];
+        const orders = Array.isArray(orderList) ? orderList : [orderList];
+        return this.mapOrderResponse(orders, customerId);
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  private mapOrderResponse(orders: any[], defaultCustomerId?: string): CrmOrder[] {
+    return orders.map((order: any) => ({
       id: order.id,
-      customerId: order.customerId,
+      customerId: order.customerId ?? order.contactId ?? defaultCustomerId,
       total: order.total,
       status: order.status,
       createdAt: order.createdAt,
@@ -2494,6 +2548,7 @@ export class Commerce7Provider implements CrmProvider {
     });
 
     const result = await response.json();
+    console.log('updateLoyaltyTier result', result);
     handleC7ApiError(result, 'updating loyalty tier');
 
     return result;
@@ -2987,7 +3042,8 @@ export class Commerce7Provider implements CrmProvider {
     const data = await response.json();
     handleC7ApiError(data, 'Create Customer Credit Card');
     
-    return fromC7Payment(data);
+    const cardData = data.customerCreditCard || data.creditCard || data;
+    return fromC7Payment(cardData);
   }
 
   // ============================================

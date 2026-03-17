@@ -42,10 +42,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   // Get communication preferences
   const preferences = await db.getCommunicationPreferences(enrollment.customers.id);
   
+  const communicationConfig = await db.getCommunicationConfig(session.clientId);
+  const smsSupported = !!(communicationConfig?.sms_provider && communicationConfig?.sms_from_number);
+  
   return {
     session,
     enrollment,
     preferences,
+    smsSupported,
   };
 }
 
@@ -86,6 +90,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return { success: false, error: 'Enrollment not found' };
       }
       
+      const communicationConfig = await db.getCommunicationConfig(session.clientId);
+      const smsSupported = !!(communicationConfig?.sms_provider && communicationConfig?.sms_from_number);
+      
       // Get customer ID from form or enrollment
       const customerId = (formData.get('customer_id') as string) || enrollment.customers.id;
       
@@ -94,8 +101,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
       await db.upsertCommunicationPreferences(customerId, {
         ...currentPreferences,
         emailMarketing: formData.get('email_marketing') === 'true',
-        smsTransactional: formData.get('sms_transactional') === 'true',
-        smsMarketing: formData.get('sms_marketing') === 'true',
+        smsTransactional: smsSupported ? formData.get('sms_transactional') === 'true' : false,
+        smsMarketing: smsSupported ? formData.get('sms_marketing') === 'true' : false,
         unsubscribedAll: formData.get('unsubscribed_all') === 'true',
       });
       
@@ -115,7 +122,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function MemberDetail() {
-  const { session, enrollment, preferences } = useLoaderData<typeof loader>();
+  const { session, enrollment, preferences, smsSupported } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
   
@@ -334,6 +341,7 @@ export default function MemberDetail() {
               customerId={enrollment.customers.id}
               showSmsOptInStatus={true}
               readOnly={false}
+              smsSupported={smsSupported}
             />
             
           </BlockStack>

@@ -24,6 +24,7 @@ interface CommunicationPreferencesFormProps {
   actionUrl?: string; // Optional custom action URL (defaults to current route)
   showSmsOptInStatus?: boolean; // Whether to show SMS opt-in status info
   readOnly?: boolean; // If true, form is read-only (for customer view before confirmation)
+  smsSupported?: boolean; // If false, hide SMS opt-in options (client has not configured SMS)
 }
 
 export function CommunicationPreferencesForm({
@@ -32,6 +33,7 @@ export function CommunicationPreferencesForm({
   actionUrl,
   showSmsOptInStatus = true,
   readOnly = false,
+  smsSupported = true,
 }: CommunicationPreferencesFormProps) {
   // Form state for communication preferences
   const [formState, setFormState] = useState({
@@ -96,61 +98,72 @@ export function CommunicationPreferencesForm({
               />
             </BlockStack>
 
-            <Divider />
+            {smsSupported && (
+              <>
+                <Divider />
 
-            <BlockStack gap="300">
-              <Text variant="headingSm" as="h3">SMS Preferences</Text>
-              {showSmsOptInStatus && preferences.smsOptInMethod && (
-                <Text variant="bodySm" as="p" tone="subdued">
-                  Opt-in method: {preferences.smsOptInMethod.replace('_', ' ')}
-                  {preferences.smsOptInConfirmedAt && ' (Confirmed)'}
-                  {preferences.smsOptInRequestSentAt &&
-                    !preferences.smsOptInConfirmedAt &&
-                    ' (Pending confirmation)'}
-                </Text>
-              )}
+                <BlockStack gap="300">
+                  <Text variant="headingSm" as="h3">SMS Preferences</Text>
+                  {showSmsOptInStatus && preferences.smsOptInMethod && (
+                    <Text variant="bodySm" as="p" tone="subdued">
+                      Opt-in method: {preferences.smsOptInMethod.replace('_', ' ')}
+                      {preferences.smsOptInConfirmedAt && ' (Confirmed)'}
+                      {preferences.smsOptInRequestSentAt &&
+                        !preferences.smsOptInConfirmedAt &&
+                        ' (Pending confirmation)'}
+                    </Text>
+                  )}
 
-              {!readOnly && (
-                <Banner tone="info">
-                  <Text variant="bodySm" as="p">
-                    <strong>SMS Communications:</strong> By checking the boxes below, you agree to receive SMS text messages. 
-                    Message frequency varies. Message and data rates may apply. Reply STOP to opt-out at any time. Reply HELP for help.
-                  </Text>
-                </Banner>
-              )}
+                  {!readOnly && (
+                    <Banner tone="info">
+                      <Text variant="bodySm" as="p">
+                        <strong>SMS Communications:</strong> By checking the boxes below, you agree to receive SMS text messages. 
+                        Message frequency varies. Message and data rates may apply. Reply STOP to opt-out at any time. Reply HELP for help.
+                      </Text>
+                    </Banner>
+                  )}
 
-              <Checkbox
-                label="I agree to receive SMS text messages for account notifications (monthly membership status updates, expiration warnings, and tier upgrade notifications)"
-                checked={formState.smsTransactional}
-                disabled={readOnly || formState.unsubscribedAll || smsDisabled}
-                onChange={(checked) =>
-                  setFormState({ ...formState, smsTransactional: checked })
-                }
-                helpText="Message and data rates may apply. Reply STOP to opt out anytime."
-              />
-              <input
-                type="hidden"
-                name="sms_transactional"
-                value={formState.smsTransactional ? 'true' : 'false'}
-              />
+                  <Checkbox
+                    label="I agree to receive SMS text messages for account notifications (monthly membership status updates, expiration warnings, and tier upgrade notifications)"
+                    checked={formState.smsTransactional}
+                    disabled={readOnly || formState.unsubscribedAll || smsDisabled}
+                    onChange={(checked) =>
+                      setFormState({ ...formState, smsTransactional: checked })
+                    }
+                    helpText="Message and data rates may apply. Reply STOP to opt out anytime."
+                  />
+                  <input
+                    type="hidden"
+                    name="sms_transactional"
+                    value={formState.smsTransactional ? 'true' : 'false'}
+                  />
 
-              <Checkbox
-                label="I agree to receive SMS text messages for marketing (promotions, product suggestions, and special offers)"
-                checked={formState.smsMarketing}
-                disabled={readOnly || formState.unsubscribedAll || smsDisabled}
-                onChange={(checked) =>
-                  setFormState({ ...formState, smsMarketing: checked })
-                }
-                helpText="Message and data rates may apply. Reply STOP to opt out anytime."
-              />
-              <input
-                type="hidden"
-                name="sms_marketing"
-                value={formState.smsMarketing ? 'true' : 'false'}
-              />
-            </BlockStack>
+                  <Checkbox
+                    label="I agree to receive SMS text messages for marketing (promotions, product suggestions, and special offers)"
+                    checked={formState.smsMarketing}
+                    disabled={readOnly || formState.unsubscribedAll || smsDisabled}
+                    onChange={(checked) =>
+                      setFormState({ ...formState, smsMarketing: checked })
+                    }
+                    helpText="Message and data rates may apply. Reply STOP to opt out anytime."
+                  />
+                  <input
+                    type="hidden"
+                    name="sms_marketing"
+                    value={formState.smsMarketing ? 'true' : 'false'}
+                  />
+                </BlockStack>
 
-            <Divider />
+                <Divider />
+              </>
+            )}
+
+            {!smsSupported && (
+              <>
+                <input type="hidden" name="sms_transactional" value="false" />
+                <input type="hidden" name="sms_marketing" value="false" />
+              </>
+            )}
 
             <Checkbox
               label="Unsubscribe from all communications"

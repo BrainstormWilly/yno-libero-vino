@@ -24,6 +24,7 @@ import * as crm from '~/lib/crm/index.server';
 import { deleteTierCrmResources } from '~/lib/club-tier-promotions.server';
 import type { loader as tierLayoutLoader } from './app.settings.club_tiers.$id';
 import TierDetailsForm from '~/components/TierDetailsForm';
+import { TierLoyaltySection } from '~/components/TierLoyaltySection';
 
 export async function action({ request, params }: ActionFunctionArgs) {
   const session = await getAppSession(request);
@@ -46,23 +47,24 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const upgradable = formData.get('upgradable') !== 'false';
 
     if (!tierName) {
-      return { success: false, message: 'Tier name is required.' };
+      return { success: false, message: 'Tier name is required.', action: 'update_tier' };
     }
     if (Number.isNaN(durationMonths) || durationMonths < 1 || durationMonths > 12) {
-      return { success: false, message: 'Duration must be between 1 and 12 months.' };
+      return { success: false, message: 'Duration must be between 1 and 12 months.', action: 'update_tier' };
     }
     if (Number.isNaN(minLtvAmount) || minLtvAmount <= 0) {
-      return { success: false, message: 'Minimum Annual LTV is required and must be greater than 0.' };
+      return { success: false, message: 'Minimum Annual LTV is required and must be greater than 0.', action: 'update_tier' };
     }
     if (initialQualificationAllowed && overrideRaw !== '' && overrideRaw != null) {
       const overrideNum = parseFloat(overrideRaw);
       if (Number.isNaN(overrideNum)) {
-        return { success: false, message: 'Initial purchase amount must be a number.' };
+        return { success: false, message: 'Initial purchase amount must be a number.', action: 'update_tier' };
       }
       if (overrideNum > minLtvAmount) {
         return {
           success: false,
           message: 'Initial purchase amount cannot exceed Minimum Annual LTV.',
+          action: 'update_tier',
         };
       }
     }
@@ -97,6 +99,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     return {
       success: true,
       message: 'Tier updated successfully',
+      action: 'update_tier',
     };
   }
 
@@ -106,6 +109,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return {
         success: false,
         message: 'Cannot delete a tier that has members. Move or remove members first.',
+        action: 'delete_tier',
       };
     }
 
@@ -115,6 +119,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return {
         success: false,
         message: `Failed to delete tier in CRM: ${err instanceof Error ? err.message : 'Unknown error'}. Tier was not deleted.`,
+        action: 'delete_tier',
       };
     }
 
@@ -133,7 +138,84 @@ export async function action({ request, params }: ActionFunctionArgs) {
       redirect: redirectUrl,
     };
   }
-  
+
+  if (actionType === 'toggle_loyalty') {
+    const enabled = formData.get('loyalty_enabled') === 'true';
+    let message: string;
+
+    if (enabled) {
+      const earnRate = parseFloat(formData.get('earn_rate') as string) / 100;
+      const bonus = parseInt(formData.get('bonus_points') as string || '0');
+
+      const tier = await db.getClubStageWithDetails(tierId);
+      const existingLoyalty = await db.getTierLoyaltyConfig(tierId);
+      const provider = crm.crmManager.getProvider(
+        session.crmType,
+        session.tenantShop,
+        session.accessToken
+      );
+
+      if (!existingLoyalty && tier?.c7_club_id) {
+        try {
+          const loyaltyTier = await provider.createLoyaltyTier({
+            title: `${tier.name} Rewards`,
+            qualificationType: 'Club',
+            clubsToQualify: [{ id: tier.c7_club_id }],
+            earnRate,
+            sortOrder: 0,
+          });
+          await db.createTierLoyaltyConfig({
+            stageId: tierId,
+            c7LoyaltyTierId: loyaltyTier.id,
+            tierTitle: loyaltyTier.title,
+            earnRate,
+            initialPointsBonus: bonus,
+          });
+        } catch (error) {
+          console.error('Failed to create loyalty tier:', error);
+        }
+        message = 'Loyalty rewards enabled';
+      } else if (existingLoyalty) {
+        try {
+          if (provider.updateLoyaltyTier) {
+            await provider.updateLoyaltyTier(existingLoyalty.c7_loyalty_tier_id, { earnRate });
+          }
+          await db.updateTierLoyaltyConfig(tierId, {
+            earnRate,
+            initialPointsBonus: bonus,
+          });
+        } catch (error) {
+          console.error('Failed to update loyalty tier:', error);
+        }
+        message = 'Loyalty config updated';
+      } else {
+        message = 'Loyalty rewards enabled';
+      }
+    } else {
+      const loyalty = await db.getTierLoyaltyConfig(tierId);
+      if (loyalty) {
+        const provider = crm.crmManager.getProvider(
+          session.crmType,
+          session.tenantShop,
+          session.accessToken
+        );
+        try {
+          await provider.deleteLoyaltyTier(loyalty.c7_loyalty_tier_id);
+        } catch (error) {
+          console.error('Failed to delete loyalty tier from CRM:', error);
+        }
+      }
+      await db.deleteTierLoyaltyConfig(tierId);
+      message = 'Loyalty rewards disabled';
+    }
+
+    return {
+      success: true,
+      message,
+      action: 'toggle_loyalty',
+    };
+  }
+
   return {
     success: false,
     message: 'Invalid action',
@@ -144,7 +226,7 @@ export default function TierDetail() {
   const parentData = useRouteLoaderData<typeof tierLayoutLoader>('routes/app.settings.club_tiers.$id');
   if (!parentData) throw new Error('Parent loader data not found');
   
-  const { session, tier, promotions, enrollmentCount } = parentData;
+  const { session, tier, promotions, enrollmentCount, loyalty } = parentData;
   const actionData = useActionData<typeof action>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -152,6 +234,8 @@ export default function TierDetail() {
   const navigation = useNavigation();
   const { smUp } = useBreakpoints();
   
+  const [tierBannerDismissed, setTierBannerDismissed] = useState(false);
+  const [deleteBannerDismissed, setDeleteBannerDismissed] = useState(false);
   const [tierName, setTierName] = useState(tier.name);
   const [durationMonths, setDurationMonths] = useState(String(tier.duration_months));
   const [minLtvAmount, setMinLtvAmount] = useState(String(tier.min_ltv_amount ?? 600));
@@ -263,6 +347,12 @@ export default function TierDetail() {
     setInitialQualificationAllowed(tier.initial_qualification_allowed ?? true);
   }, [tier.id, tier.name, tier.duration_months, tier.min_ltv_amount, tier.min_purchase_amount, tier.initial_qualification_allowed]);
   
+  // Reset banner dismissed state when new action data arrives
+  useEffect(() => {
+    if (actionData?.action === 'update_tier') setTierBannerDismissed(false);
+    if (actionData?.action === 'delete_tier') setDeleteBannerDismissed(false);
+  }, [actionData]);
+
   // Handle redirect from action
   useEffect(() => {
     if (actionData?.success && actionData.redirect) {
@@ -307,8 +397,12 @@ export default function TierDetail() {
       ]}
     >
       <BlockStack gap={{ xs: "800", sm: "400" }}>
-        {actionData && (
-          <Banner tone={actionData.success ? 'success' : 'critical'} title={actionData.message} />
+        {actionData?.action === 'delete_tier' && !deleteBannerDismissed && (
+          <Banner
+            tone={actionData.success ? 'success' : 'critical'}
+            title={actionData.message}
+            onDismiss={() => setDeleteBannerDismissed(true)}
+          />
         )}
         {enrollmentCount > 0 && (
           <Banner tone="warning">
@@ -339,7 +433,16 @@ export default function TierDetail() {
                 if (!validation.isValid) e.preventDefault();
               }}
             >
-              <TierDetailsForm
+              <BlockStack gap="400">
+                {actionData?.action === 'update_tier' && !tierBannerDismissed && (
+                  <Banner
+                    tone={actionData.success ? 'success' : 'critical'}
+                    onDismiss={() => setTierBannerDismissed(true)}
+                  >
+                    {actionData.message}
+                  </Banner>
+                )}
+                <TierDetailsForm
                 tierName={tierName}
                 durationMonths={durationMonths}
                 minLtvAmount={minLtvAmount}
@@ -366,6 +469,7 @@ export default function TierDetail() {
                 minLtvAmountError={validation.errors.minLtvAmount}
                 minPurchaseOverrideError={validation.errors.minPurchaseOverride}
               />
+              </BlockStack>
             </Form>
           </Card>
         </InlineGrid>
@@ -431,6 +535,35 @@ export default function TierDetail() {
               )}
             </BlockStack>
           </Card>
+        </InlineGrid>
+        {smUp ? <Divider /> : null}
+
+        {/* Loyalty Section */}
+        <InlineGrid columns={{ xs: '1fr', md: '2fr 5fr' }} gap="400">
+          <Box
+            as="section"
+            paddingInlineStart={{ xs: '400', sm: '0' }}
+            paddingInlineEnd={{ xs: '400', sm: '0' }}
+          >
+            <BlockStack gap="400">
+              <Text as="h3" variant="headingMd">
+                Loyalty Rewards
+              </Text>
+              <Text as="p" variant="bodyMd">
+                Configure points earning rate and welcome bonus for members in this tier. Members
+                earn points on all purchases when loyalty is enabled.
+              </Text>
+            </BlockStack>
+          </Box>
+          <TierLoyaltySection
+            loyalty={loyalty}
+            tier={tier}
+            actionResult={
+              actionData?.action === 'toggle_loyalty'
+                ? { success: actionData.success, message: actionData.message }
+                : null
+            }
+          />
         </InlineGrid>
       </BlockStack>
     </Page>

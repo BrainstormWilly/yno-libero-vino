@@ -145,13 +145,34 @@ export async function action({ request }: ActionFunctionArgs) {
         phone: phone || draft.customer.phone || undefined,
         isDefault: false, // Shipping address
       });
+
+      let shippingAddressId = shippingAddress.id;
+      if (!shippingAddressId) {
+        const addresses = await provider.getCustomerAddresses(draft.customer.crmId);
+        const match = addresses.find((address: any) =>
+          address.address1?.trim() === address1.trim() &&
+          (address.address2 || '').trim() === (address2 || '').trim() &&
+          address.city?.trim() === city.trim() &&
+          address.state?.trim() === state.trim() &&
+          address.zip?.trim() === zip.trim()
+        );
+        shippingAddressId = match?.id;
+      }
+
+      if (!shippingAddressId) {
+        return {
+          success: false,
+          error: 'Shipping address was created but no ID was returned. Please select it from existing addresses.',
+        };
+      }
       
       // Update draft with shipping address ID and full details
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
         customer: {
           ...draft.customer!,
-          shippingAddressId: shippingAddress.id!,
+          billingAddressId: draft.customer!.billingAddressId || shippingAddressId,
+          shippingAddressId,
         },
         address: {
           billing: draft.address?.billing || {
@@ -184,6 +205,10 @@ export async function action({ request }: ActionFunctionArgs) {
       // Shipping address details same as billing
       await db.updateEnrollmentDraft(session.id, {
         ...draft,
+        customer: {
+          ...draft.customer!,
+          shippingAddressId: draft.customer.billingAddressId,
+        },
         address: {
           billing: draft.address?.billing || {
             address1: '',

@@ -17,12 +17,14 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   
   const promotions = await db.getStagePromotions(tierId);
   const enrollmentCount = await db.getEnrollmentCountForStage(tierId);
+  const loyalty = await db.getTierLoyaltyConfig(tierId);
   
   return {
     session,
     tier,
     promotions,
     enrollmentCount,
+    loyalty,
   };
 }
 

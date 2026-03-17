@@ -17,6 +17,8 @@ export type C7CustomerResponse = {
   phones?: Array<{ phone: string; id?: string }>;
   createdAt: string;
   updatedAt: string;
+  /** C7 order info - lifetimeValue is in cents */
+  orderInformation?: { lifetimeValue?: number };
 };
 
 export type C7AddressResponse = {
@@ -55,16 +57,24 @@ export type C7CreditCardResponse = {
 // Conversion Functions: FROM Commerce7
 // ============================================
 
-export const fromC7Customer = (c7Customer: C7CustomerResponse): import('~/types/crm').CrmCustomer => ({
-  id: c7Customer.id,
-  email: c7Customer.emails[0].email,
-  firstName: c7Customer.firstName,
-  lastName: c7Customer.lastName,
-  phone: c7Customer.phones?.[0]?.phone,
-  createdAt: c7Customer.createdAt,
-  updatedAt: c7Customer.updatedAt,
-  emailMarketingStatus: (c7Customer as any).emailMarketingStatus, // May not exist on all C7 customer responses
-});
+export const fromC7Customer = (c7Customer: C7CustomerResponse): import('~/types/crm').CrmCustomer => {
+  const base = {
+    id: c7Customer.id,
+    email: c7Customer.emails[0].email,
+    firstName: c7Customer.firstName,
+    lastName: c7Customer.lastName,
+    phone: c7Customer.phones?.[0]?.phone,
+    createdAt: c7Customer.createdAt,
+    updatedAt: c7Customer.updatedAt,
+    emailMarketingStatus: (c7Customer as any).emailMarketingStatus, // May not exist on all C7 customer responses
+  };
+  // Use orderInformation.lifetimeValue from C7 when present (in cents)
+  const ltvCents = c7Customer.orderInformation?.lifetimeValue;
+  return {
+    ...base,
+    ...(ltvCents != null && ltvCents >= 0 ? { ltv: ltvCents / 100 } : {}),
+  };
+};
 
 export const fromC7Address = (c7Address: C7AddressResponse): CustomerAddress => ({
   id: c7Address.id,

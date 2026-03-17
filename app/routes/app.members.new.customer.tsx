@@ -34,14 +34,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     throw new Response('No tier selected', { status: 400 });
   }
   
-  // If customer already exists in draft, redirect to address
-  if (draft.customer?.isExisting) {
-    throw Response.redirect(addSessionToUrl('/app/members/new/address', session.id));
-  }
-  
+  const communicationConfig = await db.getCommunicationConfig(session.clientId);
+  const smsSupported = !!(communicationConfig?.sms_provider && communicationConfig?.sms_from_number);
+
   return {
     session,
     draft,
+    smsSupported,
   };
 }
 
@@ -51,17 +50,15 @@ export async function action({ request }: ActionFunctionArgs) {
     throw new Error('Session not found');
   }
   
+  const draft = await db.getEnrollmentDraft(session.id);
+  if (!draft || !draft.tier) {
+    return { success: false, error: 'Incomplete enrollment data' };
+  }
+
+  const communicationConfig = await db.getCommunicationConfig(session.clientId);
+  const smsSupported = !!(communicationConfig?.sms_provider && communicationConfig?.sms_from_number);
+
   const formData = await request.formData();
-  const email = formData.get('email') as string;
-  const firstName = formData.get('first_name') as string;
-  const lastName = formData.get('last_name') as string;
-  const phone = formData.get('phone') as string;
-  const birthdate = formData.get('birthdate') as string;
-  const address1 = formData.get('address_1') as string;
-  const address2 = formData.get('address_2') as string;
-  const city = formData.get('city') as string;
-  const state = formData.get('state') as string;
-  const zip = formData.get('zip') as string;
   const parseBool = (value: FormDataEntryValue | null) => value === 'true';
   const unsubscribedAll = parseBool(formData.get('pref_unsubscribed_all'));
   const preferences = unsubscribedAll
@@ -73,10 +70,38 @@ export async function action({ request }: ActionFunctionArgs) {
       }
     : {
         emailMarketing: parseBool(formData.get('pref_email_marketing')),
-        smsTransactional: parseBool(formData.get('pref_sms_transactional')),
-        smsMarketing: parseBool(formData.get('pref_sms_marketing')),
+        smsTransactional: smsSupported ? parseBool(formData.get('pref_sms_transactional')) : false,
+        smsMarketing: smsSupported ? parseBool(formData.get('pref_sms_marketing')) : false,
         unsubscribedAll: false,
       };
+  
+  // Existing customer: preferences only (LiberoVino opt-in)
+  if (draft.customer?.isExisting) {
+    if ((preferences.smsTransactional || preferences.smsMarketing) && !draft.customer.phone?.trim()) {
+      return {
+        success: false,
+        error: 'Phone number is required when opting into SMS. Add it in the CRM and refresh, or choose options that do not require SMS.',
+      };
+    }
+    await db.updateEnrollmentDraft(session.id, { ...draft, preferences });
+    // If already past address/payment (e.g. from review Edit), go back to review
+    const nextStep = draft.addressVerified && draft.paymentVerified
+      ? '/app/members/new/review'
+      : '/app/members/new/address';
+    throw redirectWithSession(nextStep, session.id);
+  }
+  
+  // New customer: create in CRM
+  const email = formData.get('email') as string;
+  const firstName = formData.get('first_name') as string;
+  const lastName = formData.get('last_name') as string;
+  const phone = formData.get('phone') as string;
+  const birthdate = formData.get('birthdate') as string;
+  const address1 = formData.get('address_1') as string;
+  const address2 = formData.get('address_2') as string;
+  const city = formData.get('city') as string;
+  const state = formData.get('state') as string;
+  const zip = formData.get('zip') as string;
   
   if (!email || !firstName || !lastName || !birthdate || !address1 || !city || !state || !zip) {
     return {
@@ -85,7 +110,6 @@ export async function action({ request }: ActionFunctionArgs) {
     };
   }
   
-  // Validate phone number is provided if SMS preferences are selected
   if ((preferences.smsTransactional || preferences.smsMarketing) && !phone?.trim()) {
     return {
       success: false,
@@ -165,9 +189,10 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function CustomerDetails() {
-  const { draft, session } = useLoaderData<typeof loader>();
+  const { draft, session, smsSupported } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigate = useNavigate();
+  const isExisting = draft?.customer?.isExisting ?? false;
   
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -181,8 +206,8 @@ export default function CustomerDetails() {
   const [zip, setZip] = useState('');
   const defaultPreferences = draft?.preferences ?? DEFAULT_COMMUNICATION_PREFERENCES;
   const [emailMarketing, setEmailMarketing] = useState(defaultPreferences.emailMarketing);
-  const [smsTransactional, setSmsTransactional] = useState(defaultPreferences.smsTransactional);
-  const [smsMarketing, setSmsMarketing] = useState(defaultPreferences.smsMarketing);
+  const [smsTransactional, setSmsTransactional] = useState(smsSupported ? defaultPreferences.smsTransactional : false);
+  const [smsMarketing, setSmsMarketing] = useState(smsSupported ? defaultPreferences.smsMarketing : false);
   const [unsubscribedAll, setUnsubscribedAll] = useState(defaultPreferences.unsubscribedAll);
   const [showUnsubscribeModal, setShowUnsubscribeModal] = useState(false);
 
@@ -235,10 +260,12 @@ export default function CustomerDetails() {
         <Card>
           <BlockStack gap="300">
             <Text variant="headingMd" as="h2">
-              Step 2: Customer & Billing Address
+              Step 2: {isExisting ? 'Communication Preferences' : 'Customer & Billing Address'}
             </Text>
             <Text variant="bodyMd" as="p">
-              Create a new customer account with billing address. This information will be saved in the connected CRM.
+              {isExisting
+                ? 'Set the member\'s LiberoVino communication preferences. This opt-in is separate from any settings in your CRM.'
+                : 'Create a new customer account with billing address. This information will be saved in the connected CRM.'}
             </Text>
             {draft?.tier && (
               <Banner tone="info">
@@ -248,10 +275,36 @@ export default function CustomerDetails() {
           </BlockStack>
         </Card>
         
-        {/* Customer + Address Form */}
+        {/* Existing customer: read-only info + preferences only */}
+        {isExisting && (
+          <Card>
+            <BlockStack gap="400">
+              <Text variant="headingMd" as="h3">
+                Customer
+              </Text>
+              <BlockStack gap="200">
+                <Text variant="bodyMd" as="p">
+                  <strong>{draft.customer?.firstName} {draft.customer?.lastName}</strong>
+                </Text>
+                <Text variant="bodySm" as="p" tone="subdued">
+                  {draft.customer?.email}
+                </Text>
+                {draft.customer?.phone && (
+                  <Text variant="bodySm" as="p" tone="subdued">
+                    {draft.customer.phone}
+                  </Text>
+                )}
+              </BlockStack>
+            </BlockStack>
+          </Card>
+        )}
+        
+        {/* Customer + Address Form (new) or Preferences only (existing) */}
         <Card>
           <Form method="post">
             <BlockStack gap="400">
+              {!isExisting && (
+                <>
               <Text variant="headingMd" as="h3">
                 Customer Information
               </Text>
@@ -292,11 +345,13 @@ export default function CustomerDetails() {
                 value={phone}
                 onChange={setPhone}
                 autoComplete="tel"
-                requiredIndicator={smsTransactional || smsMarketing}
+                requiredIndicator={smsSupported && (smsTransactional || smsMarketing)}
                 helpText={
-                  (smsTransactional || smsMarketing)
-                    ? "Required to receive SMS messages"
-                    : "Optional, but required if you opt into SMS communications"
+                  !smsSupported
+                    ? "Optional"
+                    : (smsTransactional || smsMarketing)
+                      ? "Required to receive SMS messages"
+                      : "Optional, but required if you opt into SMS communications"
                 }
               />
               
@@ -311,6 +366,8 @@ export default function CustomerDetails() {
               />
               
               <Divider />
+              </>
+              )}
               
               <Text variant="headingMd" as="h3">
                 Communication Preferences
@@ -339,40 +396,54 @@ export default function CustomerDetails() {
                 SMS Communications
               </Text>
               
-              <Banner tone="warning">
-                <BlockStack gap="200">
-                  <Text variant="bodySm" as="p" fontWeight="semibold">
-                    By opting into SMS, you agree to receive automated text messages:
+              {smsSupported ? (
+                <>
+                  <Banner tone="info">
+                    <Text variant="bodySm" as="p">
+                      SMS is enabled in your communication settings. Member opt-in below will sync to your SMS provider.
+                    </Text>
+                  </Banner>
+                  <Banner tone="warning">
+                    <BlockStack gap="200">
+                      <Text variant="bodySm" as="p" fontWeight="semibold">
+                        By opting into SMS, you agree to receive automated text messages:
+                      </Text>
+                      <List type="bullet">
+                        <List.Item>
+                          <strong>Transactional SMS:</strong> Monthly membership status updates and expiration warnings
+                        </List.Item>
+                        <List.Item>
+                          <strong>Marketing SMS:</strong> Promotional offers and product suggestions
+                        </List.Item>
+                      </List>
+                      <Text variant="bodySm" as="p" tone="subdued">
+                        Message frequency varies. Message and data rates may apply. Reply STOP to opt-out at any time.
+                        Reply HELP for help. Carriers are not liable for delayed or undelivered messages.
+                      </Text>
+                    </BlockStack>
+                  </Banner>
+                  <Checkbox
+                    label="I agree to receive SMS transactional messages (monthly status updates and expiration warnings)"
+                    checked={smsTransactional}
+                    onChange={handlePreferenceChange(setSmsTransactional)}
+                    helpText={isExisting ? "Customer must have a phone number in your CRM to receive SMS." : "You must provide a phone number above to receive SMS messages."}
+                    disabled={unsubscribedAll}
+                  />
+                  <Checkbox
+                    label="I agree to receive SMS marketing messages (promotions and product suggestions)"
+                    checked={smsMarketing}
+                    onChange={handlePreferenceChange(setSmsMarketing)}
+                    helpText={isExisting ? "Customer must have a phone number in your CRM to receive SMS." : "You must provide a phone number above to receive SMS messages."}
+                    disabled={unsubscribedAll}
+                  />
+                </>
+              ) : (
+                <Banner tone="info">
+                  <Text variant="bodySm" as="p">
+                    SMS is not configured for your account. Configure SMS in Settings → Communication to enable member opt-in.
                   </Text>
-                  <List type="bullet">
-                    <List.Item>
-                      <strong>Transactional SMS:</strong> Monthly membership status updates and expiration warnings
-                    </List.Item>
-                    <List.Item>
-                      <strong>Marketing SMS:</strong> Promotional offers and product suggestions
-                    </List.Item>
-                  </List>
-                  <Text variant="bodySm" as="p" tone="subdued">
-                    Message frequency varies. Message and data rates may apply. Reply STOP to opt-out at any time. 
-                    Reply HELP for help. Carriers are not liable for delayed or undelivered messages.
-                  </Text>
-                </BlockStack>
-              </Banner>
-              
-              <Checkbox
-                label="I agree to receive SMS transactional messages (monthly status updates and expiration warnings)"
-                checked={smsTransactional}
-                onChange={handlePreferenceChange(setSmsTransactional)}
-                helpText="You must provide a phone number above to receive SMS messages."
-                disabled={unsubscribedAll}
-              />
-              <Checkbox
-                label="I agree to receive SMS marketing messages (promotions and product suggestions)"
-                checked={smsMarketing}
-                onChange={handlePreferenceChange(setSmsMarketing)}
-                helpText="You must provide a phone number above to receive SMS messages."
-                disabled={unsubscribedAll}
-              />
+                </Banner>
+              )}
               
               <Divider />
               
@@ -383,6 +454,8 @@ export default function CustomerDetails() {
                 helpText="Overrides the individual settings above."
               />
               
+              {!isExisting && (
+                <>
               <Divider />
               
               <Text variant="headingMd" as="h3">
@@ -434,6 +507,8 @@ export default function CustomerDetails() {
                   />
                 </div>
               </InlineStack>
+              </>
+              )}
               
               <input type="hidden" name="email" value={email} />
               <input type="hidden" name="first_name" value={firstName} />
@@ -471,19 +546,21 @@ export default function CustomerDetails() {
                   variant="primary"
                   submit
                   disabled={
-                    !email || 
-                    !firstName || 
-                    !lastName || 
-                    !birthdate || 
-                    !address1 || 
-                    !city || 
-                    !state || 
-                    !zip ||
-                    ((smsTransactional || smsMarketing) && !phone?.trim())
+                    isExisting
+                      ? false // Action validates phone if SMS selected
+                      : !email || 
+                        !firstName || 
+                        !lastName || 
+                        !birthdate || 
+                        !address1 || 
+                        !city || 
+                        !state || 
+                        !zip ||
+                        ((smsTransactional || smsMarketing) && !phone?.trim())
                   }
                   size="large"
                 >
-                  Continue to Additional Addresses →
+                  {isExisting ? 'Continue to Address Selection →' : 'Continue to Additional Addresses →'}
                 </Button>
               </Box>
             </BlockStack>

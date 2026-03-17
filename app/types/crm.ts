@@ -210,6 +210,7 @@ export interface CrmProvider {
   
   // Loyalty tier operations (optional feature)
   createLoyaltyTier(data: any): Promise<any>;
+  updateLoyaltyTier?(loyaltyTierId: string, data: any): Promise<any>;
   deleteLoyaltyTier(loyaltyTierId: string): Promise<void>;
 
   // Optional loyalty bonus helper (used by Commerce7)
